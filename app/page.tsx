@@ -18,6 +18,12 @@ export default function LandingPage() {
           יצירת חשבון לעסק
         </Link>
         <Link
+          href="/login"
+          className="rounded-full border border-neutral-500 px-6 py-2 text-sm font-semibold hover:border-white transition"
+        >
+          התחברות עסק קיים
+        </Link>
+        <Link
           href="/super-admin/login"
           className="rounded-full border border-neutral-500 px-6 py-2 text-sm font-semibold hover:border-white transition"
         >
