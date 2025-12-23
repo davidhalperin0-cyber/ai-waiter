@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
 import toast from 'react-hot-toast';
@@ -78,6 +78,10 @@ export default function DashboardPage() {
   const [editingItem, setEditingItem] = useState<DashboardMenuItem | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const fileInputGalleryRef = useRef<HTMLInputElement | null>(null);
+  const fileInputCameraRef = useRef<HTMLInputElement | null>(null);
 
   const [newItem, setNewItem] = useState({
     category: '',
@@ -259,7 +263,7 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           businessId,
-          category: newItem.category,
+          category: newItem.category.trim(),
           name: newItem.name,
           nameEn: newItem.nameEn || undefined,
           price: priceNumber,
@@ -348,7 +352,7 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           businessId,
-          category: newItem.category,
+          category: newItem.category.trim(),
           name: newItem.name,
           nameEn: newItem.nameEn || undefined,
           price: priceNumber,
@@ -370,10 +374,13 @@ export default function DashboardPage() {
       setNewItem({
         category: '',
         name: '',
+        nameEn: '',
         price: '',
         imageUrl: '',
         ingredients: '',
+        ingredientsEn: '',
         allergens: '',
+        allergensEn: '',
         isFeatured: false,
         isPregnancySafe: false,
         isBusiness: false,
@@ -524,6 +531,40 @@ export default function DashboardPage() {
       setSelectedTable(tableId);
     } catch (err) {
       setError('נכשל ביצירת קוד QR');
+    }
+  }
+
+  async function handleImageUpload(file: File) {
+    if (!businessId) {
+      toast.error('מזהה עסק לא נמצא, אנא התחברו מחדש.');
+      return;
+    }
+    try {
+      setUploadingImage(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('businessId', businessId);
+
+      const res = await fetch('/api/upload/image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'העלאת תמונה נכשלה');
+      }
+
+      if (!data.url) {
+        throw new Error('לא התקבל URL לתמונה מהשרת');
+      }
+
+      setNewItem((prev) => ({ ...prev, imageUrl: data.url }));
+      toast.success('התמונה הועלתה בהצלחה ונשמרה לפריט!');
+    } catch (err: any) {
+      toast.error(err.message || 'העלאת תמונה נכשלה');
+    } finally {
+      setUploadingImage(false);
     }
   }
 
@@ -706,13 +747,73 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2 items-end">
-              <div className="flex-1 min-w-[200px]">
-                <label className="block mb-1 text-neutral-300">URL תמונה (אופציונלי)</label>
+              <div className="flex-1 min-w-[200px] space-y-1">
+                <label className="block mb-1 text-neutral-300">תמונה של המנה</label>
+                {newItem.imageUrl && (
+                  <div className="mb-1">
+                    <img
+                      src={newItem.imageUrl}
+                      alt={newItem.name || 'תמונה'}
+                      className="h-16 w-16 object-cover rounded border border-neutral-700 mb-1"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputGalleryRef.current?.click()}
+                    disabled={uploadingImage}
+                    className="rounded-md bg-white text-black px-3 py-1 text-[11px] font-semibold disabled:opacity-60"
+                  >
+                    העלה מהטלפון / מהמחשב
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fileInputCameraRef.current?.click()}
+                    disabled={uploadingImage}
+                    className="rounded-md bg-neutral-700 text-white px-3 py-1 text-[11px] font-semibold hover:bg-neutral-600 disabled:opacity-60"
+                  >
+                    צלם עכשיו
+                  </button>
+                </div>
+                <input
+                  ref={fileInputGalleryRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      void handleImageUpload(file);
+                      e.target.value = '';
+                    }
+                  }}
+                />
+                <input
+                  ref={fileInputCameraRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      void handleImageUpload(file);
+                      e.target.value = '';
+                    }
+                  }}
+                />
+                <p className="text-[10px] text-neutral-500">
+                  או הדביקו URL קיים:
+                </p>
                 <input
                   type="url"
                   value={newItem.imageUrl}
                   onChange={(e) => setNewItem((v) => ({ ...v, imageUrl: e.target.value }))}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1"
+                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1 text-[11px]"
                   placeholder="https://example.com/image.jpg"
                 />
               </div>
