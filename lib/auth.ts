@@ -1,4 +1,4 @@
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT, jwtVerify, JWTPayload } from 'jose';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -13,7 +13,8 @@ const getSecretKey = () => {
 
 export type AuthRole = "business" | "super_admin";
 
-export interface AuthPayload {
+// Extend JWTPayload so it matches what jose expects while still being typed
+export interface AuthPayload extends JWTPayload {
   businessId: string;
   email: string;
   role: AuthRole;

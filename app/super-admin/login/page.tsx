@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function SuperAdminLoginPage() {
+function SuperAdminLoginInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('from') || '/super-admin';
@@ -109,3 +109,11 @@ export default function SuperAdminLoginPage() {
   );
 }
 
+export default function SuperAdminLoginPage() {
+  // Wrap useSearchParams usage in Suspense to satisfy Next.js requirements
+  return (
+    <Suspense fallback={null}>
+      <SuperAdminLoginInner />
+    </Suspense>
+  );
+}
