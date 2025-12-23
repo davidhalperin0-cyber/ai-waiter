@@ -89,28 +89,6 @@ export function BarThemeModern({ children }: { children: ReactNode }) {
         }}
       />
 
-      {/* Neon sign effect */}
-      {mounted && (
-        <motion.div
-          className="absolute top-6 left-1/2 transform -translate-x-1/2 text-amber-400/40 text-5xl font-bold whitespace-nowrap"
-          animate={{
-            opacity: [0.4, 0.8, 0.4],
-            textShadow: [
-              '0 0 15px rgba(251,191,36,0.6)',
-              '0 0 25px rgba(251,191,36,0.9), 0 0 35px rgba(251,191,36,0.7)',
-              '0 0 15px rgba(251,191,36,0.6)',
-            ],
-          }}
-          transition={{
-            duration: 2,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
-        >
-          🍻 BAR 🍻
-        </motion.div>
-      )}
-
       {/* Content */}
       <div className="relative z-10">{children}</div>
     </div>
