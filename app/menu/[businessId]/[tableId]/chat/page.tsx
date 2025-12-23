@@ -160,9 +160,9 @@ function ChatPageContent({
 
     const now = Date.now();
     const timeSinceOrder = now - session.lastOrderTime;
-    const checkInterval = 1 * 60 * 1000; // 1 minute (לבדיקה - לשנות חזרה ל-15 דקות אחרי)
+    const checkInterval = 10 * 60 * 1000; // 10 minutes
 
-    // Only show if 1+ minute has passed since order
+    // Only show if 10+ minutes have passed since order
     if (timeSinceOrder >= checkInterval) {
       const checkMessage: Message = {
         id: Date.now(),
