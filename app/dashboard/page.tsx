@@ -9,10 +9,13 @@ interface DashboardMenuItem {
   businessId: string;
   category: string;
   name: string;
+  nameEn?: string;
   price: number;
   imageUrl?: string;
   ingredients?: string[];
   allergens?: string[];
+  ingredientsEn?: string[];
+  allergensEn?: string[];
   customizationOptions?: string[];
   isFeatured?: boolean;
   isPregnancySafe?: boolean;
@@ -79,10 +82,13 @@ export default function DashboardPage() {
   const [newItem, setNewItem] = useState({
     category: '',
     name: '',
+    nameEn: '',
     price: '',
     imageUrl: '',
     ingredients: '',
+    ingredientsEn: '',
     allergens: '',
+    allergensEn: '',
     isFeatured: false,
     isPregnancySafe: false,
     isBusiness: false,
@@ -241,6 +247,12 @@ export default function DashboardPage() {
       const allergens = newItem.allergens
         ? newItem.allergens.split(',').map((a) => a.trim()).filter(Boolean)
         : [];
+      const ingredientsEn = newItem.ingredientsEn
+        ? newItem.ingredientsEn.split(',').map((i) => i.trim()).filter(Boolean)
+        : [];
+      const allergensEn = newItem.allergensEn
+        ? newItem.allergensEn.split(',').map((a) => a.trim()).filter(Boolean)
+        : [];
 
       const res = await fetch('/api/menu', {
         method: 'POST',
@@ -249,10 +261,13 @@ export default function DashboardPage() {
           businessId,
           category: newItem.category,
           name: newItem.name,
+          nameEn: newItem.nameEn || undefined,
           price: priceNumber,
           imageUrl: newItem.imageUrl || undefined,
           ingredients: ingredients.length > 0 ? ingredients : undefined,
+          ingredientsEn: ingredientsEn.length > 0 ? ingredientsEn : undefined,
           allergens: allergens.length > 0 ? allergens : undefined,
+          allergensEn: allergensEn.length > 0 ? allergensEn : undefined,
           isFeatured: newItem.isFeatured,
           isPregnancySafe: newItem.isPregnancySafe,
           isBusiness: newItem.isBusiness,
@@ -265,10 +280,13 @@ export default function DashboardPage() {
       setNewItem({
         category: '',
         name: '',
+        nameEn: '',
         price: '',
         imageUrl: '',
         ingredients: '',
+        ingredientsEn: '',
         allergens: '',
+        allergensEn: '',
         isFeatured: false,
         isPregnancySafe: false,
         isBusiness: false,
@@ -286,10 +304,13 @@ export default function DashboardPage() {
     setNewItem({
       category: item.category,
       name: item.name,
+      nameEn: item.nameEn || '',
       price: item.price.toString(),
       imageUrl: item.imageUrl || '',
       ingredients: item.ingredients?.join(', ') || '',
+      ingredientsEn: item.ingredientsEn?.join(', ') || '',
       allergens: item.allergens?.join(', ') || '',
+      allergensEn: item.allergensEn?.join(', ') || '',
       isFeatured: item.isFeatured || false,
       isPregnancySafe: item.isPregnancySafe || false,
       isBusiness: item.isBusiness || false,
@@ -315,6 +336,12 @@ export default function DashboardPage() {
       const allergens = newItem.allergens
         ? newItem.allergens.split(',').map((a) => a.trim()).filter(Boolean)
         : [];
+      const ingredientsEn = newItem.ingredientsEn
+        ? newItem.ingredientsEn.split(',').map((i) => i.trim()).filter(Boolean)
+        : [];
+      const allergensEn = newItem.allergensEn
+        ? newItem.allergensEn.split(',').map((a) => a.trim()).filter(Boolean)
+        : [];
 
       const res = await fetch(`/api/menu/${encodeURIComponent(editingItem.name)}`, {
         method: 'PUT',
@@ -323,10 +350,13 @@ export default function DashboardPage() {
           businessId,
           category: newItem.category,
           name: newItem.name,
+          nameEn: newItem.nameEn || undefined,
           price: priceNumber,
           imageUrl: newItem.imageUrl || undefined,
           ingredients: ingredients.length > 0 ? ingredients : undefined,
+          ingredientsEn: ingredientsEn.length > 0 ? ingredientsEn : undefined,
           allergens: allergens.length > 0 ? allergens : undefined,
+          allergensEn: allergensEn.length > 0 ? allergensEn : undefined,
           isFeatured: newItem.isFeatured,
           isPregnancySafe: newItem.isPregnancySafe,
           isBusiness: newItem.isBusiness,
@@ -361,10 +391,13 @@ export default function DashboardPage() {
     setNewItem({
       category: '',
       name: '',
+      nameEn: '',
       price: '',
       imageUrl: '',
       ingredients: '',
+      ingredientsEn: '',
       allergens: '',
+      allergensEn: '',
       isFeatured: false,
       isPregnancySafe: false,
       isBusiness: false,
@@ -650,6 +683,15 @@ export default function DashboardPage() {
                   required
                 />
               </div>
+              <div className="flex-1 min-w-[140px]">
+                <label className="block mb-1 text-neutral-300">שם באנגלית</label>
+                <input
+                  value={newItem.nameEn}
+                  onChange={(e) => setNewItem((v) => ({ ...v, nameEn: e.target.value }))}
+                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1"
+                  placeholder="e.g. Margherita Pizza"
+                />
+              </div>
               <div className="w-24">
                 <label className="block mb-1 text-neutral-300">מחיר</label>
                 <input
@@ -692,6 +734,26 @@ export default function DashboardPage() {
                   onChange={(e) => setNewItem((v) => ({ ...v, allergens: e.target.value }))}
                   className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1"
                   placeholder="למשל: גלוטן, חלב"
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 items-end">
+              <div className="flex-1 min-w-[200px]">
+                <label className="block mb-1 text-neutral-300">מרכיבים באנגלית (מופרדים בפסיקים)</label>
+                <input
+                  value={newItem.ingredientsEn}
+                  onChange={(e) => setNewItem((v) => ({ ...v, ingredientsEn: e.target.value }))}
+                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1"
+                  placeholder="e.g. Tomatoes, Mozzarella, Basil"
+                />
+              </div>
+              <div className="flex-1 min-w-[200px]">
+                <label className="block mb-1 text-neutral-300">אלרגנים באנגלית (מופרדים בפסיקים)</label>
+                <input
+                  value={newItem.allergensEn}
+                  onChange={(e) => setNewItem((v) => ({ ...v, allergensEn: e.target.value }))}
+                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1"
+                  placeholder="e.g. Gluten, Milk"
                 />
               </div>
             </div>

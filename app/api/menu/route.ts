@@ -36,9 +36,15 @@ export async function GET(req: NextRequest) {
     // Map DB columns to frontend fields
     const mappedItems = items?.map((item: any) => ({
       ...item,
+      // Featured / pregnancy flags (snake_case in DB)
       isFeatured: item.is_featured || false,
       isPregnancySafe: item.is_pregnancy_safe || false,
-      isBusiness: item.isBusiness !== undefined ? item.isBusiness : false, // Handle missing column gracefully
+      // Business flag (may not exist on older schemas)
+      isBusiness: item.isBusiness !== undefined ? item.isBusiness : false,
+      // English fields (may be null / missing)
+      nameEn: item.name_en || undefined,
+      ingredientsEn: item.ingredients_en || undefined,
+      allergensEn: item.allergens_en || undefined,
     })) || [];
 
     return NextResponse.json({ items: mappedItems }, { status: 200 });
@@ -57,10 +63,13 @@ export async function POST(req: NextRequest) {
       businessId,
       category,
       name,
+      nameEn,
       price,
       imageUrl,
       ingredients,
+      ingredientsEn,
       allergens,
+      allergensEn,
       customizationOptions,
       isFeatured,
       isPregnancySafe,
@@ -84,40 +93,65 @@ export async function POST(req: NextRequest) {
       is_pregnancy_safe: isPregnancySafe || false,
     };
 
+    // Optional English fields
+    if (nameEn) {
+      item.name_en = nameEn;
+    }
+    if (ingredientsEn && Array.isArray(ingredientsEn) && ingredientsEn.length > 0) {
+      item.ingredients_en = ingredientsEn;
+    }
+    if (allergensEn && Array.isArray(allergensEn) && allergensEn.length > 0) {
+      item.allergens_en = allergensEn;
+    }
+
     // Add isBusiness if provided (only if column exists)
     if (isBusiness !== undefined) {
       item.isBusiness = isBusiness || false;
     }
 
-    // Try to insert with isBusiness first
-    let { error } = await supabaseAdmin
-      .from('menuItems')
-      .insert(item);
+    // Try to insert with all optional columns first
+    let { error } = await supabaseAdmin.from('menuItems').insert(item);
 
-    // If error is about isBusiness column not existing, retry without it
-    if (error && error.message?.includes('isBusiness')) {
-      console.warn('isBusiness column may not exist yet, retrying without it:', error.message);
-      // Remove isBusiness and retry
-      const itemWithoutBusiness = { ...item };
-      delete itemWithoutBusiness.isBusiness;
-      
-      const retry = await supabaseAdmin
-        .from('menuItems')
-        .insert(itemWithoutBusiness);
-      
-      if (retry.error) {
-        console.error('Error creating menu item (retry)', retry.error);
-        return NextResponse.json({ 
-          message: 'Database error', 
-          details: retry.error.message 
-        }, { status: 500 });
+    // If error is about optional columns not existing yet, retry without them
+    if (error && error.message) {
+      const message = error.message;
+      const relatesToOptionalColumn =
+        message.includes('isBusiness') ||
+        message.includes('name_en') ||
+        message.includes('ingredients_en') ||
+        message.includes('allergens_en');
+
+      if (relatesToOptionalColumn) {
+        console.warn('Optional menuItems columns may not exist yet, retrying without them:', message);
+
+        const itemFallback: any = { ...item };
+        delete itemFallback.isBusiness;
+        delete itemFallback.name_en;
+        delete itemFallback.ingredients_en;
+        delete itemFallback.allergens_en;
+
+        const retry = await supabaseAdmin.from('menuItems').insert(itemFallback);
+
+        if (retry.error) {
+          console.error('Error creating menu item (retry)', retry.error);
+          return NextResponse.json(
+            {
+              message: 'Database error',
+              details: retry.error.message,
+            },
+            { status: 500 },
+          );
+        }
+
+        return NextResponse.json(
+          {
+            item: itemFallback,
+            warning:
+              'Some optional fields were not saved because the corresponding columns do not exist in the database yet',
+          },
+          { status: 201 },
+        );
       }
-      
-      // Return success but warn that isBusiness wasn't saved
-      return NextResponse.json({ 
-        item: itemWithoutBusiness,
-        warning: 'isBusiness was not saved because the column does not exist in the database'
-      }, { status: 201 });
     }
 
     if (error) {

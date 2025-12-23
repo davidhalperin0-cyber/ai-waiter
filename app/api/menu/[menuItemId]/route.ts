@@ -15,10 +15,13 @@ export async function PUT(
       businessId,
       category,
       name,
+      nameEn,
       price,
       imageUrl,
       ingredients,
+      ingredientsEn,
       allergens,
+      allergensEn,
       customizationOptions,
       isFeatured,
       isPregnancySafe,
@@ -32,51 +35,68 @@ export async function PUT(
     const updateData: any = {};
     if (category !== undefined) updateData.category = category;
     if (name !== undefined) updateData.name = name;
+    if (nameEn !== undefined) (updateData as any).name_en = nameEn;
     if (price !== undefined) updateData.price = price;
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
     if (ingredients !== undefined) updateData.ingredients = ingredients;
+    if (ingredientsEn !== undefined) (updateData as any).ingredients_en = ingredientsEn;
     if (allergens !== undefined) updateData.allergens = allergens;
+    if (allergensEn !== undefined) (updateData as any).allergens_en = allergensEn;
     if (customizationOptions !== undefined) updateData.customizationOptions = customizationOptions;
     if (isFeatured !== undefined) updateData.is_featured = isFeatured;
     if (isPregnancySafe !== undefined) updateData.is_pregnancy_safe = isPregnancySafe;
     
     // Handle isBusiness separately - if column doesn't exist, skip it
-    let isBusinessUpdate: any = {};
+    let extraUpdates: any = {};
     if (isBusiness !== undefined) {
-      isBusinessUpdate.isBusiness = isBusiness;
+      extraUpdates.isBusiness = isBusiness;
     }
 
-    // Try to update with isBusiness first
-    let updatePayload = { ...updateData, ...isBusinessUpdate };
+    // Try to update with all optional fields first
+    const updatePayload = { ...updateData, ...extraUpdates };
     let { error } = await supabaseAdmin
       .from('menuItems')
       .update(updatePayload)
       .eq('businessId', businessId)
       .eq('name', menuItemId);
 
-    // If error is about isBusiness column not existing, retry without it
-    if (error && error.message?.includes('isBusiness')) {
-      console.warn('isBusiness column may not exist yet, retrying without it:', error.message);
-      // Retry without isBusiness
-      const retry = await supabaseAdmin
-        .from('menuItems')
-        .update(updateData)
-        .eq('businessId', businessId)
-        .eq('name', menuItemId);
-      
-      if (retry.error) {
-        console.error('Error updating menu item (retry)', retry.error);
-        return NextResponse.json({ 
-          message: 'Database error', 
-          details: retry.error.message 
-        }, { status: 500 });
+    // If error is about optional columns not existing, retry without them
+    if (error && error.message) {
+      const message = error.message;
+      const relatesToOptionalColumn =
+        message.includes('isBusiness') ||
+        message.includes('name_en') ||
+        message.includes('ingredients_en') ||
+        message.includes('allergens_en');
+
+      if (relatesToOptionalColumn) {
+        console.warn('Optional menuItems columns may not exist yet, retrying update without them:', message);
+
+        const fallbackUpdate: any = { ...updateData };
+        const retry = await supabaseAdmin
+          .from('menuItems')
+          .update(fallbackUpdate)
+          .eq('businessId', businessId)
+          .eq('name', menuItemId);
+
+        if (retry.error) {
+          console.error('Error updating menu item (retry)', retry.error);
+          return NextResponse.json(
+            {
+              message: 'Database error',
+              details: retry.error.message,
+            },
+            { status: 500 },
+          );
+        }
+
+        return NextResponse.json(
+          {
+            message: 'Updated (some optional columns not found - please run SQL migrations)',
+          },
+          { status: 200 },
+        );
       }
-      
-      // Return success but warn that isBusiness wasn't updated
-      return NextResponse.json({ 
-        message: 'Updated (isBusiness column not found - please run SQL migration)',
-        warning: 'isBusiness was not updated because the column does not exist in the database'
-      }, { status: 200 });
     }
 
     if (error) {

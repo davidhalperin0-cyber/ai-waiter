@@ -6,3 +6,21 @@ body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
 }
 
+/* Accessibility modes */
+.a11y-night body {
+  background-color: #020617; /* slate-950-ish */
+  color: #f9fafb;
+}
+
+.a11y-high-contrast body {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.a11y-high-contrast button,
+.a11y-high-contrast a {
+  outline: 2px solid #facc15;
+  outline-offset: 1px;
+}
+
+

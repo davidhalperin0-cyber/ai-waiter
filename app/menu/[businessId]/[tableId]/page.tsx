@@ -14,10 +14,13 @@ interface MenuItem {
   businessId: string;
   category: string;
   name: string;
+  nameEn?: string;
   price: number;
   imageUrl?: string;
   ingredients?: string[];
+  ingredientsEn?: string[];
   allergens?: string[];
+  allergensEn?: string[];
   isFeatured?: boolean;
   isPregnancySafe?: boolean;
   isBusiness?: boolean;
@@ -61,6 +64,7 @@ function CustomerMenuPageContent({
     imageUrl?: string;
   } | null>(null);
   const [hasNewChatMessage, setHasNewChatMessage] = useState(false);
+  const [language, setLanguage] = useState<'he' | 'en'>('he');
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const totalPrice = items.reduce(
@@ -144,6 +148,22 @@ function CustomerMenuPageContent({
     
     return () => clearInterval(interval);
   }, [businessId]);
+
+  // Load saved language preference from localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const saved = window.localStorage.getItem('menu_language');
+    if (saved === 'he' || saved === 'en') {
+      setLanguage(saved);
+    }
+  }, []);
+
+  const switchLanguage = (lang: 'he' | 'en') => {
+    setLanguage(lang);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('menu_language', lang);
+    }
+  };
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -300,12 +320,18 @@ function CustomerMenuPageContent({
       return;
     }
 
+    const displayName = language === 'en' && item.nameEn ? item.nameEn : item.name;
+
     addItem({
       menuItemId: `${item.businessId}-${item.name}`,
-      name: item.name,
+      name: displayName,
       price: item.price,
     });
-    toast.success(`${item.name} נוסף לעגלה`);
+    toast.success(
+      language === 'en'
+        ? `${displayName} was added to the cart`
+        : `${displayName} נוסף לעגלה`,
+    );
     
     // Mark cart as updated
     markCartUpdated();
@@ -464,11 +490,35 @@ function CustomerMenuPageContent({
               <div className="flex items-center justify-center gap-3">
                 <span className="h-[1px] w-8 bg-white/20" />
                 <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-medium">
-                  שולחן {tableId}
+                  {language === 'en' ? `Table ${tableId}` : `שולחן ${tableId}`}
                 </span>
                 <span className="h-[1px] w-8 bg-white/20" />
               </div>
             </motion.div>
+            <div className="mt-6 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => switchLanguage('he')}
+                className={`px-3 py-1 rounded-full text-xs font-medium border ${
+                  language === 'he'
+                    ? 'bg-white text-black border-white'
+                    : 'bg-white/5 text-white/70 border-white/20'
+                }`}
+              >
+                עברית
+              </button>
+              <button
+                type="button"
+                onClick={() => switchLanguage('en')}
+                className={`px-3 py-1 rounded-full text-xs font-medium border ${
+                  language === 'en'
+                    ? 'bg-white text-black border-white'
+                    : 'bg-white/5 text-white/70 border-white/20'
+                }`}
+              >
+                English
+              </button>
+            </div>
           </div>
         </header>
 
@@ -507,12 +557,14 @@ function CustomerMenuPageContent({
                   className="relative flex-shrink-0 group"
                   whileTap={{ scale: 0.95 }}
                 >
-                  <div className={`px-5 py-2.5 rounded-full text-xs font-medium tracking-wider transition-all duration-500 ${
-                    activeCategory === 'all'
-                      ? 'text-black z-10'
-                      : 'text-white/60 bg-white/5 border border-white/10'
-                  }`}>
-                    עמוד הבית
+                  <div
+                    className={`px-5 py-2.5 rounded-full text-xs font-medium tracking-wider transition-all duration-500 ${
+                      activeCategory === 'all'
+                        ? 'text-black z-10'
+                        : 'text-white/60 bg-white/5 border border-white/10'
+                    }`}
+                  >
+                    {language === 'en' ? 'Home' : 'עמוד הבית'}
                   </div>
                   {activeCategory === 'all' && (
                     <motion.div
@@ -530,12 +582,18 @@ function CustomerMenuPageContent({
                     className="relative flex-shrink-0 group"
                     whileTap={{ scale: 0.95 }}
                   >
-                    <div className={`px-5 py-2.5 rounded-full text-xs font-medium tracking-wider transition-all duration-500 ${
-                      activeCategory === cat
-                        ? 'text-black z-10'
-                        : 'text-white/60 bg-white/5 border border-white/10'
-                    }`}>
-                      {cat === 'business' ? '💼 מנות עסקיות' : cat}
+                    <div
+                      className={`px-5 py-2.5 rounded-full text-xs font-medium tracking-wider transition-all duration-500 ${
+                        activeCategory === cat
+                          ? 'text-black z-10'
+                          : 'text-white/60 bg-white/5 border border-white/10'
+                      }`}
+                    >
+                      {cat === 'business'
+                        ? language === 'en'
+                          ? '💼 Business meals'
+                          : '💼 מנות עסקיות'
+                        : cat}
                     </div>
                     {activeCategory === cat && (
                       <motion.div
@@ -560,7 +618,9 @@ function CustomerMenuPageContent({
             {/* Featured Deals Carousel - Hero mode */}
             {featuredItems.length > 0 && (
               <section>
-                <h2 className="text-[10px] uppercase tracking-[0.3em] text-white/30 font-bold mb-6 text-center">מבצעים ודילים חמים</h2>
+                <h2 className="text-[10px] uppercase tracking-[0.3em] text-white/30 font-bold mb-6 text-center">
+                  {language === 'en' ? 'Featured deals' : 'מבצעים ודילים חמים'}
+                </h2>
                 <div className="relative h-[28rem] lg:h-[32rem] rounded-[3rem] overflow-hidden bg-white/[0.02] border border-white/10 shadow-2xl group">
                   <AnimatePresence mode="wait">
                     <motion.div
@@ -598,7 +658,9 @@ function CustomerMenuPageContent({
                           מומלץ השבוע
                         </span>
                         <h3 className="text-3xl lg:text-4xl font-light tracking-tight text-white mb-4">
-                          {featuredItems[featuredIndex].name}
+                          {language === 'en' && featuredItems[featuredIndex].nameEn
+                            ? featuredItems[featuredIndex].nameEn
+                            : featuredItems[featuredIndex].name}
                         </h3>
                         <div className="flex items-center justify-center gap-4 mb-6">
                           <span className="h-[1px] w-8 bg-white/10" />
@@ -617,7 +679,7 @@ function CustomerMenuPageContent({
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                         >
-                          הוסף להזמנה
+                          {language === 'en' ? 'Add to order' : 'הוסף להזמנה'}
                         </motion.button>
                       </div>
                     </motion.div>
@@ -730,9 +792,13 @@ function CustomerMenuPageContent({
                         )}
                       </div>
                       <div className="flex-1">
-                        <span className="text-[8px] uppercase tracking-[0.2em] text-amber-200/50 block mb-1">דיל מומלץ</span>
+                        <span className="text-[8px] uppercase tracking-[0.2em] text-amber-200/50 block mb-1">
+                          {language === 'en' ? 'Recommended deal' : 'דיל מומלץ'}
+                        </span>
                         <h3 className="text-2xl font-light tracking-tight text-white mb-4">
-                          {featuredItems[featuredIndex].name}
+                          {language === 'en' && featuredItems[featuredIndex].nameEn
+                            ? featuredItems[featuredIndex].nameEn
+                            : featuredItems[featuredIndex].name}
                         </h3>
                         <div className="flex items-center justify-between">
                           <span className="text-xl font-light tracking-widest text-white/90">
@@ -747,7 +813,7 @@ function CustomerMenuPageContent({
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                           >
-                            הוסף
+                            {language === 'en' ? 'Add' : 'הוסף'}
                           </motion.button>
                         </div>
                       </div>
@@ -777,7 +843,9 @@ function CustomerMenuPageContent({
           {/* Menu Items List – בעמוד הראשי לא מציגים את הכל; רק אחרי בחירת קטגוריה (לא \"הכל\") */}
           <section id="full-menu-section" className="space-y-4 order-2 lg:order-1">
             {loading && (
-              <p className="text-sm text-white/60 text-center py-8">טוען תפריט...</p>
+              <p className="text-sm text-white/60 text-center py-8">
+                {language === 'en' ? 'Loading menu...' : 'טוען תפריט...'}
+              </p>
             )}
             {error && (
               <p className="text-sm text-red-400 bg-red-950/40 border border-red-500/40 rounded px-4 py-3">
@@ -789,10 +857,14 @@ function CustomerMenuPageContent({
                 {activeCategory === 'business' && businessInfo?.businessHours && !isBusinessHoursActive() ? (
                   <div className="space-y-3">
                     <p className="text-lg text-white/90 font-medium">
-                      מנות עסקיות לא זמינות כרגע
+                      {language === 'en'
+                        ? 'Business meals are not available right now'
+                        : 'מנות עסקיות לא זמינות כרגע'}
                     </p>
                     <p className="text-sm text-white/60">
-                      מנות עסקיות זמינות רק בין השעות{' '}
+                      {language === 'en'
+                        ? 'Business meals are only available between '
+                        : 'מנות עסקיות זמינות רק בין השעות '}{' '}
                       <span className="font-semibold text-white/80">
                         {businessInfo.businessHours.start} - {businessInfo.businessHours.end}
                       </span>
@@ -800,7 +872,9 @@ function CustomerMenuPageContent({
                   </div>
                 ) : (
                   <p className="text-sm text-white/50">
-                    עדיין אין מנות בתפריט. בעל העסק צריך להוסיף מנות בדשבורד.
+                    {language === 'en'
+                      ? 'There are no items in the menu yet. The business owner needs to add items in the dashboard.'
+                      : 'עדיין אין מנות בתפריט. בעל העסק צריך להוסיף מנות בדשבורד.'}
                   </p>
                 )}
               </div>
@@ -810,6 +884,16 @@ function CustomerMenuPageContent({
             {activeCategory !== 'all' &&
               visibleItems.map((item, index) => {
                 const isExpanded = expandedItem?.name === item.name;
+                const displayName = language === 'en' && item.nameEn ? item.nameEn : item.name;
+                const displayIngredients =
+                  language === 'en' && item.ingredientsEn && item.ingredientsEn.length > 0
+                    ? item.ingredientsEn
+                    : item.ingredients;
+                const displayAllergens =
+                  language === 'en' && item.allergensEn && item.allergensEn.length > 0
+                    ? item.allergensEn
+                    : item.allergens;
+
                 return (
                   <AnimatePresence key={`${item.businessId}-${item.name}`} mode="wait">
                     {!isExpanded ? (
@@ -846,18 +930,20 @@ function CustomerMenuPageContent({
                           {/* Badges */}
                           <div className="flex items-center gap-2 mb-2 flex-wrap">
                             {item.isFeatured && (
-                              <span className={menuStyle.badge.featured}>מומלץ</span>
+                              <span className={menuStyle.badge.featured}>
+                                {language === 'en' ? 'Recommended' : 'מומלץ'}
+                              </span>
                             )}
                             {item.isBusiness && (
                               <span className="text-[10px] tracking-[0.2em] uppercase text-blue-300/80 border border-blue-300/20 px-3 py-1 rounded-full inline-block">
-                                💼 עסקי
+                                {language === 'en' ? '💼 Business' : '💼 עסקי'}
                               </span>
                             )}
                           </div>
 
                           {/* Title and Price Row */}
                           <div className="flex items-start justify-between gap-4 mb-2">
-                            <h3 className={menuStyle.typography.itemTitle}>{item.name}</h3>
+                            <h3 className={menuStyle.typography.itemTitle}>{displayName}</h3>
                             <span className={`${menuStyle.typography.price} hidden lg:block whitespace-nowrap`}>
                               ₪{item.price.toFixed(2)}
                             </span>
@@ -869,17 +955,20 @@ function CustomerMenuPageContent({
                           )}
 
                           {/* Description */}
-                          {(item.ingredients?.length || item.allergens?.length || item.isPregnancySafe) && (
+                          {(displayIngredients?.length ||
+                            displayAllergens?.length ||
+                            item.isPregnancySafe) && (
                             <p className={menuStyle.typography.itemDescription}>
-                              {item.ingredients?.join(', ')}
-                              {item.allergens?.length && (
+                              {displayIngredients?.join(', ')}
+                              {displayAllergens?.length && (
                                 <span className="text-red-300">
-                                  {' • '}אלרגנים: {item.allergens.join(', ')}
+                                  {language === 'en' ? ' • Allergens: ' : ' • אלרגנים: '}
+                                  {displayAllergens.join(', ')}
                                 </span>
                               )}
                               {item.isPregnancySafe && (
                                 <span className={`${menuStyle.badge.pregnancy} mt-2 block w-fit`}>
-                                  🤰 מתאים להריון
+                                  {language === 'en' ? '🤰 Pregnancy-safe' : '🤰 מתאים להריון'}
                                 </span>
                               )}
                             </p>
@@ -895,11 +984,19 @@ function CustomerMenuPageContent({
                                 e.stopPropagation();
                                 handleAddToCart(item);
                               }}
-                              className={`${menuStyle.button.primary} ${menuStyleVariant === 'compact' ? 'lg:block' : 'w-full lg:w-auto'}`}
+                              className={`${menuStyle.button.primary} ${
+                                menuStyleVariant === 'compact' ? 'lg:block' : 'w-full lg:w-auto'
+                              }`}
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
                             >
-                              {menuStyleVariant === 'elegant' ? 'הוסף' : 'הוסף לעגלה'}
+                              {language === 'en'
+                                ? menuStyleVariant === 'elegant'
+                                  ? 'Add'
+                                  : 'Add to cart'
+                                : menuStyleVariant === 'elegant'
+                                ? 'הוסף'
+                                : 'הוסף לעגלה'}
                             </motion.button>
                           </div>
                         </div>
@@ -944,7 +1041,11 @@ function CustomerMenuPageContent({
                         <div className={menuStyle.expanded.content}>
                           <div className="mb-4">
                             <div className="flex items-start justify-between gap-4 mb-3">
-                              <h2 className={`${menuStyle.typography.itemTitle} text-2xl lg:text-3xl text-white`}>{item.name}</h2>
+                              <h2
+                                className={`${menuStyle.typography.itemTitle} text-2xl lg:text-3xl text-white`}
+                              >
+                                {displayName}
+                              </h2>
                               <span className={`${menuStyle.typography.price} text-2xl lg:text-3xl text-white whitespace-nowrap`}>
                                 ₪{item.price.toFixed(2)}
                               </span>
@@ -955,21 +1056,25 @@ function CustomerMenuPageContent({
                           </div>
 
                           {/* Full Description */}
-                          {item.ingredients && item.ingredients.length > 0 && (
+                          {displayIngredients && displayIngredients.length > 0 && (
                             <div className="mb-4">
-                              <h3 className="text-lg font-semibold text-white mb-2">מרכיבים:</h3>
+                              <h3 className="text-lg font-semibold text-white mb-2">
+                                {language === 'en' ? 'Ingredients:' : 'מרכיבים:'}
+                              </h3>
                               <p className="text-base text-white/80 leading-relaxed">
-                                {item.ingredients.join(', ')}
+                                {displayIngredients.join(', ')}
                               </p>
                             </div>
                           )}
 
                           {/* Allergens */}
-                          {item.allergens && item.allergens.length > 0 && (
+                          {displayAllergens && displayAllergens.length > 0 && (
                             <div className="mb-4">
-                              <h3 className="text-lg font-semibold text-white mb-2">אלרגנים:</h3>
+                              <h3 className="text-lg font-semibold text-white mb-2">
+                                {language === 'en' ? 'Allergens:' : 'אלרגנים:'}
+                              </h3>
                               <p className="text-sm text-red-300">
-                                {item.allergens.join(', ')}
+                                {displayAllergens.join(', ')}
                               </p>
                             </div>
                           )}
@@ -979,7 +1084,9 @@ function CustomerMenuPageContent({
                             <div className="mb-4">
                               <span className={menuStyle.badge.pregnancy}>
                                 <span>🤰</span>
-                                <span className="font-semibold">מתאים להריון</span>
+                                <span className="font-semibold">
+                                  {language === 'en' ? 'Pregnancy-safe' : 'מתאים להריון'}
+                                </span>
                               </span>
                             </div>
                           )}
@@ -1002,7 +1109,8 @@ function CustomerMenuPageContent({
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                           >
-                            הוסף לעגלה - ₪{item.price.toFixed(2)}
+                            {language === 'en' ? 'Add to cart' : 'הוסף לעגלה'} - ₪
+                            {item.price.toFixed(2)}
                           </motion.button>
                         </div>
                       </div>
@@ -1066,43 +1174,75 @@ function CustomerMenuPageContent({
                     <div className={menuStyle.expanded.content}>
                       <div className="mb-4">
                         <div className="flex items-start justify-between gap-4 mb-3">
-                          <h2 className={`${menuStyle.typography.itemTitle} text-2xl text-white`}>{expandedItem.name}</h2>
+                          <h2 className={`${menuStyle.typography.itemTitle} text-2xl text-white`}>
+                            {language === 'en' && expandedItem.nameEn
+                              ? expandedItem.nameEn
+                              : expandedItem.name}
+                          </h2>
                           <span className={`${menuStyle.typography.price} text-2xl text-white whitespace-nowrap`}>
                             ₪{expandedItem.price.toFixed(2)}
                           </span>
                         </div>
                         <span className={menuStyle.badge.category}>
                           {expandedItem.category}
-          </span>
+                        </span>
                       </div>
 
                       {/* Full Description */}
-                      {expandedItem.ingredients && expandedItem.ingredients.length > 0 && (
-                        <div className="mb-4">
-                          <h3 className="text-lg font-semibold text-white mb-2">מרכיבים:</h3>
-                          <p className="text-base text-white/80 leading-relaxed">
-                            {expandedItem.ingredients.join(', ')}
-                          </p>
-                        </div>
-                      )}
+                      {(
+                        language === 'en'
+                          ? expandedItem.ingredientsEn
+                          : expandedItem.ingredients
+                      ) &&
+                        (language === 'en'
+                          ? expandedItem.ingredientsEn
+                          : expandedItem.ingredients
+                        )!.length > 0 && (
+                          <div className="mb-4">
+                            <h3 className="text-lg font-semibold text-white mb-2">
+                              {language === 'en' ? 'Ingredients:' : 'מרכיבים:'}
+                            </h3>
+                            <p className="text-base text-white/80 leading-relaxed">
+                              {(language === 'en'
+                                ? expandedItem.ingredientsEn
+                                : expandedItem.ingredients
+                              )!.join(', ')}
+                            </p>
+                          </div>
+                        )}
 
                       {/* Allergens */}
-                      {expandedItem.allergens && expandedItem.allergens.length > 0 && (
-                        <div className="mb-4">
-                          <h3 className="text-lg font-semibold text-white mb-2">אלרגנים:</h3>
-                          <p className="text-sm text-red-300">
-                            {expandedItem.allergens.join(', ')}
-                          </p>
-                        </div>
-                      )}
+                      {(
+                        language === 'en'
+                          ? expandedItem.allergensEn
+                          : expandedItem.allergens
+                      ) &&
+                        (language === 'en'
+                          ? expandedItem.allergensEn
+                          : expandedItem.allergens
+                        )!.length > 0 && (
+                          <div className="mb-4">
+                            <h3 className="text-lg font-semibold text-white mb-2">
+                              {language === 'en' ? 'Allergens:' : 'אלרגנים:'}
+                            </h3>
+                            <p className="text-sm text-red-300">
+                              {(language === 'en'
+                                ? expandedItem.allergensEn
+                                : expandedItem.allergens
+                              )!.join(', ')}
+                            </p>
+                          </div>
+                        )}
 
                       {/* Pregnancy Safe Badge */}
                       {expandedItem.isPregnancySafe && (
                         <div className="mb-4">
                           <span className={menuStyle.badge.pregnancy}>
                             <span>🤰</span>
-                            <span className="font-semibold">מתאים להריון</span>
-          </span>
+                            <span className="font-semibold">
+                              {language === 'en' ? 'Pregnancy-safe' : 'מתאים להריון'}
+                            </span>
+                          </span>
                         </div>
                       )}
                     </div>
@@ -1119,7 +1259,8 @@ function CustomerMenuPageContent({
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                       >
-                        הוסף לעגלה - ₪{expandedItem.price.toFixed(2)}
+                        {language === 'en' ? 'Add to cart' : 'הוסף לעגלה'} - ₪
+                        {expandedItem.price.toFixed(2)}
                       </motion.button>
                     </div>
                   </div>

@@ -81,10 +81,14 @@ export interface MenuItem {
   businessId: string;
   category: string;
   name: string;
+  // Optional English variants for multi-language menu
+  nameEn?: string;
   imageUrl?: string;
   price: number;
   ingredients?: string[];
   allergens?: string[];
+  ingredientsEn?: string[];
+  allergensEn?: string[];
   customizationOptions?: string[];
   isFeatured?: boolean; // מנה מומלצת/דיל
   isPregnancySafe?: boolean; // האם מתאים להריון
