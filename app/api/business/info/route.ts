@@ -11,7 +11,8 @@ export async function GET(req: NextRequest) {
     }
 
     // Try to select all columns - handle missing columns gracefully
-    let { data: business, error } = await supabaseAdmin
+    // Use loose typing here because Supabase returns dynamic shapes depending on selected columns
+    let { data: business, error }: { data: any; error: any } = await supabaseAdmin
       .from('businesses')
       .select('businessId, name, logoUrl, type, template, menuStyle, email, isEnabled, subscription, printerConfig, posConfig, aiInstructions, businessHours')
       .eq('businessId', businessId)
@@ -25,13 +26,23 @@ export async function GET(req: NextRequest) {
       if (error.message?.includes('menuStyle') || error.message?.includes('businessHours')) {
         const retry = await supabaseAdmin
           .from('businesses')
-          .select('businessId, name, logoUrl, type, template, email, isEnabled, subscription, printerConfig, posConfig, aiInstructions')
+          .select(
+            'businessId, name, logoUrl, type, template, email, isEnabled, subscription, printerConfig, posConfig, aiInstructions',
+          )
           .eq('businessId', businessId)
           .maybeSingle();
-        business = retry.data;
+
+        // Ensure the fallback result still has menuStyle & businessHours keys
+        business = retry.data
+          ? {
+              ...retry.data,
+              menuStyle: null,
+              businessHours: null,
+            }
+          : null;
         error = retry.error;
       }
-      
+
       // If still error and it's about type, try without type
       if (error && error.message?.includes('type')) {
         const retry2 = await supabaseAdmin
@@ -39,7 +50,15 @@ export async function GET(req: NextRequest) {
           .select('businessId, name, template, email, isEnabled, subscription, printerConfig, posConfig, aiInstructions')
           .eq('businessId', businessId)
           .maybeSingle();
-        business = retry2.data;
+
+        business = retry2.data
+          ? {
+              ...retry2.data,
+              // Preserve possible values from previous fallback if they exist
+              menuStyle: (business as any)?.menuStyle ?? null,
+              businessHours: (business as any)?.businessHours ?? null,
+            }
+          : null;
         error = retry2.error;
       }
     }
