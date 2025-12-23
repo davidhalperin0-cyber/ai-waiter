@@ -32,7 +32,7 @@ export default function DashboardPage() {
   const [tables, setTables] = useState<DashboardTable[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'menu' | 'tables' | 'settings' | 'printer' | 'orders'>('menu');
+  const [activeTab, setActiveTab] = useState<'menu' | 'tables' | 'settings' | 'printer' | 'orders' | 'pos'>('menu');
   const [businessInfo, setBusinessInfo] = useState<{
     name: string;
     type: string;

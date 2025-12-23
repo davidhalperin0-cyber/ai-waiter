@@ -153,7 +153,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
 // Handle invoice.payment_failed
 // Sets subscription status to past_due
-async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
+// Use loose typing for invoice because Stripe typings may omit `subscription` on Invoice
+async function handleInvoicePaymentFailed(invoice: any) {
   // Get subscription ID from invoice
   const subscriptionId = typeof invoice.subscription === 'string' 
     ? invoice.subscription 

@@ -14,7 +14,8 @@ export async function GET(req: NextRequest) {
     }
 
     // Try to select with menuStyle and businessHours, fallback if column doesn't exist
-    let { data: business, error } = await supabaseAdmin
+    // Use loose typing because selected columns can change in fallbacks
+    let { data: business, error }: { data: any; error: any } = await supabaseAdmin
       .from('businesses')
       .select('businessId, name, logoUrl, template, menuStyle, isEnabled, subscription, businessHours')
       .eq('businessId', businessId)
@@ -28,7 +29,15 @@ export async function GET(req: NextRequest) {
         .select('businessId, name, logoUrl, template, isEnabled, subscription')
         .eq('businessId', businessId)
         .maybeSingle();
-      business = retry.data;
+
+      // Ensure we still have menuStyle & businessHours keys for typing
+      business = retry.data
+        ? {
+            ...retry.data,
+            menuStyle: null,
+            businessHours: null,
+          }
+        : null;
       error = retry.error;
     }
 
