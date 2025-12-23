@@ -80,6 +80,7 @@ export interface MenuItem {
   _id?: string;
   businessId: string;
   category: string;
+  categoryEn?: string;
   name: string;
   // Optional English variants for multi-language menu
   nameEn?: string;

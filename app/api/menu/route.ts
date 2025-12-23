@@ -42,6 +42,7 @@ export async function GET(req: NextRequest) {
       // Business flag (may not exist on older schemas)
       isBusiness: item.isBusiness !== undefined ? item.isBusiness : false,
       // English fields (may be null / missing)
+      categoryEn: item.category_en || undefined,
       nameEn: item.name_en || undefined,
       ingredientsEn: item.ingredients_en || undefined,
       allergensEn: item.allergens_en || undefined,
@@ -62,6 +63,7 @@ export async function POST(req: NextRequest) {
     const {
       businessId,
       category,
+      categoryEn,
       name,
       nameEn,
       price,
@@ -103,6 +105,9 @@ export async function POST(req: NextRequest) {
     if (allergensEn && Array.isArray(allergensEn) && allergensEn.length > 0) {
       item.allergens_en = allergensEn;
     }
+    if (categoryEn) {
+      item.category_en = categoryEn;
+    }
 
     // Add isBusiness if provided (only if column exists)
     if (isBusiness !== undefined) {
@@ -117,6 +122,7 @@ export async function POST(req: NextRequest) {
       const message = error.message;
       const relatesToOptionalColumn =
         message.includes('isBusiness') ||
+        message.includes('category_en') ||
         message.includes('name_en') ||
         message.includes('ingredients_en') ||
         message.includes('allergens_en');
@@ -126,6 +132,7 @@ export async function POST(req: NextRequest) {
 
         const itemFallback: any = { ...item };
         delete itemFallback.isBusiness;
+        delete itemFallback.category_en;
         delete itemFallback.name_en;
         delete itemFallback.ingredients_en;
         delete itemFallback.allergens_en;

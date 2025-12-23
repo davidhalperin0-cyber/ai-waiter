@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 interface DashboardMenuItem {
   businessId: string;
   category: string;
+  categoryEn?: string;
   name: string;
   nameEn?: string;
   price: number;
@@ -85,6 +86,7 @@ export default function DashboardPage() {
 
   const [newItem, setNewItem] = useState({
     category: '',
+    categoryEn: '',
     name: '',
     nameEn: '',
     price: '',
@@ -264,6 +266,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           businessId,
           category: newItem.category.trim(),
+          categoryEn: newItem.categoryEn.trim() || undefined,
           name: newItem.name,
           nameEn: newItem.nameEn || undefined,
           price: priceNumber,
@@ -283,6 +286,7 @@ export default function DashboardPage() {
       }
       setNewItem({
         category: '',
+        categoryEn: '',
         name: '',
         nameEn: '',
         price: '',
@@ -307,6 +311,7 @@ export default function DashboardPage() {
     setEditingItem(item);
     setNewItem({
       category: item.category,
+      categoryEn: item.categoryEn || '',
       name: item.name,
       nameEn: item.nameEn || '',
       price: item.price.toString(),
@@ -353,6 +358,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           businessId,
           category: newItem.category.trim(),
+          categoryEn: newItem.categoryEn.trim() || undefined,
           name: newItem.name,
           nameEn: newItem.nameEn || undefined,
           price: priceNumber,
@@ -373,6 +379,7 @@ export default function DashboardPage() {
       setEditingItem(null);
       setNewItem({
         category: '',
+        categoryEn: '',
         name: '',
         nameEn: '',
         price: '',
@@ -397,6 +404,7 @@ export default function DashboardPage() {
     setEditingItem(null);
     setNewItem({
       category: '',
+      categoryEn: '',
       name: '',
       nameEn: '',
       price: '',
@@ -568,6 +576,54 @@ export default function DashboardPage() {
     }
   }
 
+  async function handleAutoTranslate(
+    source: 'category' | 'name' | 'ingredients' | 'allergens',
+  ) {
+    try {
+      let text = '';
+      if (source === 'category') text = newItem.category;
+      if (source === 'name') text = newItem.name;
+      if (source === 'ingredients') text = newItem.ingredients;
+      if (source === 'allergens') text = newItem.allergens;
+
+      if (!text.trim()) {
+        toast.error('אין טקסט בעברית לתרגום');
+        return;
+      }
+
+      const res = await fetch('/api/ai/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          target: source,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'תרגום נכשל');
+      }
+
+      const translated: string = data.translated || '';
+      if (!translated) {
+        toast.error('לא התקבל תרגום מהשרת');
+        return;
+      }
+
+      setNewItem((prev) => {
+        if (source === 'category') return { ...prev, categoryEn: translated };
+        if (source === 'name') return { ...prev, nameEn: translated };
+        if (source === 'ingredients') return { ...prev, ingredientsEn: translated };
+        if (source === 'allergens') return { ...prev, allergensEn: translated };
+        return prev;
+      });
+      toast.success('התרגום נוסף לשדה האנגלי, אפשר לערוך לפני שמירה');
+    } catch (err: any) {
+      toast.error(err.message || 'תרגום נכשל');
+    }
+  }
+
   if (!businessId) {
   return (
     <main className="min-h-screen bg-neutral-950 text-white p-6">
@@ -715,6 +771,24 @@ export default function DashboardPage() {
                 />
               </div>
               <div className="flex-1 min-w-[140px]">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-neutral-300">קטגוריה באנגלית</label>
+                  <button
+                    type="button"
+                    onClick={() => handleAutoTranslate('category')}
+                    className="text-[10px] text-blue-300 hover:text-blue-200"
+                  >
+                    תרגם אוטומטית
+                  </button>
+                </div>
+                <input
+                  value={newItem.categoryEn}
+                  onChange={(e) => setNewItem((v) => ({ ...v, categoryEn: e.target.value }))}
+                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1"
+                  placeholder="e.g. Starters"
+                />
+              </div>
+              <div className="flex-1 min-w-[140px]">
                 <label className="block mb-1 text-neutral-300">שם</label>
                 <input
                   value={newItem.name}
@@ -725,7 +799,16 @@ export default function DashboardPage() {
                 />
               </div>
               <div className="flex-1 min-w-[140px]">
-                <label className="block mb-1 text-neutral-300">שם באנגלית</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-neutral-300">שם באנגלית</label>
+                  <button
+                    type="button"
+                    onClick={() => handleAutoTranslate('name')}
+                    className="text-[10px] text-blue-300 hover:text-blue-200"
+                  >
+                    תרגם אוטומטית
+                  </button>
+                </div>
                 <input
                   value={newItem.nameEn}
                   onChange={(e) => setNewItem((v) => ({ ...v, nameEn: e.target.value }))}
@@ -840,7 +923,18 @@ export default function DashboardPage() {
             </div>
             <div className="flex flex-wrap gap-2 items-end">
               <div className="flex-1 min-w-[200px]">
-                <label className="block mb-1 text-neutral-300">מרכיבים באנגלית (מופרדים בפסיקים)</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-neutral-300">
+                    מרכיבים באנגלית (מופרדים בפסיקים)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleAutoTranslate('ingredients')}
+                    className="text-[10px] text-blue-300 hover:text-blue-200"
+                  >
+                    תרגם אוטומטית
+                  </button>
+                </div>
                 <input
                   value={newItem.ingredientsEn}
                   onChange={(e) => setNewItem((v) => ({ ...v, ingredientsEn: e.target.value }))}
@@ -849,7 +943,18 @@ export default function DashboardPage() {
                 />
               </div>
               <div className="flex-1 min-w-[200px]">
-                <label className="block mb-1 text-neutral-300">אלרגנים באנגלית (מופרדים בפסיקים)</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-neutral-300">
+                    אלרגנים באנגלית (מופרדים בפסיקים)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleAutoTranslate('allergens')}
+                    className="text-[10px] text-blue-300 hover:text-blue-200"
+                  >
+                    תרגם אוטומטית
+                  </button>
+                </div>
                 <input
                   value={newItem.allergensEn}
                   onChange={(e) => setNewItem((v) => ({ ...v, allergensEn: e.target.value }))}

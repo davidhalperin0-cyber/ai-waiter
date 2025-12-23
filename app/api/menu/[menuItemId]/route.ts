@@ -14,6 +14,7 @@ export async function PUT(
     const {
       businessId,
       category,
+      categoryEn,
       name,
       nameEn,
       price,
@@ -34,6 +35,7 @@ export async function PUT(
 
     const updateData: any = {};
     if (category !== undefined) updateData.category = category;
+    if (categoryEn !== undefined) (updateData as any).category_en = categoryEn;
     if (name !== undefined) updateData.name = name;
     if (nameEn !== undefined) (updateData as any).name_en = nameEn;
     if (price !== undefined) updateData.price = price;
