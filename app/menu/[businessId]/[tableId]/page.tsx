@@ -39,7 +39,7 @@ function CustomerMenuPageContent({
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<string | 'all'>('all');
+  const [activeCategory, setActiveCategory] = useState<string | 'all'>('all'); // For scroll-based highlighting only
   const [businessInfo, setBusinessInfo] = useState<{
     name: string;
     logoUrl?: string;
@@ -279,33 +279,96 @@ function CustomerMenuPageContent({
     return currentTime >= start && currentTime <= end;
   }
 
-  const visibleItems = useMemo(
-    () => {
-      const businessHoursActive = isBusinessHoursActive();
-      
-      if (activeCategory === 'all') {
-        // Filter out business items if outside business hours
-        if (!businessHoursActive && businessInfo?.businessHours) {
-          return menuItems.filter((item) => !item.isBusiness);
-        }
-        return menuItems;
-      } else if (activeCategory === 'business') {
-        // Show only business items, but only if business hours are active
-        if (!businessHoursActive) {
-          return []; // Return empty array - we'll show a message instead
-        }
-        return menuItems.filter((item) => item.isBusiness === true);
-      } else {
-        // Show items from specific category (excluding business items if outside hours)
-        let filtered = menuItems.filter((item) => item.category === activeCategory);
-        if (!businessHoursActive && businessInfo?.businessHours) {
-          filtered = filtered.filter((item) => !item.isBusiness);
-        }
-        return filtered;
+  // Group items by category for continuous scroll display
+  const itemsByCategory = useMemo(() => {
+    const businessHoursActive = isBusinessHoursActive();
+    const grouped: Record<string, MenuItem[]> = {};
+    
+    menuItems.forEach((item) => {
+      // Filter out business items if outside business hours
+      if (item.isBusiness && !businessHoursActive && businessInfo?.businessHours) {
+        return; // Skip this item
       }
-    },
-    [menuItems, activeCategory, businessInfo?.businessHours],
-  );
+      
+      const categoryKey = item.isBusiness ? 'business' : item.category;
+      if (!grouped[categoryKey]) {
+        grouped[categoryKey] = [];
+      }
+      grouped[categoryKey].push(item);
+    });
+    
+    return grouped;
+  }, [menuItems, businessInfo?.businessHours]);
+
+  // Get all categories in order (business first if exists, then others)
+  const orderedCategories = useMemo(() => {
+    const cats = categories.filter(cat => cat !== 'business');
+    const businessHoursActive = isBusinessHoursActive();
+    const hasBusinessItems = itemsByCategory['business'] && itemsByCategory['business'].length > 0;
+    
+    if (hasBusinessItems && businessHoursActive) {
+      return ['business', ...cats];
+    }
+    return cats;
+  }, [categories, itemsByCategory]);
+
+  // Scroll-based active category detection
+  useEffect(() => {
+    function updateActiveCategory() {
+      const headerOffset = 120;
+      const scrollPosition = window.scrollY + headerOffset;
+
+      // Check featured section first
+      const featuredSection = document.getElementById('featured-section');
+      if (featuredSection) {
+        const featuredTop = featuredSection.offsetTop;
+        const featuredBottom = featuredTop + featuredSection.offsetHeight;
+        if (scrollPosition >= featuredTop && scrollPosition < featuredBottom) {
+          setActiveCategory('all');
+          return;
+        }
+      }
+
+      // Check each category section
+      for (const category of orderedCategories) {
+        const categoryElement = document.getElementById(`category-${category}`);
+        if (categoryElement) {
+          const categoryTop = categoryElement.offsetTop;
+          const categoryBottom = categoryTop + categoryElement.offsetHeight;
+          if (scrollPosition >= categoryTop && scrollPosition < categoryBottom) {
+            setActiveCategory(category);
+            return;
+          }
+        }
+      }
+
+      // Default to first category if scrolled past all
+      if (orderedCategories.length > 0) {
+        setActiveCategory(orderedCategories[0]);
+      }
+    }
+
+    window.addEventListener('scroll', updateActiveCategory);
+    updateActiveCategory(); // Initial check
+
+    return () => window.removeEventListener('scroll', updateActiveCategory);
+  }, [orderedCategories]);
+
+  // Scroll to category section
+  function scrollToCategory(category: string) {
+    const categoryId = category === 'all' ? 'featured-section' : `category-${category}`;
+    const element = document.getElementById(categoryId);
+    if (element) {
+      const headerOffset = 120; // Account for sticky header
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
+    }
+  }
 
   async function handleAddToCart(item: MenuItem) {
     if (subscriptionExpired || businessDisabled) {
@@ -553,7 +616,7 @@ function CustomerMenuPageContent({
               
               <div className="flex gap-3 overflow-x-auto px-4 pb-2 scrollbar-hide no-scrollbar items-center">
                 <motion.button
-                  onClick={() => setActiveCategory('all')}
+                  onClick={() => scrollToCategory('all')}
                   className="relative flex-shrink-0 group"
                   whileTap={{ scale: 0.95 }}
                 >
@@ -575,10 +638,10 @@ function CustomerMenuPageContent({
                   )}
                 </motion.button>
 
-                {categories.map((cat) => (
+                {orderedCategories.map((cat) => (
                   <motion.button
                     key={cat}
-                    onClick={() => setActiveCategory(cat)}
+                    onClick={() => scrollToCategory(cat)}
                     className="relative flex-shrink-0 group"
                     whileTap={{ scale: 0.95 }}
                   >
@@ -612,12 +675,13 @@ function CustomerMenuPageContent({
             </div>
           </nav>
 
-        {/* Hero Layout when "all" selected - Featured + Categories side by side */}
-        {activeCategory === 'all' ? (
-          <div className="lg:grid lg:grid-cols-[1fr_14rem] lg:gap-6 mb-6">
-            {/* Featured Deals Carousel - Hero mode */}
+        {/* Continuous Menu Layout - All items in one scrollable page */}
+        <div className="lg:grid lg:grid-cols-[1fr_14rem] lg:gap-6 mb-6">
+          {/* Main Content Area */}
+          <div className="space-y-8">
+            {/* Featured Section */}
             {featuredItems.length > 0 && (
-              <section>
+              <section id="featured-section" className="mb-12">
                 <h2 className="text-[10px] uppercase tracking-[0.3em] text-white/30 font-bold mb-6 text-center">
                   {language === 'en' ? 'Featured deals' : 'מבצעים ודילים חמים'}
                 </h2>
@@ -699,149 +763,11 @@ function CustomerMenuPageContent({
                       />
                     ))}
                   </div>
-        </div>
-      </section>
-            )}
-
-            {/* Categories Sidebar - Desktop Premium Design */}
-            <aside className="hidden lg:block lg:mb-0 lg:sticky lg:top-8 lg:self-start">
-              <div className="relative pl-6">
-                <div className="mb-8 pl-4">
-                  <h2 className="text-[10px] uppercase tracking-[0.3em] text-white/30 font-bold mb-1">תפריט</h2>
-                  <div className="h-[1px] w-8 bg-white/20" />
-                </div>
-                
-                <div className="space-y-1">
-                  <motion.button
-                    onClick={() => setActiveCategory('all')}
-                    className="relative w-full text-right group flex items-center justify-end py-3 px-4 transition-all"
-                    whileHover={{ x: -4 }}
-                  >
-                    <span className={`text-sm tracking-wide transition-all duration-300 ${
-                      activeCategory === 'all' ? 'text-white font-medium' : 'text-white/40 group-hover:text-white/70'
-                    }`}>
-                      עמוד הבית
-                    </span>
-                    {activeCategory === 'all' && (
-                      <motion.div
-                        layoutId="activeTabDesktop"
-                        className="absolute right-0 w-1 h-6 bg-white rounded-full"
-                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                      />
-                    )}
-                  </motion.button>
-
-                  {categories.map((cat, index) => (
-                    <motion.button
-                      key={cat}
-                      onClick={() => setActiveCategory(cat)}
-                      className="relative w-full text-right group flex items-center justify-end py-3 px-4 transition-all"
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      whileHover={{ x: -4 }}
-                    >
-                      <span className={`text-sm tracking-wide transition-all duration-300 ${
-                        activeCategory === cat ? 'text-white font-medium' : 'text-white/40 group-hover:text-white/70'
-                      }`}>
-                        {cat}
-                      </span>
-                      {activeCategory === cat && (
-                        <motion.div
-                          layoutId="activeTabDesktop"
-                          className="absolute right-0 w-1 h-6 bg-white rounded-full"
-                          transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                        />
-                      )}
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
-            </aside>
-          </div>
-        ) : (
-          <>
-            {/* Compact Featured Deals Carousel when category selected */}
-            {featuredItems.length > 0 && (
-              <section className="mb-12 px-2">
-                <div className="relative h-56 rounded-[2.5rem] overflow-hidden bg-white/[0.03] border border-white/10 group shadow-2xl">
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={featuredIndex}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                      className="absolute inset-0 flex items-center gap-6 p-6 cursor-pointer z-10"
-                      onClick={() => scrollToItem(featuredItems[featuredIndex].name)}
-                    >
-                      <div className="w-32 h-32 lg:w-40 lg:h-40 rounded-2xl overflow-hidden bg-white/10 border border-white/20 flex-shrink-0 shadow-xl group-hover:scale-105 transition-transform duration-700">
-                        {featuredItems[featuredIndex].imageUrl ? (
-                          <img
-                            src={featuredItems[featuredIndex].imageUrl}
-                            alt={featuredItems[featuredIndex].name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-4xl opacity-20">
-                            🍽️
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <span className="text-[8px] uppercase tracking-[0.2em] text-amber-200/50 block mb-1">
-                          {language === 'en' ? 'Recommended deal' : 'דיל מומלץ'}
-                        </span>
-                        <h3 className="text-2xl font-light tracking-tight text-white mb-4">
-                          {language === 'en' && featuredItems[featuredIndex].nameEn
-                            ? featuredItems[featuredIndex].nameEn
-                            : featuredItems[featuredIndex].name}
-                        </h3>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xl font-light tracking-widest text-white/90">
-                            ₪{featuredItems[featuredIndex].price.toFixed(2)}
-                          </span>
-                          <motion.button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAddToCart(featuredItems[featuredIndex]);
-                            }}
-                            className="rounded-full bg-white text-black px-6 py-2 text-[10px] font-medium uppercase tracking-[0.1em] hover:bg-neutral-200 transition-colors"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                          >
-                            {language === 'en' ? 'Add' : 'הוסף'}
-                          </motion.button>
-                        </div>
-                      </div>
-                    </motion.div>
-                  </AnimatePresence>
-                  
-                  {/* Minimal Indicators for compact version */}
-                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 z-20">
-                    {featuredItems.map((_, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setFeaturedIndex(i)}
-                        className={`h-0.5 rounded-full transition-all duration-500 ${
-                          i === featuredIndex
-                            ? 'w-6 bg-white'
-                            : 'w-1 bg-white/20'
-                        }`}
-                      />
-                    ))}
-                  </div>
                 </div>
               </section>
             )}
 
-            {/* Layout container for categories and menu items */}
-            <div className="lg:grid lg:grid-cols-[1fr_14rem] lg:gap-6">
-          {/* Menu Items List – בעמוד הראשי לא מציגים את הכל; רק אחרי בחירת קטגוריה (לא \"הכל\") */}
-          <section id="full-menu-section" className="space-y-4 order-2 lg:order-1">
+            {/* All Categories - Continuous Scroll */}
             {loading && (
               <p className="text-sm text-white/60 text-center py-8">
                 {language === 'en' ? 'Loading menu...' : 'טוען תפריט...'}
@@ -852,37 +778,36 @@ function CustomerMenuPageContent({
                 {error}
               </p>
             )}
-            {!loading && !error && visibleItems.length === 0 && (
+            {!loading && !error && orderedCategories.length === 0 && (
               <div className="text-center py-12">
-                {activeCategory === 'business' && businessInfo?.businessHours && !isBusinessHoursActive() ? (
-                  <div className="space-y-3">
-                    <p className="text-lg text-white/90 font-medium">
-                      {language === 'en'
-                        ? 'Business meals are not available right now'
-                        : 'מנות עסקיות לא זמינות כרגע'}
-                    </p>
-                    <p className="text-sm text-white/60">
-                      {language === 'en'
-                        ? 'Business meals are only available between '
-                        : 'מנות עסקיות זמינות רק בין השעות '}{' '}
-                      <span className="font-semibold text-white/80">
-                        {businessInfo.businessHours.start} - {businessInfo.businessHours.end}
-                      </span>
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-white/50">
-                    {language === 'en'
-                      ? 'There are no items in the menu yet. The business owner needs to add items in the dashboard.'
-                      : 'עדיין אין מנות בתפריט. בעל העסק צריך להוסיף מנות בדשבורד.'}
-                  </p>
-                )}
+                <p className="text-sm text-white/50">
+                  {language === 'en'
+                    ? 'There are no items in the menu yet. The business owner needs to add items in the dashboard.'
+                    : 'עדיין אין מנות בתפריט. בעל העסק צריך להוסיף מנות בדשבורד.'}
+                </p>
               </div>
             )}
 
-            {/* בעמוד הראשי: אם הקטגוריה היא 'all' לא מציגים רשימה כלל */}
-            {activeCategory !== 'all' &&
-              visibleItems.map((item, index) => {
+            {/* Render all categories with their items */}
+            {!loading && !error && orderedCategories.map((category) => {
+              const categoryItems = itemsByCategory[category] || [];
+              if (categoryItems.length === 0) return null;
+
+              return (
+                <section key={category} id={`category-${category}`} className="space-y-4">
+                  {/* Category Header */}
+                  <div className="mb-6 pt-8">
+                    <h2 className={menuStyle.typography.sectionTitle}>
+                      {category === 'business'
+                        ? language === 'en'
+                          ? '💼 Business Meals'
+                          : '💼 מנות עסקיות'
+                        : category}
+                    </h2>
+                  </div>
+
+                  {/* Category Items */}
+                  {categoryItems.map((item, index) => {
                 const isExpanded = expandedItem?.name === item.name;
                 const displayName = language === 'en' && item.nameEn ? item.nameEn : item.name;
                 const displayIngredients =
@@ -1004,101 +929,105 @@ function CustomerMenuPageContent({
                   ) : (
                     <motion.div
                       key={`expanded-${item.name}`}
-                      className="hidden lg:block w-full rounded-3xl overflow-hidden"
+                      className="hidden lg:block w-full rounded-3xl overflow-hidden max-h-[80vh] flex flex-col"
                       initial={{ opacity: 0, scale: 0.95, y: -20 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95, y: -20 }}
                       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                     >
-                      <div className={menuStyle.expanded.container}>
+                      <div className={`${menuStyle.expanded.container} flex-1 min-h-0 flex flex-col`}>
                         {/* Close Button */}
-          <button
+                        <button
                           onClick={handleCollapseItem}
-                          className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 transition"
-          >
+                          className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 transition"
+                        >
                           <span className="text-2xl">×</span>
-          </button>
+                        </button>
 
-                        {/* Image */}
-                        <div className={menuStyle.expanded.image}>
-                          {item.imageUrl ? (
-                            <img
-                              src={item.imageUrl}
-                              alt={item.name}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = 'none';
-                              }}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-8xl opacity-30">
-                              🍽️
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Content */}
-                        <div className={menuStyle.expanded.content}>
-                          <div className="mb-4">
-                            <div className="flex items-start justify-between gap-4 mb-3">
-                              <h2
-                                className={`${menuStyle.typography.itemTitle} text-2xl lg:text-3xl text-white`}
-                              >
-                                {displayName}
-                              </h2>
-                              <span className={`${menuStyle.typography.price} text-2xl lg:text-3xl text-white whitespace-nowrap`}>
-                                ₪{item.price.toFixed(2)}
-                              </span>
-                            </div>
-                            <span className={menuStyle.badge.category}>
-                              {item.category}
+                        {/* Title and Price - Fixed at top */}
+                        <div className="flex-shrink-0 p-6 lg:p-8 pb-4 border-b border-white/10">
+                          <div className="flex items-start justify-between gap-4 mb-2">
+                            <h2
+                              className={`${menuStyle.typography.itemTitle} text-2xl lg:text-3xl text-white`}
+                            >
+                              {displayName}
+                            </h2>
+                            <span className={`${menuStyle.typography.price} text-2xl lg:text-3xl text-white whitespace-nowrap`}>
+                              ₪{item.price.toFixed(2)}
                             </span>
                           </div>
+                          <span className={menuStyle.badge.category}>
+                            {item.category}
+                          </span>
+                        </div>
 
-                          {/* Full Description */}
-                          {displayIngredients && displayIngredients.length > 0 && (
-                            <div className="mb-4">
-                              <h3 className="text-lg font-semibold text-white mb-2">
-                                {language === 'en' ? 'Ingredients:' : 'מרכיבים:'}
-                              </h3>
-                              <p className="text-base text-white/80 leading-relaxed">
-                                {displayIngredients.join(', ')}
-                              </p>
-                            </div>
-                          )}
+                        {/* Scrollable Content Area - Image and Details */}
+                        <div className="flex-1 overflow-y-auto min-h-0">
+                          {/* Image - Smaller, positioned lower */}
+                          <div className="max-h-[25vh] h-[25vh] w-full overflow-hidden my-6 mx-8 rounded-2xl">
+                            {item.imageUrl ? (
+                              <img
+                                src={item.imageUrl}
+                                alt={item.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-8xl opacity-30">
+                                🍽️
+                              </div>
+                            )}
+                          </div>
 
-                          {/* Allergens */}
-                          {displayAllergens && displayAllergens.length > 0 && (
-                            <div className="mb-4">
-                              <h3 className="text-lg font-semibold text-white mb-2">
-                                {language === 'en' ? 'Allergens:' : 'אלרגנים:'}
-                              </h3>
-                              <p className="text-sm text-red-300">
-                                {displayAllergens.join(', ')}
-                              </p>
-                            </div>
-                          )}
+                          {/* Details Section - Above button */}
+                          <div className="px-8 lg:px-16 pb-4">
+                            {/* Full Description */}
+                            {displayIngredients && displayIngredients.length > 0 && (
+                              <div className="mb-4">
+                                <h3 className="text-lg font-semibold text-white mb-2">
+                                  {language === 'en' ? 'Ingredients:' : 'מרכיבים:'}
+                                </h3>
+                                <p className="text-base text-white/80 leading-relaxed">
+                                  {displayIngredients.join(', ')}
+                                </p>
+                              </div>
+                            )}
 
-                          {/* Pregnancy Safe Badge */}
-                          {item.isPregnancySafe && (
-                            <div className="mb-4">
-                              <span className={menuStyle.badge.pregnancy}>
-                                <span>🤰</span>
-                                <span className="font-semibold">
-                                  {language === 'en' ? 'Pregnancy-safe' : 'מתאים להריון'}
+                            {/* Allergens */}
+                            {displayAllergens && displayAllergens.length > 0 && (
+                              <div className="mb-4">
+                                <h3 className="text-lg font-semibold text-white mb-2">
+                                  {language === 'en' ? 'Allergens:' : 'אלרגנים:'}
+                                </h3>
+                                <p className="text-sm text-red-300">
+                                  {displayAllergens.join(', ')}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Pregnancy Safe Badge */}
+                            {item.isPregnancySafe && (
+                              <div className="mb-4">
+                                <span className={menuStyle.badge.pregnancy}>
+                                  <span>🤰</span>
+                                  <span className="font-semibold">
+                                    {language === 'en' ? 'Pregnancy-safe' : 'מתאים להריון'}
+                                  </span>
                                 </span>
-                              </span>
-                            </div>
-                          )}
+                              </div>
+                            )}
 
-                          {/* Options / Add-ons placeholder - can be extended later */}
-                          <div className="mb-6">
-                            {/* Future: Add customization options here */}
+                            {/* Options / Add-ons placeholder - can be extended later */}
+                            <div className="mb-6">
+                              {/* Future: Add customization options here */}
+                            </div>
                           </div>
                         </div>
 
-                        {/* Add to Cart Button */}
-                        <div className="p-6 lg:p-8 border-t border-white/20">
+                        {/* Fixed Bottom Action Section */}
+                        <div className="flex-shrink-0 p-6 lg:p-8 border-t border-white/20 bg-neutral-950/90 backdrop-blur-sm">
                           <motion.button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1119,9 +1048,69 @@ function CustomerMenuPageContent({
                 </AnimatePresence>
               );
             })}
-      </section>
+                </section>
+              );
+            })}
+          </div>
 
-          {/* Mobile Expanded Overlay */}
+          {/* Categories Sidebar - Desktop Premium Design */}
+          <aside className="hidden lg:block lg:mb-0 lg:sticky lg:top-8 lg:self-start">
+            <div className="relative pl-6">
+              <div className="mb-8 pl-4">
+                <h2 className="text-[10px] uppercase tracking-[0.3em] text-white/30 font-bold mb-1">תפריט</h2>
+                <div className="h-[1px] w-8 bg-white/20" />
+              </div>
+              
+              <div className="space-y-1">
+                <motion.button
+                  onClick={() => scrollToCategory('all')}
+                  className="relative w-full text-right group flex items-center justify-end py-3 px-4 transition-all"
+                  whileHover={{ x: -4 }}
+                >
+                  <span className={`text-sm tracking-wide transition-all duration-300 ${
+                    activeCategory === 'all' ? 'text-white font-medium' : 'text-white/40 group-hover:text-white/70'
+                  }`}>
+                    עמוד הבית
+                  </span>
+                  {activeCategory === 'all' && (
+                    <motion.div
+                      layoutId="activeTabDesktop"
+                      className="absolute right-0 w-1 h-6 bg-white rounded-full"
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    />
+                  )}
+                </motion.button>
+
+                {orderedCategories.map((cat, index) => (
+                  <motion.button
+                    key={cat}
+                    onClick={() => scrollToCategory(cat)}
+                    className="relative w-full text-right group flex items-center justify-end py-3 px-4 transition-all"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    whileHover={{ x: -4 }}
+                  >
+                    <span className={`text-sm tracking-wide transition-all duration-300 ${
+                      activeCategory === cat ? 'text-white font-medium' : 'text-white/40 group-hover:text-white/70'
+                    }`}>
+                      {cat === 'business' ? '💼 מנות עסקיות' : cat}
+                    </span>
+                    {activeCategory === cat && (
+                      <motion.div
+                        layoutId="activeTabDesktop"
+                        className="absolute right-0 w-1 h-6 bg-white rounded-full"
+                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                      />
+                    )}
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        {/* Mobile Expanded Overlay */}
           <AnimatePresence>
             {expandedItem && (
               <>
@@ -1136,119 +1125,123 @@ function CustomerMenuPageContent({
 
                 {/* Mobile Expanded Card - near full-screen */}
                 <motion.div
-                  className="fixed inset-x-4 top-20 bottom-24 lg:hidden z-50 rounded-3xl"
+                  className="fixed inset-x-4 top-20 bottom-24 lg:hidden z-50 rounded-3xl flex flex-col overflow-hidden"
                   initial={{ opacity: 0, scale: 0.9, y: 20 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9, y: 20 }}
                   transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className={`${menuStyle.expanded.container} h-full`}>
+                  <div className={`${menuStyle.expanded.container} flex-1 min-h-0 flex flex-col`}>
                     {/* Close Button */}
                     <button
                       onClick={handleCollapseItem}
-                      className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 transition"
+                      className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 transition"
                     >
                       <span className="text-2xl">×</span>
                     </button>
 
-                    {/* Image */}
-                    <div className={menuStyle.expanded.image}>
-                      {expandedItem.imageUrl ? (
-                        <img
-                          src={expandedItem.imageUrl}
-                          alt={expandedItem.name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-8xl opacity-30">
-                          🍽️
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Content */}
-                    <div className={menuStyle.expanded.content}>
-                      <div className="mb-4">
-                        <div className="flex items-start justify-between gap-4 mb-3">
-                          <h2 className={`${menuStyle.typography.itemTitle} text-2xl text-white`}>
-                            {language === 'en' && expandedItem.nameEn
-                              ? expandedItem.nameEn
-                              : expandedItem.name}
-                          </h2>
-                          <span className={`${menuStyle.typography.price} text-2xl text-white whitespace-nowrap`}>
-                            ₪{expandedItem.price.toFixed(2)}
-                          </span>
-                        </div>
-                        <span className={menuStyle.badge.category}>
-                          {expandedItem.category}
+                    {/* Title and Price - Fixed at top */}
+                    <div className="flex-shrink-0 p-6 pb-4 border-b border-white/10">
+                      <div className="flex items-start justify-between gap-4 mb-2">
+                        <h2 className={`${menuStyle.typography.itemTitle} text-2xl text-white`}>
+                          {language === 'en' && expandedItem.nameEn
+                            ? expandedItem.nameEn
+                            : expandedItem.name}
+                        </h2>
+                        <span className={`${menuStyle.typography.price} text-2xl text-white whitespace-nowrap`}>
+                          ₪{expandedItem.price.toFixed(2)}
                         </span>
                       </div>
-
-                      {/* Full Description */}
-                      {(
-                        language === 'en'
-                          ? expandedItem.ingredientsEn
-                          : expandedItem.ingredients
-                      ) &&
-                        (language === 'en'
-                          ? expandedItem.ingredientsEn
-                          : expandedItem.ingredients
-                        )!.length > 0 && (
-                          <div className="mb-4">
-                            <h3 className="text-lg font-semibold text-white mb-2">
-                              {language === 'en' ? 'Ingredients:' : 'מרכיבים:'}
-                            </h3>
-                            <p className="text-base text-white/80 leading-relaxed">
-                              {(language === 'en'
-                                ? expandedItem.ingredientsEn
-                                : expandedItem.ingredients
-                              )!.join(', ')}
-                            </p>
-                          </div>
-                        )}
-
-                      {/* Allergens */}
-                      {(
-                        language === 'en'
-                          ? expandedItem.allergensEn
-                          : expandedItem.allergens
-                      ) &&
-                        (language === 'en'
-                          ? expandedItem.allergensEn
-                          : expandedItem.allergens
-                        )!.length > 0 && (
-                          <div className="mb-4">
-                            <h3 className="text-lg font-semibold text-white mb-2">
-                              {language === 'en' ? 'Allergens:' : 'אלרגנים:'}
-                            </h3>
-                            <p className="text-sm text-red-300">
-                              {(language === 'en'
-                                ? expandedItem.allergensEn
-                                : expandedItem.allergens
-                              )!.join(', ')}
-                            </p>
-                          </div>
-                        )}
-
-                      {/* Pregnancy Safe Badge */}
-                      {expandedItem.isPregnancySafe && (
-                        <div className="mb-4">
-                          <span className={menuStyle.badge.pregnancy}>
-                            <span>🤰</span>
-                            <span className="font-semibold">
-                              {language === 'en' ? 'Pregnancy-safe' : 'מתאים להריון'}
-                            </span>
-                          </span>
-                        </div>
-                      )}
+                      <span className={menuStyle.badge.category}>
+                        {expandedItem.category}
+                      </span>
                     </div>
 
-                    {/* Add to Cart Button - Fixed at bottom */}
-                    <div className="p-6 border-t border-white/20 sticky bottom-0 bg-white/10 backdrop-blur-sm">
+                    {/* Scrollable Content Area - Image and Details */}
+                    <div className="flex-1 overflow-y-auto min-h-0">
+                      {/* Image - Smaller, positioned lower */}
+                      <div className="max-h-[25vh] h-[25vh] w-full overflow-hidden my-4 mx-6 rounded-2xl">
+                        {expandedItem.imageUrl ? (
+                          <img
+                            src={expandedItem.imageUrl}
+                            alt={expandedItem.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-8xl opacity-30">
+                            🍽️
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Details Section - Above button */}
+                      <div className="px-6 pb-4">
+                        {/* Full Description */}
+                        {(
+                          language === 'en'
+                            ? expandedItem.ingredientsEn
+                            : expandedItem.ingredients
+                        ) &&
+                          (language === 'en'
+                            ? expandedItem.ingredientsEn
+                            : expandedItem.ingredients
+                          )!.length > 0 && (
+                            <div className="mb-4">
+                              <h3 className="text-lg font-semibold text-white mb-2">
+                                {language === 'en' ? 'Ingredients:' : 'מרכיבים:'}
+                              </h3>
+                              <p className="text-base text-white/80 leading-relaxed">
+                                {(language === 'en'
+                                  ? expandedItem.ingredientsEn
+                                  : expandedItem.ingredients
+                                )!.join(', ')}
+                              </p>
+                            </div>
+                          )}
+
+                        {/* Allergens */}
+                        {(
+                          language === 'en'
+                            ? expandedItem.allergensEn
+                            : expandedItem.allergens
+                        ) &&
+                          (language === 'en'
+                            ? expandedItem.allergensEn
+                            : expandedItem.allergens
+                          )!.length > 0 && (
+                            <div className="mb-4">
+                              <h3 className="text-lg font-semibold text-white mb-2">
+                                {language === 'en' ? 'Allergens:' : 'אלרגנים:'}
+                              </h3>
+                              <p className="text-sm text-red-300">
+                                {(language === 'en'
+                                  ? expandedItem.allergensEn
+                                  : expandedItem.allergens
+                                )!.join(', ')}
+                              </p>
+                            </div>
+                          )}
+
+                        {/* Pregnancy Safe Badge */}
+                        {expandedItem.isPregnancySafe && (
+                          <div className="mb-4">
+                            <span className={menuStyle.badge.pregnancy}>
+                              <span>🤰</span>
+                              <span className="font-semibold">
+                                {language === 'en' ? 'Pregnancy-safe' : 'מתאים להריון'}
+                              </span>
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Fixed Bottom Action Section */}
+                    <div className="flex-shrink-0 p-6 border-t border-white/20 bg-white/10 backdrop-blur-sm">
                       <motion.button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1268,46 +1261,6 @@ function CustomerMenuPageContent({
               </>
             )}
           </AnimatePresence>
-
-          {/* Categories Sidebar - Desktop only */}
-          <aside className="hidden lg:block lg:mb-0 lg:sticky lg:top-4 lg:self-start order-1 lg:order-2">
-            <h2 className="text-lg font-semibold mb-3">קטגוריות</h2>
-            <div className="max-h-[calc(100vh-8rem)] overflow-y-auto space-y-2 pr-2">
-              <motion.button
-                onClick={() => setActiveCategory('all')}
-                className={`w-full text-right rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
-                  activeCategory === 'all'
-                    ? menuStyle.button.category.active
-                    : menuStyle.button.category.inactive
-                }`}
-                whileHover={{ scale: 1.02, x: -4 }}
-                whileTap={{ scale: 0.98 }}
-        >
-                עמוד הבית
-              </motion.button>
-              {categories.map((cat, index) => (
-                <motion.button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
-                  className={`w-full text-right rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
-                    activeCategory === cat
-                      ? menuStyle.button.category.active
-                      : menuStyle.button.category.inactive
-                  }`}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{ scale: 1.02, x: -4 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  {cat === 'business' ? '💼 מנות עסקיות' : cat}
-                </motion.button>
-              ))}
-            </div>
-          </aside>
-        </div>
-          </>
-        )}
 
         {/* Upsell Suggestion - Subtle and contextual */}
         <AnimatePresence>

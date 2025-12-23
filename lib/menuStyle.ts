@@ -49,7 +49,7 @@ export const menuStyles: Record<MenuStyleVariant, MenuStyleConfig> = {
   elegant: {
     card: {
       base: 'flex flex-col rounded-[2.5rem] border border-white/10 bg-white/[0.03] backdrop-blur-xl p-5 transition-all duration-700 cursor-pointer',
-      image: 'w-full aspect-[4/3] rounded-[2rem] overflow-hidden bg-white/5 border border-white/5 mb-4 shadow-2xl',
+      image: 'w-full h-56 rounded-[2rem] overflow-hidden bg-white/5 border border-white/5 mb-4 shadow-2xl flex-shrink-0',
       hover: 'hover:bg-white/[0.06] hover:border-white/20 hover:-translate-y-1',
       content: 'px-2',
     },
@@ -76,9 +76,9 @@ export const menuStyles: Record<MenuStyleVariant, MenuStyleConfig> = {
       sectionGap: 'mb-20',
     },
     expanded: {
-      container: 'bg-neutral-950/90 backdrop-blur-3xl border border-white/10 rounded-[3rem] overflow-hidden flex flex-col relative',
-      image: 'relative h-[40vh] w-full grayscale-[0.2]',
-      content: 'flex-1 p-10 lg:p-16 text-center',
+      container: 'bg-neutral-950/90 backdrop-blur-3xl border border-white/10 rounded-[3rem] overflow-hidden flex flex-col relative h-full',
+      image: 'relative max-h-[20vh] h-[20vh] w-full grayscale-[0.2] flex-shrink-0 overflow-hidden',
+      content: 'flex-1 overflow-y-auto p-10 lg:p-16 text-center min-h-0',
       button: 'w-full rounded-full bg-white text-black py-5 text-sm font-light tracking-[0.3em] uppercase hover:tracking-[0.4em] transition-all duration-700',
     },
   },
@@ -89,7 +89,7 @@ export const menuStyles: Record<MenuStyleVariant, MenuStyleConfig> = {
   compact: {
     card: {
       base: 'flex items-center gap-4 rounded-2xl border border-white/5 bg-white/10 backdrop-blur-md p-3 transition-all duration-300 cursor-pointer',
-      image: 'w-20 h-20 rounded-xl overflow-hidden bg-white/5 border border-white/10 flex-shrink-0',
+      image: 'w-24 h-24 rounded-xl overflow-hidden bg-white/5 border border-white/10 flex-shrink-0',
       hover: 'hover:bg-white/15 hover:scale-[1.02] active:scale-[0.98]',
       content: 'flex-1 min-w-0',
     },
@@ -116,9 +116,9 @@ export const menuStyles: Record<MenuStyleVariant, MenuStyleConfig> = {
       sectionGap: 'mb-10',
     },
     expanded: {
-      container: 'bg-[#121212] border border-white/10 rounded-3xl overflow-hidden flex flex-col relative',
-      image: 'relative h-48 w-full',
-      content: 'flex-1 p-6',
+      container: 'bg-[#121212] border border-white/10 rounded-3xl overflow-hidden flex flex-col relative h-full',
+      image: 'relative max-h-[20vh] h-[20vh] w-full flex-shrink-0 overflow-hidden',
+      content: 'flex-1 overflow-y-auto p-6 min-h-0',
       button: 'w-full rounded-2xl bg-white text-black py-4 text-base font-bold active:scale-95 transition-all',
     },
   },
@@ -129,7 +129,7 @@ export const menuStyles: Record<MenuStyleVariant, MenuStyleConfig> = {
   bold: {
     card: {
       base: 'flex flex-col rounded-none border-l-4 border-white bg-black p-0 transition-all duration-300 cursor-pointer overflow-hidden',
-      image: 'w-full aspect-video grayscale hover:grayscale-0 transition-all duration-500',
+      image: 'w-full h-56 grayscale hover:grayscale-0 transition-all duration-500 flex-shrink-0 overflow-hidden',
       hover: 'hover:border-l-[12px] hover:bg-neutral-900',
       content: 'p-6 border-t border-white/10',
     },
@@ -156,9 +156,9 @@ export const menuStyles: Record<MenuStyleVariant, MenuStyleConfig> = {
       sectionGap: 'mb-16',
     },
     expanded: {
-      container: 'bg-black border-4 border-white rounded-none flex flex-col relative',
-      image: 'relative h-[30vh] w-full border-b-4 border-white',
-      content: 'flex-1 p-8',
+      container: 'bg-black border-4 border-white rounded-none flex flex-col relative h-full',
+      image: 'relative max-h-[20vh] h-[20vh] w-full border-b-4 border-white flex-shrink-0 overflow-hidden',
+      content: 'flex-1 overflow-y-auto p-8 min-h-0',
       button: 'w-full rounded-none bg-white text-black py-6 text-2xl font-black italic uppercase hover:bg-neutral-200 transition-all',
     },
   },
