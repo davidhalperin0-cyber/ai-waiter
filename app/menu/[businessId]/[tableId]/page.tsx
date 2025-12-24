@@ -34,7 +34,8 @@ function CustomerMenuPageContent({
   tableId: string;
 }) {
   const { items, addItem } = useCart();
-  const { session, markCartUpdated, updateSession } = useSession();
+  const { session, markCartUpdated, updateSession, isSessionValid } = useSession();
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -376,6 +377,13 @@ function CustomerMenuPageContent({
       return;
     }
 
+    // Check if session is still valid
+    if (!isSessionValid || !isSessionValid()) {
+      toast.error('הקישור פג תוקף. אנא סרוק את קוד ה-QR מחדש כדי להזמין.');
+      setSessionExpired(true);
+      return;
+    }
+
     // Check if this is a business item and if business hours are active
     if (item.isBusiness && !isBusinessHoursActive()) {
       const { start, end } = businessInfo?.businessHours || { start: '', end: '' };
@@ -399,22 +407,39 @@ function CustomerMenuPageContent({
     // Mark cart as updated
     markCartUpdated();
     
-    // Check for upsell suggestion (only if not already shown in this phase)
+    // Check for upsell suggestion (only if not already shown for this specific item)
+    // GUARDRAIL: Frequency limitation - one upsell per item, per session
     if (session && !session.upsellShown) {
-      try {
-        const res = await fetch(
-          `/api/ai/upsell?businessId=${encodeURIComponent(businessId)}&itemName=${encodeURIComponent(item.name)}`,
-        );
-        if (res.ok) {
-          const data = await res.json();
-          if (data.suggestedItem) {
-            setUpsellSuggestion(data.suggestedItem);
-            updateSession({ upsellShown: true });
+      // GUARDRAIL: Don't suggest if item is already in cart (double-check client-side)
+      const itemAlreadyInCart = items.some((cartItem) => 
+        cartItem.name.toLowerCase() === item.name.toLowerCase()
+      );
+      
+      if (!itemAlreadyInCart) {
+        try {
+          // Pass current cart items to API for server-side filtering
+          const cartItemNames = items.map((i) => i.name);
+          const res = await fetch(
+            `/api/ai/upsell?businessId=${encodeURIComponent(businessId)}&itemName=${encodeURIComponent(item.name)}&cartItems=${encodeURIComponent(JSON.stringify(cartItemNames))}`,
+          );
+          if (res.ok) {
+            const data = await res.json();
+            if (data.suggestedItem) {
+              // GUARDRAIL: Double-check the suggested item is not in cart
+              const suggestedInCart = items.some((cartItem) =>
+                cartItem.name.toLowerCase() === data.suggestedItem.name.toLowerCase()
+              );
+              
+              if (!suggestedInCart) {
+                setUpsellSuggestion(data.suggestedItem);
+                updateSession({ upsellShown: true });
+              }
+            }
           }
+        } catch (err) {
+          // Silently fail - upsell is optional
+          console.error('Upsell fetch error:', err);
         }
-      } catch (err) {
-        // Silently fail - upsell is optional
-        console.error('Upsell fetch error:', err);
       }
     }
   }
@@ -605,6 +630,25 @@ function CustomerMenuPageContent({
                   תצוגה בלבד
           </p>
         </div>
+            </motion.div>
+          )}
+
+          {sessionExpired && !subscriptionExpired && !businessDisabled && (
+            <motion.div
+              className="mb-8 rounded-[2rem] border border-yellow-500/30 bg-yellow-950/20 backdrop-blur-xl p-6 text-center"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <div className="text-3xl mb-3">⏰</div>
+              <h2 className="text-lg font-medium mb-2 text-yellow-200">
+                הקישור פג תוקף
+              </h2>
+              <p className="text-sm text-white/70 leading-relaxed max-w-xs mx-auto mb-4">
+                הקישור תקף לשעה אחת בלבד. כדי להזמין שוב, אנא סרוק את קוד ה-QR מחדש.
+              </p>
+              <p className="text-xs text-white/50">
+                ניתן לצפות בתפריט, אך לא ניתן להוסיף פריטים לעגלה
+              </p>
             </motion.div>
           )}
 
@@ -1273,11 +1317,12 @@ function CustomerMenuPageContent({
             >
               <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-4 flex items-center gap-4">
                 <div className="flex-1">
-                  <p className="text-sm text-white/70 mb-1">💡 המלצה חכמה</p>
-                  <p className="text-base font-semibold text-white">
+                  <p className="text-sm text-white/70 mb-1">💡 המלצה</p>
+                  <p className="text-base font-medium text-white">
                     לקוחות אחרים הזמינו גם את {upsellSuggestion.name}
                   </p>
                   <p className="text-sm text-white/60 mt-1">₪{upsellSuggestion.price.toFixed(2)}</p>
+                  <p className="text-xs text-white/50 mt-1">אם תרצה, אפשר להוסיף</p>
                 </div>
                 <motion.button
                   onClick={() => {

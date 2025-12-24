@@ -35,7 +35,8 @@ function ChatPageContent({
   tableId: string;
 }) {
   const { items, addItem, removeItem, clear } = useCart();
-  const { session, markOrderConfirmed, markCartUpdated, updateSession } = useSession();
+  const { session, markOrderConfirmed, markCartUpdated, updateSession, isSessionValid } = useSession();
+  const [sessionExpired, setSessionExpired] = useState(false);
   
   // Initialize with welcome message (same for server and client to avoid hydration error)
   const [messages, setMessages] = useState<Message[]>([
@@ -49,11 +50,20 @@ function ChatPageContent({
   
   const [isHydrated, setIsHydrated] = useState(false);
   
+  // Get storage key for AI history - uses deviceId if available, otherwise falls back to tableId
+  const getChatStorageKey = () => {
+    const deviceId = session?.deviceId;
+    // Use deviceId for AI history persistence across sessions, fallback to tableId for backward compatibility
+    return deviceId 
+      ? `chat_messages_${businessId}_${deviceId}`
+      : `chat_messages_${businessId}_${tableId}`;
+  };
+  
   // Load messages from localStorage after hydration (client-side only)
   useEffect(() => {
     setIsHydrated(true);
     
-    const storageKey = `chat_messages_${businessId}_${tableId}`;
+    const storageKey = getChatStorageKey();
     const stored = localStorage.getItem(storageKey);
     
     if (stored) {
@@ -67,15 +77,15 @@ function ChatPageContent({
         // Invalid stored data
       }
     }
-  }, [businessId, tableId]);
+  }, [businessId, tableId, session?.deviceId]);
   
   // Save messages to localStorage whenever they change (only after hydration)
   useEffect(() => {
     if (!isHydrated || typeof window === 'undefined') return;
     
-    const storageKey = `chat_messages_${businessId}_${tableId}`;
+    const storageKey = getChatStorageKey();
     localStorage.setItem(storageKey, JSON.stringify(messages));
-  }, [messages, businessId, tableId, isHydrated]);
+  }, [messages, businessId, tableId, isHydrated, session?.deviceId]);
   const [input, setInput] = useState('');
   const [isFinalReady, setIsFinalReady] = useState(false);
   const [lastSummary, setLastSummary] = useState<string | null>(null);
@@ -245,6 +255,12 @@ function ChatPageContent({
     });
 
     if (addedCount > 0 || removedCount > 0) {
+      // GUARDRAIL: If changes were made after a summary, reset confirmation state
+      // The AI should provide a new summary in its next response
+      setIsFinalReady(false);
+      setLastSummary(null);
+      markCartUpdated();
+
       const summaryParts: string[] = [];
       if (addedItemsSummary.length > 0) {
         const itemsText = addedItemsSummary
@@ -264,7 +280,7 @@ function ChatPageContent({
       const assistantMessage: Message = {
         id: Date.now() + 2,
         role: 'assistant',
-        content: `${summaryParts.join('. ')}.\nיש עוד משהו שאפשר לעזור בו לפני שסוגרים את ההזמנה?`,
+        content: `${summaryParts.join('. ')}.\nאני אכין סיכום מעודכן של ההזמנה.`,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -274,6 +290,13 @@ function ChatPageContent({
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault();
     if (!input.trim() || loading) return;
+
+    // Check if session is still valid
+    if (!isSessionValid || !isSessionValid()) {
+      toast.error('הקישור פג תוקף. אנא סרוק את קוד ה-QR מחדש כדי להזמין.');
+      setSessionExpired(true);
+      return;
+    }
 
     const userMessage: Message = {
       id: Date.now(),
@@ -320,12 +343,30 @@ function ChatPageContent({
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
-      setLastSummary(reply);
-      setIsFinalReady(true);
 
-      if (data.actions) {
+      // GUARDRAIL: Check if this is a summary (contains structured order format)
+      const isOrderSummary = reply.includes('סיכום') || reply.includes('סה"כ') || 
+                             (reply.includes('×') && reply.match(/\d+\s*×/));
+      
+      if (isOrderSummary) {
+        setLastSummary(reply);
+        setIsFinalReady(true);
+      }
+
+      // GUARDRAIL: If user requested changes (actions were applied), reset confirmation state
+      if (data.actions && data.actions.length > 0) {
+        const hasCartChanges = data.actions.some(
+          (a: any) => a.type === 'add_to_cart' || a.type === 'remove_from_cart'
+        );
+        
+        if (hasCartChanges) {
+          // User requested changes - require new summary and confirmation
+          setIsFinalReady(false);
+          setLastSummary(null);
+          markCartUpdated();
+        }
+        
         applyActions(data.actions);
-        markCartUpdated();
       }
     } catch (err) {
       const assistantMessage: Message = {
@@ -341,6 +382,13 @@ function ChatPageContent({
 
   async function confirmOrder() {
     if (!items.length || !lastSummary) return;
+
+    // Check if session is still valid
+    if (!isSessionValid || !isSessionValid()) {
+      toast.error('הקישור פג תוקף. אנא סרוק את קוד ה-QR מחדש כדי להזמין.');
+      setSessionExpired(true);
+      return;
+    }
 
     try {
       const res = await fetch('/api/orders', {
@@ -359,6 +407,10 @@ function ChatPageContent({
         markOrderConfirmed();
         clear();
         
+        // GUARDRAIL: Post-confirmation lock - clear all confirmation state
+        setIsFinalReady(false);
+        setLastSummary(null);
+        
         // Clear chat messages after order confirmation
         const welcomeMessage: Message = {
           id: Date.now(),
@@ -370,12 +422,10 @@ function ChatPageContent({
         
         // Clear from localStorage
         if (typeof window !== 'undefined') {
-          const storageKey = `chat_messages_${businessId}_${tableId}`;
+          const storageKey = getChatStorageKey();
           localStorage.setItem(storageKey, JSON.stringify([welcomeMessage]));
         }
         
-        setIsFinalReady(false);
-        setLastSummary(null);
         toast.success(`הזמנה אושרה! מזהה: ${data.orderId}`);
       } else {
         toast.error(data.message || 'נכשל ביצירת ההזמנה');
@@ -430,6 +480,26 @@ function ChatPageContent({
             </Link>
           </div>
         </header>
+
+        {/* Session Expired Message */}
+        {sessionExpired && (
+          <motion.div
+            className="mx-6 mt-6 rounded-[2rem] border border-yellow-500/30 bg-yellow-950/20 backdrop-blur-xl p-6 text-center"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="text-3xl mb-3">⏰</div>
+            <h2 className="text-lg font-medium mb-2 text-yellow-200">
+              הקישור פג תוקף
+            </h2>
+            <p className="text-sm text-white/70 leading-relaxed max-w-xs mx-auto mb-4">
+              הקישור תקף לשעה אחת בלבד. כדי להזמין שוב, אנא סרוק את קוד ה-QR מחדש.
+            </p>
+            <p className="text-xs text-white/50">
+              ניתן לצפות בהודעות, אך לא ניתן להזמין
+            </p>
+          </motion.div>
+        )}
 
         {/* Messages Section - Scrollable */}
         <section className="flex-1 overflow-y-auto px-6 py-8 space-y-8 scrollbar-hide no-scrollbar">

@@ -23,4 +23,26 @@ body {
   outline-offset: 1px;
 }
 
+/* Mobile bottom navigation */
+@media (max-width: 1023px) {
+  body {
+    padding-bottom: 0;
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Hide scrollbar for horizontal scroll */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 

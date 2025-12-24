@@ -1,16 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
-// GET /api/ai/upsell?businessId=...&itemName=...
+// GET /api/ai/upsell?businessId=...&itemName=...&cartItems=...
 // Returns a suggested upsell item based on co-occurrence statistics
+// cartItems: JSON stringified array of current cart item names (optional)
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const businessId = searchParams.get('businessId');
     const itemName = searchParams.get('itemName');
+    const cartItemsParam = searchParams.get('cartItems');
 
     if (!businessId || !itemName) {
       return NextResponse.json({ message: 'businessId and itemName are required' }, { status: 400 });
+    }
+
+    // Parse current cart items to avoid suggesting items already in cart
+    let currentCartItems: string[] = [];
+    if (cartItemsParam) {
+      try {
+        currentCartItems = JSON.parse(cartItemsParam).map((name: string) => name.toLowerCase());
+      } catch (e) {
+        // Invalid cart items, continue without filtering
+      }
     }
 
     // Get all orders for this business
@@ -83,6 +95,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ suggestedItem: null }, { status: 200 });
     }
 
+    // GUARDRAIL 1: Do NOT suggest if item is already in cart
+    if (currentCartItems.includes(menuItem.name.toLowerCase())) {
+      return NextResponse.json({ suggestedItem: null }, { status: 200 });
+    }
+
+    // GUARDRAIL 2: Confidence threshold - must be clearly ≥ 30% (not borderline)
+    const confidence = Math.round((maxCount / totalOccurrences) * 100);
+    if (confidence < 30) {
+      return NextResponse.json({ suggestedItem: null }, { status: 200 });
+    }
+
     return NextResponse.json(
       {
         suggestedItem: {
@@ -90,7 +113,7 @@ export async function GET(req: NextRequest) {
           price: menuItem.price,
           category: menuItem.category,
           imageUrl: menuItem.imageUrl,
-          confidence: Math.round((maxCount / totalOccurrences) * 100),
+          confidence: confidence,
         },
       },
       { status: 200 },

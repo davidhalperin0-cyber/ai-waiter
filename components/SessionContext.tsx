@@ -14,6 +14,23 @@ export interface SessionState {
   upsellShown: boolean; // track if upsell was already shown in this phase
   everythingOkayShown: boolean; // track if "everything okay" was shown
   incompleteOrderShown: boolean; // track if incomplete order prompt was shown
+  deviceId?: string; // unique device identifier for AI history
+}
+
+// Generate or get device ID for AI history persistence
+export function getDeviceId(): string {
+  if (typeof window === 'undefined') return '';
+  
+  const storageKey = 'device_id';
+  let deviceId = localStorage.getItem(storageKey);
+  
+  if (!deviceId) {
+    // Generate a unique device ID
+    deviceId = `device_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    localStorage.setItem(storageKey, deviceId);
+  }
+  
+  return deviceId;
 }
 
 interface SessionContextValue {
@@ -22,6 +39,7 @@ interface SessionContextValue {
   resetSession: () => void;
   markOrderConfirmed: () => void;
   markCartUpdated: () => void;
+  isSessionValid: () => boolean; // Check if session is still valid (within 1 hour)
 }
 
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
@@ -45,10 +63,10 @@ export function SessionProvider({
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        // Check if session is still valid (not older than 24 hours)
+        // Check if session is still valid (not older than 1 hour)
         const now = Date.now();
         const sessionAge = now - parsed.sessionStart;
-        const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+        const maxAge = 60 * 60 * 1000; // 1 hour
         
         if (sessionAge < maxAge) {
           setSession(parsed);
@@ -68,6 +86,7 @@ export function SessionProvider({
       upsellShown: false,
       everythingOkayShown: false,
       incompleteOrderShown: false,
+      deviceId: getDeviceId(),
     };
     
     setSession(newSession);
@@ -100,6 +119,7 @@ export function SessionProvider({
       upsellShown: false,
       everythingOkayShown: false,
       incompleteOrderShown: false,
+      deviceId: getDeviceId(),
     };
     setSession(newSession);
   }
@@ -120,8 +140,16 @@ export function SessionProvider({
     });
   }
 
+  function isSessionValid(): boolean {
+    if (!session) return false;
+    const now = Date.now();
+    const sessionAge = now - session.sessionStart;
+    const maxAge = 60 * 60 * 1000; // 1 hour
+    return sessionAge < maxAge;
+  }
+
   return (
-    <SessionContext.Provider value={{ session, updateSession, resetSession, markOrderConfirmed, markCartUpdated }}>
+    <SessionContext.Provider value={{ session, updateSession, resetSession, markOrderConfirmed, markCartUpdated, isSessionValid }}>
       {children}
     </SessionContext.Provider>
   );

@@ -9,7 +9,7 @@ export async function PUT(
   { params }: { params: { menuItemId: string } },
 ) {
   try {
-    const menuItemId = params.menuItemId;
+    const menuItemId = decodeURIComponent(params.menuItemId);
     const body = await req.json();
     const {
       businessId,
@@ -35,15 +35,35 @@ export async function PUT(
 
     const updateData: any = {};
     if (category !== undefined) updateData.category = category;
-    if (categoryEn !== undefined) (updateData as any).category_en = categoryEn;
+    if (categoryEn !== undefined) {
+      if (categoryEn === null || categoryEn === '') {
+        (updateData as any).category_en = null;
+      } else if (typeof categoryEn === 'string') {
+        (updateData as any).category_en = categoryEn.trim() || null;
+      } else {
+        (updateData as any).category_en = categoryEn;
+      }
+    }
     if (name !== undefined) updateData.name = name;
-    if (nameEn !== undefined) (updateData as any).name_en = nameEn;
+    if (nameEn !== undefined) {
+      if (nameEn === null || nameEn === '') {
+        (updateData as any).name_en = null;
+      } else if (typeof nameEn === 'string') {
+        (updateData as any).name_en = nameEn.trim() || null;
+      } else {
+        (updateData as any).name_en = nameEn;
+      }
+    }
     if (price !== undefined) updateData.price = price;
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
     if (ingredients !== undefined) updateData.ingredients = ingredients;
-    if (ingredientsEn !== undefined) (updateData as any).ingredients_en = ingredientsEn;
+    if (ingredientsEn !== undefined) {
+      (updateData as any).ingredients_en = ingredientsEn;
+    }
     if (allergens !== undefined) updateData.allergens = allergens;
-    if (allergensEn !== undefined) (updateData as any).allergens_en = allergensEn;
+    if (allergensEn !== undefined) {
+      (updateData as any).allergens_en = allergensEn;
+    }
     if (customizationOptions !== undefined) updateData.customizationOptions = customizationOptions;
     if (isFeatured !== undefined) updateData.is_featured = isFeatured;
     if (isPregnancySafe !== undefined) updateData.is_pregnancy_safe = isPregnancySafe;
@@ -64,17 +84,26 @@ export async function PUT(
 
     // If error is about optional columns not existing, retry without them
     if (error && error.message) {
-      const message = error.message;
+      const message = error.message.toLowerCase();
       const relatesToOptionalColumn =
-        message.includes('isBusiness') ||
+        message.includes('isbusiness') ||
+        message.includes('category_en') ||
         message.includes('name_en') ||
         message.includes('ingredients_en') ||
-        message.includes('allergens_en');
+        message.includes('allergens_en') ||
+        (message.includes('column') && message.includes('_en'));
 
       if (relatesToOptionalColumn) {
-        console.warn('Optional menuItems columns may not exist yet, retrying update without them:', message);
+        console.warn('Optional menuItems columns may not exist yet, retrying update without them:', error.message);
 
         const fallbackUpdate: any = { ...updateData };
+        // Remove optional English columns from fallback update
+        delete fallbackUpdate.category_en;
+        delete fallbackUpdate.name_en;
+        delete fallbackUpdate.ingredients_en;
+        delete fallbackUpdate.allergens_en;
+        delete extraUpdates.isBusiness;
+
         const retry = await supabaseAdmin
           .from('menuItems')
           .update(fallbackUpdate)
@@ -110,9 +139,13 @@ export async function PUT(
     }
 
     return NextResponse.json({ message: 'Updated' }, { status: 200 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating menu item', error);
-    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ 
+      message: 'Internal server error',
+      details: error?.message || 'Unknown error',
+      stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
+    }, { status: 500 });
   }
 }
 

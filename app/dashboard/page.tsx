@@ -136,6 +136,13 @@ export default function DashboardPage() {
   useEffect(() => {
     if (businessId && activeTab === 'orders') {
       loadOrders();
+      
+      // Auto-refresh orders and stats every 5 seconds when orders tab is active
+      const interval = setInterval(() => {
+        loadOrders();
+      }, 5000);
+      
+      return () => clearInterval(interval);
     }
   }, [businessId, activeTab]);
 
@@ -358,9 +365,9 @@ export default function DashboardPage() {
         body: JSON.stringify({
           businessId,
           category: newItem.category.trim(),
-          categoryEn: newItem.categoryEn.trim() || undefined,
+          categoryEn: newItem.categoryEn?.trim() || undefined,
           name: newItem.name,
-          nameEn: newItem.nameEn || undefined,
+          nameEn: newItem.nameEn?.trim() || undefined,
           price: priceNumber,
           imageUrl: newItem.imageUrl || undefined,
           ingredients: ingredients.length > 0 ? ingredients : undefined,
@@ -633,233 +640,247 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-white p-6 space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold mb-2">לוח בקרה עסקי</h1>
-        <p className="text-neutral-400 text-sm">
-          נהלו את התפריט, השולחנות וקודי QR, מדפסת, וצפו בהזמנות והכנסות.
-        </p>
+    <main className="min-h-screen bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 text-white pb-24 lg:pb-6">
+      {/* Header - Modern Design */}
+      <header className="sticky top-0 z-40 bg-neutral-950/80 backdrop-blur-xl border-b border-neutral-800/50 px-4 lg:px-6 py-4 lg:py-6">
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-2xl lg:text-3xl font-bold mb-1 bg-gradient-to-r from-white to-neutral-300 bg-clip-text text-transparent">
+            לוח בקרה עסקי
+          </h1>
+          <p className="text-neutral-400 text-sm lg:text-base">
+            נהלו את התפריט, השולחנות וקודי QR, מדפסת, וצפו בהזמנות והכנסות.
+          </p>
+        </div>
       </header>
 
-      {error && (
-        <p className="text-sm text-red-400 bg-red-950/40 border border-red-500/40 rounded px-3 py-2">
-          {error}
-        </p>
-      )}
+      <div className="max-w-7xl mx-auto px-4 lg:px-6 py-4 lg:py-6 space-y-6">
+        {error && (
+          <div className="bg-red-950/40 border border-red-500/50 rounded-xl px-4 py-3 backdrop-blur-sm">
+            <p className="text-sm text-red-300 font-medium">{error}</p>
+          </div>
+        )}
 
-      {/* Subscription Warning Banner */}
-      {businessInfo?.subscription && 
-       (businessInfo.subscription.status === 'expired' || businessInfo.subscription.status === 'past_due') && (
-        <div className="bg-yellow-900/40 border-2 border-yellow-500/50 rounded-lg p-4 mb-4">
-          <div className="flex items-start gap-3">
-            <div className="text-2xl">⚠️</div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-yellow-300 mb-1">
-                המנוי {businessInfo.subscription.status === 'expired' ? 'פג תוקף' : 'בפיגור תשלום'}
-              </h3>
-              <p className="text-sm text-yellow-200/80 mb-2">
-                המנוי שלך {businessInfo.subscription.status === 'expired' ? 'פג תוקף' : 'בפיגור תשלום'}.
-                הלקוחות לא יוכלו לבצע הזמנות עד שתחדש את המנוי.
-              </p>
-              {businessInfo.subscription.nextBillingDate && (
-                <p className="text-xs text-yellow-200/60">
-                  תאריך חיוב הבא: {new Date(businessInfo.subscription.nextBillingDate).toLocaleDateString('he-IL')}
+        {/* Subscription Warning Banner */}
+        {businessInfo?.subscription && 
+         (businessInfo.subscription.status === 'expired' || businessInfo.subscription.status === 'past_due') && (
+          <div className="bg-gradient-to-r from-yellow-900/40 to-orange-900/40 border border-yellow-500/50 rounded-xl p-4 backdrop-blur-sm shadow-lg">
+            <div className="flex items-start gap-3">
+              <div className="text-2xl">⚠️</div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-yellow-300 mb-1">
+                  המנוי {businessInfo.subscription.status === 'expired' ? 'פג תוקף' : 'בפיגור תשלום'}
+                </h3>
+                <p className="text-sm text-yellow-200/80 mb-2">
+                  המנוי שלך {businessInfo.subscription.status === 'expired' ? 'פג תוקף' : 'בפיגור תשלום'}.
+                  הלקוחות לא יוכלו לבצע הזמנות עד שתחדש את המנוי.
                 </p>
+                {businessInfo.subscription.nextBillingDate && (
+                  <p className="text-xs text-yellow-200/60">
+                    תאריך חיוב הבא: {new Date(businessInfo.subscription.nextBillingDate).toLocaleDateString('he-IL')}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Desktop Navigation - Horizontal Scroll */}
+        <nav className="hidden lg:flex gap-2 border-b border-neutral-800/50 mb-6 overflow-x-auto scrollbar-hide">
+          {[
+            { id: 'menu', label: '📋 ניהול תפריט', icon: '📋' },
+            { id: 'tables', label: '🪑 שולחנות וקודי QR', icon: '🪑' },
+            { id: 'settings', label: '⚙️ הגדרות עסק', icon: '⚙️' },
+            { id: 'printer', label: '🖨️ הגדרות מדפסת', icon: '🖨️' },
+            { id: 'pos', label: '💳 אינטגרציית POS', icon: '💳' },
+            { id: 'orders', label: '📊 הזמנות ורווחים', icon: '📊' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setActiveTab(tab.id as any);
+                if (tab.id === 'orders' && businessId) loadOrders();
+              }}
+              className={`px-5 py-3 text-sm font-semibold rounded-t-lg transition-all duration-300 whitespace-nowrap ${
+                activeTab === tab.id
+                  ? 'bg-neutral-800/80 text-white border-b-2 border-white shadow-lg'
+                  : 'text-neutral-400 hover:text-white hover:bg-neutral-800/40'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Mobile Bottom Navigation */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-neutral-900/95 backdrop-blur-xl border-t border-neutral-800/50 shadow-2xl">
+          <div className="grid grid-cols-3 gap-1 p-2">
+            {[
+              { id: 'menu', label: 'תפריט', icon: '📋' },
+              { id: 'tables', label: 'שולחנות', icon: '🪑' },
+              { id: 'settings', label: 'הגדרות', icon: '⚙️' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-lg transition-all duration-200 ${
+                  activeTab === tab.id
+                    ? 'bg-neutral-800 text-white'
+                    : 'text-neutral-400 active:bg-neutral-800/50'
+                }`}
+              >
+                <span className="text-xl">{tab.icon}</span>
+                <span className="text-[10px] font-medium">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-3 gap-1 p-2 border-t border-neutral-800/30">
+            {[
+              { id: 'printer', label: 'מדפסת', icon: '🖨️' },
+              { id: 'pos', label: 'POS', icon: '💳' },
+              { id: 'orders', label: 'הזמנות', icon: '📊', action: () => businessId && loadOrders() },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id as any);
+                  if (tab.action) tab.action();
+                }}
+                className={`flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-lg transition-all duration-200 ${
+                  activeTab === tab.id
+                    ? 'bg-neutral-800 text-white'
+                    : 'text-neutral-400 active:bg-neutral-800/50'
+                }`}
+              >
+                <span className="text-xl">{tab.icon}</span>
+                <span className="text-[10px] font-medium">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        </nav>
+
+        {activeTab === 'menu' && (
+          <section className="space-y-6">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div>
+                <h2 className="text-xl lg:text-2xl font-bold mb-2">ניהול תפריט</h2>
+                <p className="text-sm text-neutral-400">
+                  צרו ועדכנו קטגוריות, פריטים, מרכיבים, אלרגנים והתאמות אישיות.
+                </p>
+              </div>
+              {tables.length > 0 && businessId && (
+                <a
+                  href={`/menu/${businessId}/${tables[0].tableId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm text-green-400 hover:text-green-300 border border-green-400/40 px-4 py-2 rounded-lg transition-all hover:bg-green-400/10"
+                >
+                  <span>→</span>
+                  <span>צפה בתפריט לקוח</span>
+                </a>
               )}
             </div>
-          </div>
-        </div>
-      )}
 
-      <div className="flex gap-2 border-b border-neutral-800 mb-4">
-        <button
-          onClick={() => setActiveTab('menu')}
-          className={`px-4 py-2 text-sm font-semibold ${
-            activeTab === 'menu'
-              ? 'border-b-2 border-white text-white'
-              : 'text-neutral-400'
-          }`}
-        >
-          ניהול תפריט
-        </button>
-        <button
-          onClick={() => setActiveTab('tables')}
-          className={`px-4 py-2 text-sm font-semibold ${
-            activeTab === 'tables'
-              ? 'border-b-2 border-white text-white'
-              : 'text-neutral-400'
-          }`}
-        >
-          שולחנות וקודי QR
-        </button>
-        <button
-          onClick={() => setActiveTab('settings')}
-          className={`px-4 py-2 text-sm font-semibold ${
-            activeTab === 'settings'
-              ? 'border-b-2 border-white text-white'
-              : 'text-neutral-400'
-          }`}
-        >
-          הגדרות עסק
-        </button>
-        <button
-          onClick={() => setActiveTab('printer')}
-          className={`px-4 py-2 text-sm font-semibold ${
-            activeTab === 'printer'
-              ? 'border-b-2 border-white text-white'
-              : 'text-neutral-400'
-          }`}
-        >
-          הגדרות מדפסת
-        </button>
-        <button
-          onClick={() => setActiveTab('pos')}
-          className={`px-4 py-2 text-sm font-semibold ${
-            activeTab === 'pos'
-              ? 'border-b-2 border-white text-white'
-              : 'text-neutral-400'
-          }`}
-        >
-          אינטגרציית POS
-        </button>
-        <button
-          onClick={() => {
-            setActiveTab('orders');
-            if (businessId) loadOrders();
-          }}
-          className={`px-4 py-2 text-sm font-semibold ${
-            activeTab === 'orders'
-              ? 'border-b-2 border-white text-white'
-              : 'text-neutral-400'
-          }`}
-        >
-          הזמנות ורווחים
-        </button>
-      </div>
-
-      {activeTab === 'menu' && (
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">ניהול תפריט</h2>
-              <p className="text-xs text-neutral-400 mb-3">
-                צרו ועדכנו קטגוריות, פריטים, מרכיבים, אלרגנים והתאמות אישיות.
-              </p>
-            </div>
-            {tables.length > 0 && businessId && (
-              <a
-                href={`/menu/${businessId}/${tables[0].tableId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-green-400 hover:text-green-300 border border-green-400/40 px-3 py-1 rounded"
-              >
-                → צפה בתפריט לקוח
-              </a>
-            )}
-          </div>
-
-          <form onSubmit={editingItem ? handleUpdateItem : handleAddItem} className="space-y-3 mb-4 text-xs border border-neutral-800 rounded-lg p-4 bg-neutral-900/50">
-            <div className="flex flex-wrap gap-2 items-end">
-              <div className="flex-1 min-w-[120px]">
-                <label className="block mb-1 text-neutral-300">קטגוריה</label>
-                <input
-                  value={newItem.category}
-                  onChange={(e) => setNewItem((v) => ({ ...v, category: e.target.value }))}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1"
-                  placeholder="למשל: עיקריות"
-                  required
-                />
-              </div>
-              <div className="flex-1 min-w-[140px]">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-neutral-300">קטגוריה באנגלית</label>
-                  <button
-                    type="button"
-                    onClick={() => handleAutoTranslate('category')}
-                    className="text-[10px] text-blue-300 hover:text-blue-200"
-                  >
-                    תרגם אוטומטית
-                  </button>
+            <form onSubmit={editingItem ? handleUpdateItem : handleAddItem} className="bg-neutral-900/60 backdrop-blur-sm border border-neutral-800/50 rounded-2xl p-5 lg:p-6 space-y-4 shadow-xl">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-neutral-200">קטגוריה</label>
+                  <input
+                    value={newItem.category}
+                    onChange={(e) => setNewItem((v) => ({ ...v, category: e.target.value.trim() }))}
+                    className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                    placeholder="למשל: עיקריות"
+                    required
+                  />
                 </div>
-                <input
-                  value={newItem.categoryEn}
-                  onChange={(e) => setNewItem((v) => ({ ...v, categoryEn: e.target.value }))}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1"
-                  placeholder="e.g. Starters"
-                />
-              </div>
-              <div className="flex-1 min-w-[140px]">
-                <label className="block mb-1 text-neutral-300">שם</label>
-                <input
-                  value={newItem.name}
-                  onChange={(e) => setNewItem((v) => ({ ...v, name: e.target.value }))}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1"
-                  placeholder="למשל: פיצה מרגריטה"
-                  required
-                />
-              </div>
-              <div className="flex-1 min-w-[140px]">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-neutral-300">שם באנגלית</label>
-                  <button
-                    type="button"
-                    onClick={() => handleAutoTranslate('name')}
-                    className="text-[10px] text-blue-300 hover:text-blue-200"
-                  >
-                    תרגם אוטומטית
-                  </button>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-neutral-200">קטגוריה באנגלית</label>
+                    <button
+                      type="button"
+                      onClick={() => handleAutoTranslate('category')}
+                      className="text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors"
+                    >
+                      ✨ תרגם אוטומטית
+                    </button>
+                  </div>
+                  <input
+                    value={newItem.categoryEn}
+                    onChange={(e) => setNewItem((v) => ({ ...v, categoryEn: e.target.value }))}
+                    className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                    placeholder="e.g. Starters"
+                  />
                 </div>
-                <input
-                  value={newItem.nameEn}
-                  onChange={(e) => setNewItem((v) => ({ ...v, nameEn: e.target.value }))}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1"
-                  placeholder="e.g. Margherita Pizza"
-                />
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-neutral-200">שם</label>
+                  <input
+                    value={newItem.name}
+                    onChange={(e) => setNewItem((v) => ({ ...v, name: e.target.value }))}
+                    className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                    placeholder="למשל: פיצה מרגריטה"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-neutral-200">שם באנגלית</label>
+                    <button
+                      type="button"
+                      onClick={() => handleAutoTranslate('name')}
+                      className="text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors"
+                    >
+                      ✨ תרגם אוטומטית
+                    </button>
+                  </div>
+                  <input
+                    value={newItem.nameEn}
+                    onChange={(e) => setNewItem((v) => ({ ...v, nameEn: e.target.value }))}
+                    className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                    placeholder="e.g. Margherita Pizza"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-neutral-200">מחיר (₪)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newItem.price}
+                    onChange={(e) => setNewItem((v) => ({ ...v, price: e.target.value }))}
+                    className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                    placeholder="12.50"
+                    required
+                  />
+                </div>
               </div>
-              <div className="w-24">
-                <label className="block mb-1 text-neutral-300">מחיר</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={newItem.price}
-                  onChange={(e) => setNewItem((v) => ({ ...v, price: e.target.value }))}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1"
-                  placeholder="12.5"
-                  required
-                />
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2 items-end">
-              <div className="flex-1 min-w-[200px] space-y-1">
-                <label className="block mb-1 text-neutral-300">תמונה של המנה</label>
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-neutral-200">תמונה של המנה</label>
                 {newItem.imageUrl && (
-                  <div className="mb-1">
+                  <div className="mb-3">
                     <img
                       src={newItem.imageUrl}
                       alt={newItem.name || 'תמונה'}
-                      className="h-16 w-16 object-cover rounded border border-neutral-700 mb-1"
+                      className="h-24 w-24 lg:h-32 lg:w-32 object-cover rounded-xl border-2 border-neutral-700/50 shadow-lg"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
                     />
                   </div>
                 )}
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-3">
                   <button
                     type="button"
                     onClick={() => fileInputGalleryRef.current?.click()}
                     disabled={uploadingImage}
-                    className="rounded-md bg-white text-black px-3 py-1 text-[11px] font-semibold disabled:opacity-60"
+                    className="flex-1 lg:flex-initial rounded-lg bg-white text-black px-4 py-3 text-sm font-semibold disabled:opacity-60 hover:bg-neutral-100 transition-all active:scale-95"
                   >
-                    העלה מהטלפון / מהמחשב
+                    📷 העלה מהטלפון
                   </button>
                   <button
                     type="button"
                     onClick={() => fileInputCameraRef.current?.click()}
                     disabled={uploadingImage}
-                    className="rounded-md bg-neutral-700 text-white px-3 py-1 text-[11px] font-semibold hover:bg-neutral-600 disabled:opacity-60"
+                    className="flex-1 lg:flex-initial rounded-lg bg-neutral-700/80 text-white px-4 py-3 text-sm font-semibold hover:bg-neutral-600 disabled:opacity-60 transition-all active:scale-95"
                   >
-                    צלם עכשיו
+                    📸 צלם עכשיו
                   </button>
                 </div>
                 <input
@@ -889,184 +910,199 @@ export default function DashboardPage() {
                     }
                   }}
                 />
-                <p className="text-[10px] text-neutral-500">
+                <p className="text-xs text-neutral-400 mt-2 mb-1">
                   או הדביקו URL קיים:
                 </p>
                 <input
                   type="url"
                   value={newItem.imageUrl}
                   onChange={(e) => setNewItem((v) => ({ ...v, imageUrl: e.target.value }))}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1 text-[11px]"
+                  className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                   placeholder="https://example.com/image.jpg"
                 />
               </div>
-            </div>
-            <div className="flex flex-wrap gap-2 items-end">
-              <div className="flex-1 min-w-[200px]">
-                <label className="block mb-1 text-neutral-300">מרכיבים (מופרדים בפסיקים)</label>
-                <input
-                  value={newItem.ingredients}
-                  onChange={(e) => setNewItem((v) => ({ ...v, ingredients: e.target.value }))}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1"
-                  placeholder="למשל: עגבניות, מוצרלה, בזיליקום"
-                />
-              </div>
-              <div className="flex-1 min-w-[200px]">
-                <label className="block mb-1 text-neutral-300">אלרגנים (מופרדים בפסיקים)</label>
-                <input
-                  value={newItem.allergens}
-                  onChange={(e) => setNewItem((v) => ({ ...v, allergens: e.target.value }))}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1"
-                  placeholder="למשל: גלוטן, חלב"
-                />
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2 items-end">
-              <div className="flex-1 min-w-[200px]">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-neutral-300">
-                    מרכיבים באנגלית (מופרדים בפסיקים)
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => handleAutoTranslate('ingredients')}
-                    className="text-[10px] text-blue-300 hover:text-blue-200"
-                  >
-                    תרגם אוטומטית
-                  </button>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-neutral-200">מרכיבים (מופרדים בפסיקים)</label>
+                  <input
+                    value={newItem.ingredients}
+                    onChange={(e) => setNewItem((v) => ({ ...v, ingredients: e.target.value }))}
+                    className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                    placeholder="למשל: עגבניות, מוצרלה, בזיליקום"
+                  />
                 </div>
-                <input
-                  value={newItem.ingredientsEn}
-                  onChange={(e) => setNewItem((v) => ({ ...v, ingredientsEn: e.target.value }))}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1"
-                  placeholder="e.g. Tomatoes, Mozzarella, Basil"
-                />
-              </div>
-              <div className="flex-1 min-w-[200px]">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-neutral-300">
-                    אלרגנים באנגלית (מופרדים בפסיקים)
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => handleAutoTranslate('allergens')}
-                    className="text-[10px] text-blue-300 hover:text-blue-200"
-                  >
-                    תרגם אוטומטית
-                  </button>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-neutral-200">אלרגנים (מופרדים בפסיקים)</label>
+                  <input
+                    value={newItem.allergens}
+                    onChange={(e) => setNewItem((v) => ({ ...v, allergens: e.target.value }))}
+                    className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                    placeholder="למשל: גלוטן, חלב"
+                  />
                 </div>
-                <input
-                  value={newItem.allergensEn}
-                  onChange={(e) => setNewItem((v) => ({ ...v, allergensEn: e.target.value }))}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1"
-                  placeholder="e.g. Gluten, Milk"
-                />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-neutral-200">
+                      מרכיבים באנגלית
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => handleAutoTranslate('ingredients')}
+                      className="text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors"
+                    >
+                      ✨ תרגם אוטומטית
+                    </button>
+                  </div>
+                  <input
+                    value={newItem.ingredientsEn}
+                    onChange={(e) => setNewItem((v) => ({ ...v, ingredientsEn: e.target.value }))}
+                    className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                    placeholder="e.g. Tomatoes, Mozzarella, Basil"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-neutral-200">
+                      אלרגנים באנגלית
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => handleAutoTranslate('allergens')}
+                      className="text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors"
+                    >
+                      ✨ תרגם אוטומטית
+                    </button>
+                  </div>
+                  <input
+                    value={newItem.allergensEn}
+                    onChange={(e) => setNewItem((v) => ({ ...v, allergensEn: e.target.value }))}
+                    className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                    placeholder="e.g. Gluten, Milk"
+                  />
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-4 mb-2 flex-wrap">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={newItem.isPregnancySafe}
-                  onChange={(e) => setNewItem((v) => ({ ...v, isPregnancySafe: e.target.checked }))}
-                  className="w-4 h-4 rounded border-neutral-700 bg-neutral-800 text-white"
-                />
-                <span className="text-sm text-neutral-300">🤰 מתאים להריון</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={newItem.isBusiness}
-                  onChange={(e) => setNewItem((v) => ({ ...v, isBusiness: e.target.checked }))}
-                  className="w-4 h-4 rounded border-neutral-700 bg-neutral-800 text-white"
-                />
-                <span className="text-sm text-neutral-300">💼 מנה עסקית</span>
-              </label>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="rounded-md bg-white text-black px-3 py-2 text-xs font-semibold disabled:opacity-60"
-              >
-                {loading ? 'שומר...' : editingItem ? 'עדכן פריט' : 'הוסף פריט'}
-              </button>
-              {editingItem && (
+              <div className="flex flex-wrap gap-4 pt-2">
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={newItem.isFeatured}
+                    onChange={(e) => setNewItem((v) => ({ ...v, isFeatured: e.target.checked }))}
+                    className="w-5 h-5 rounded border-2 border-neutral-600 bg-neutral-800/80 text-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all cursor-pointer"
+                  />
+                  <span className="text-sm font-medium text-neutral-200 group-hover:text-white transition-colors">⭐ מומלץ</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={newItem.isPregnancySafe}
+                    onChange={(e) => setNewItem((v) => ({ ...v, isPregnancySafe: e.target.checked }))}
+                    className="w-5 h-5 rounded border-2 border-neutral-600 bg-neutral-800/80 text-green-500 focus:ring-2 focus:ring-green-500/50 transition-all cursor-pointer"
+                  />
+                  <span className="text-sm font-medium text-neutral-200 group-hover:text-white transition-colors">🤰 מתאים להריון</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={newItem.isBusiness}
+                    onChange={(e) => setNewItem((v) => ({ ...v, isBusiness: e.target.checked }))}
+                    className="w-5 h-5 rounded border-2 border-neutral-600 bg-neutral-800/80 text-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all cursor-pointer"
+                  />
+                  <span className="text-sm font-medium text-neutral-200 group-hover:text-white transition-colors">💼 מנה עסקית</span>
+                </label>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-neutral-800/50">
                 <button
-                  type="button"
-                  onClick={cancelEdit}
-                  className="rounded-md bg-neutral-700 text-white px-3 py-2 text-xs font-semibold hover:bg-neutral-600"
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-3 text-sm font-semibold disabled:opacity-60 hover:from-blue-500 hover:to-blue-400 transition-all shadow-lg hover:shadow-xl active:scale-95"
                 >
-                  ביטול
+                  {loading ? '⏳ שומר...' : editingItem ? '✅ עדכן פריט' : '➕ הוסף פריט'}
                 </button>
-              )}
-            </div>
+                {editingItem && (
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className="flex-1 sm:flex-initial rounded-lg bg-neutral-700/80 text-white px-6 py-3 text-sm font-semibold hover:bg-neutral-600 transition-all active:scale-95"
+                  >
+                    ✖️ ביטול
+                  </button>
+                )}
+              </div>
           </form>
 
-          <div className="border border-neutral-800 rounded-lg overflow-hidden">
-            <div className="bg-neutral-900/70 text-[11px] text-neutral-400 px-3 py-2">
-              רשימת פריטים
+          <div className="bg-neutral-900/60 backdrop-blur-sm border border-neutral-800/50 rounded-2xl overflow-hidden shadow-xl">
+            <div className="bg-gradient-to-r from-neutral-800/50 to-neutral-800/30 px-5 py-4 border-b border-neutral-800/50">
+              <h3 className="text-base font-bold text-white">📋 רשימת פריטים</h3>
+              <p className="text-xs text-neutral-400 mt-1">{items.length} פריטים בתפריט</p>
             </div>
-            <div className="divide-y divide-neutral-800 text-xs">
+            <div className="divide-y divide-neutral-800/30">
               {items.length === 0 && (
-                <div className="px-3 py-3 text-neutral-500 text-[11px]">
-                  עדיין אין פריטים. צרו את הפריט הראשון שלכם למעלה.
+                <div className="px-5 py-12 text-center">
+                  <div className="text-4xl mb-3 opacity-30">🍽️</div>
+                  <p className="text-sm text-neutral-400 font-medium">
+                    עדיין אין פריטים. צרו את הפריט הראשון שלכם למעלה.
+                  </p>
                 </div>
               )}
               {items.map((item) => (
                 <div
                   key={`${item.businessId}-${item.name}`}
-                  className="px-3 py-3 space-y-2"
+                  className="px-4 lg:px-6 py-4 hover:bg-neutral-800/30 transition-colors"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] text-neutral-400 bg-neutral-800 px-2 py-0.5 rounded">
+                  <div className="flex flex-col lg:flex-row gap-4">
+                    {item.imageUrl && (
+                      <div className="flex-shrink-0">
+                        <img
+                          src={item.imageUrl}
+                          alt={item.name}
+                          className="h-20 w-20 lg:h-24 lg:w-24 object-cover rounded-xl border-2 border-neutral-700/50 shadow-md"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <span className="text-xs font-medium text-neutral-300 bg-neutral-800/60 px-2.5 py-1 rounded-lg">
                           {item.category}
                         </span>
                         {item.isFeatured && (
-                          <span className="text-[10px] text-yellow-400 bg-yellow-900/30 px-2 py-0.5 rounded">
+                          <span className="text-xs font-medium text-yellow-300 bg-yellow-900/40 px-2.5 py-1 rounded-lg border border-yellow-700/30">
                             ⭐ מומלץ
                           </span>
                         )}
                         {item.isBusiness && (
-                          <span className="text-[10px] text-blue-400 bg-blue-900/30 px-2 py-0.5 rounded">
+                          <span className="text-xs font-medium text-blue-300 bg-blue-900/40 px-2.5 py-1 rounded-lg border border-blue-700/30">
                             💼 עסקי
                           </span>
                         )}
-                        <span className="font-semibold">{item.name}</span>
-                        <span className="text-white">₪{item.price.toFixed(2)}</span>
+                        {item.isPregnancySafe && (
+                          <span className="text-xs font-medium text-green-300 bg-green-900/40 px-2.5 py-1 rounded-lg border border-green-700/30">
+                            🤰 מתאים להריון
+                          </span>
+                        )}
+                        <span className="text-lg font-bold text-white ml-auto">₪{item.price.toFixed(2)}</span>
                       </div>
-                      {item.imageUrl && (
-                        <div className="mb-1">
-                          <img
-                            src={item.imageUrl}
-                            alt={item.name}
-                            className="h-16 w-16 object-cover rounded border border-neutral-700"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                        </div>
-                      )}
+                      <h4 className="text-base font-semibold text-white mb-2">{item.name}</h4>
                       {item.ingredients && item.ingredients.length > 0 && (
-                        <p className="text-[11px] text-neutral-400 mb-1">
-                          <span className="text-neutral-500">מרכיבים:</span> {item.ingredients.join(', ')}
+                        <p className="text-sm text-neutral-400 mb-1">
+                          <span className="text-neutral-500 font-medium">מרכיבים:</span> {item.ingredients.join(', ')}
                         </p>
                       )}
                       {item.allergens && item.allergens.length > 0 && (
-                        <p className="text-[11px] text-red-400">
-                          <span className="text-neutral-500">אלרגנים:</span> {item.allergens.join(', ')}
+                        <p className="text-sm text-red-300">
+                          <span className="text-neutral-500 font-medium">אלרגנים:</span> {item.allergens.join(', ')}
                         </p>
                       )}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2 lg:flex-col">
                       <button
                         onClick={() => toggleFeatured(item)}
-                        className={`text-[11px] px-2 py-1 rounded ${
+                        className={`text-sm px-4 py-2 rounded-lg font-medium transition-all active:scale-95 ${
                           item.isFeatured
-                            ? 'text-yellow-400 bg-yellow-900/30 hover:bg-yellow-900/40'
-                            : 'text-neutral-400 bg-neutral-800 hover:bg-neutral-700'
+                            ? 'text-yellow-300 bg-yellow-900/40 border border-yellow-700/30 hover:bg-yellow-900/50'
+                            : 'text-neutral-400 bg-neutral-800/60 border border-neutral-700/30 hover:bg-neutral-700/60 hover:text-white'
                         }`}
                         title={item.isFeatured ? 'הסר ממומלצות' : 'סמן כמומלץ'}
                       >
@@ -1074,15 +1110,15 @@ export default function DashboardPage() {
                       </button>
                       <button
                         onClick={() => handleEditItem(item)}
-                        className="text-[11px] text-white bg-neutral-700 px-2 py-1 rounded hover:bg-neutral-600"
+                        className="text-sm px-4 py-2 rounded-lg font-medium text-white bg-blue-600/80 border border-blue-500/30 hover:bg-blue-600 transition-all active:scale-95"
                       >
-                        ערוך
+                        ✏️ ערוך
                       </button>
                       <button
                         onClick={() => handleDeleteItem(item.name)}
-                        className="text-[11px] text-red-400 hover:text-red-300"
+                        className="text-sm px-4 py-2 rounded-lg font-medium text-red-300 bg-red-900/30 border border-red-700/30 hover:bg-red-900/40 transition-all active:scale-95"
                       >
-                        מחק
+                        🗑️ מחק
                       </button>
                     </div>
                   </div>
@@ -1094,98 +1130,108 @@ export default function DashboardPage() {
       )}
 
       {activeTab === 'tables' && (
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold">שולחנות וקודי QR</h2>
-          <p className="text-xs text-neutral-400 mb-3">
-            הגדירו שולחנות ויצרו קודי QR אוטומטיים לכל שולחן.
-          </p>
+        <section className="space-y-6">
+          <div>
+            <h2 className="text-xl lg:text-2xl font-bold mb-2">🪑 שולחנות וקודי QR</h2>
+            <p className="text-sm text-neutral-400">
+              הגדירו שולחנות ויצרו קודי QR אוטומטיים לכל שולחן.
+            </p>
+          </div>
 
-          <form onSubmit={handleAddTable} className="space-y-3 mb-4 text-xs border border-neutral-800 rounded-lg p-4 bg-neutral-900/50">
-            <div className="mb-2">
-              <p className="text-[10px] text-neutral-400 mb-3">
-                <strong className="text-neutral-300">מזהה שולחן</strong> - מזהה טכני ייחודי (ללא רווחים, למשל: table-1, bar-1)
+          <form onSubmit={handleAddTable} className="bg-neutral-900/60 backdrop-blur-sm border border-neutral-800/50 rounded-2xl p-5 lg:p-6 space-y-4 shadow-xl">
+            <div className="bg-blue-900/20 border border-blue-700/30 rounded-lg p-3 mb-2">
+              <p className="text-xs text-neutral-300 leading-relaxed">
+                <strong className="text-blue-300">מזהה שולחן</strong> - מזהה טכני ייחודי (ללא רווחים, למשל: table-1, bar-1)
                 <br />
-                <strong className="text-neutral-300">תווית</strong> - השם שהלקוח רואה (יכול להיות בעברית, למשל: שולחן 1, בר 1)
+                <strong className="text-blue-300">תווית</strong> - השם שהלקוח רואה (יכול להיות בעברית, למשל: שולחן 1, בר 1)
               </p>
             </div>
-            <div className="flex flex-wrap gap-2 items-end">
-              <div className="flex-1 min-w-[140px]">
-                <label className="block mb-1 text-neutral-300">
-                  מזהה שולחן <span className="text-neutral-500 text-[10px]">(ייחודי, ללא רווחים)</span>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-neutral-200">
+                  מזהה שולחן <span className="text-neutral-500 text-xs">(ייחודי, ללא רווחים)</span>
                 </label>
                 <input
                   value={newTable.tableId}
                   onChange={(e) => setNewTable((v) => ({ ...v, tableId: e.target.value.replace(/\s+/g, '-') }))}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1"
+                  className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                   placeholder="table-1"
                   required
                   pattern="[a-zA-Z0-9-_]+"
                   title="רק אותיות, מספרים, מקפים ותחתונים (ללא רווחים)"
                 />
               </div>
-              <div className="flex-1 min-w-[140px]">
-                <label className="block mb-1 text-neutral-300">
-                  תווית <span className="text-neutral-500 text-[10px]">(מה שהלקוח רואה)</span>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-neutral-200">
+                  תווית <span className="text-neutral-500 text-xs">(מה שהלקוח רואה)</span>
                 </label>
                 <input
                   value={newTable.label}
                   onChange={(e) => setNewTable((v) => ({ ...v, label: e.target.value }))}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1"
+                  className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                   placeholder="שולחן 1"
                   required
                 />
               </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="rounded-md bg-white text-black px-3 py-2 text-xs font-semibold disabled:opacity-60"
-              >
-                {loading ? 'שומר...' : 'הוסף שולחן'}
-              </button>
+              <div className="flex items-end">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full rounded-lg bg-gradient-to-r from-green-600 to-green-500 text-white px-6 py-3 text-sm font-semibold disabled:opacity-60 hover:from-green-500 hover:to-green-400 transition-all shadow-lg hover:shadow-xl active:scale-95"
+                >
+                  {loading ? '⏳ שומר...' : '➕ הוסף שולחן'}
+                </button>
+              </div>
             </div>
           </form>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="border border-neutral-800 rounded-lg overflow-hidden">
-              <div className="bg-neutral-900/70 text-[11px] text-neutral-400 px-3 py-2">
-                שולחנות
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="bg-neutral-900/60 backdrop-blur-sm border border-neutral-800/50 rounded-2xl overflow-hidden shadow-xl">
+              <div className="bg-gradient-to-r from-neutral-800/50 to-neutral-800/30 px-5 py-4 border-b border-neutral-800/50">
+                <h3 className="text-base font-bold text-white">🪑 שולחנות</h3>
+                <p className="text-xs text-neutral-400 mt-1">{tables.length} שולחנות פעילים</p>
               </div>
-              <div className="divide-y divide-neutral-800 text-xs">
+              <div className="divide-y divide-neutral-800/30">
                 {tables.length === 0 && (
-                  <div className="px-3 py-3 text-neutral-500 text-[11px]">
-                    עדיין אין שולחנות. צרו את השולחן הראשון שלכם למעלה.
+                  <div className="px-5 py-12 text-center">
+                    <div className="text-4xl mb-3 opacity-30">🪑</div>
+                    <p className="text-sm text-neutral-400 font-medium">
+                      עדיין אין שולחנות. צרו את השולחן הראשון שלכם למעלה.
+                    </p>
                   </div>
                 )}
                 {tables.map((table) => (
                   <div
                     key={`${table.businessId}-${table.tableId}`}
-                    className="flex items-center justify-between px-3 py-2"
+                    className="px-4 lg:px-6 py-4 hover:bg-neutral-800/30 transition-colors"
                   >
-                    <div>
-                      <div className="font-semibold">{table.label}</div>
-                      <div className="text-neutral-400 text-[11px]">{table.tableId}</div>
-                    </div>
-                    <div className="flex gap-2">
-                      <a
-                        href={`/menu/${businessId}/${table.tableId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] text-white bg-green-600 px-2 py-1 rounded hover:bg-green-500"
-                      >
-                        צפה בתפריט
-                      </a>
-                      <button
-                        onClick={() => generateQR(table.tableId)}
-                        className="text-[11px] text-white bg-neutral-700 px-2 py-1 rounded hover:bg-neutral-600"
-                      >
-                        צפה ב-QR
-                      </button>
-                      <button
-                        onClick={() => handleDeleteTable(table.tableId)}
-                        className="text-[11px] text-red-400 hover:text-red-300"
-                      >
-                        מחק
-                      </button>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-white text-base mb-1">{table.label}</div>
+                        <div className="text-neutral-400 text-xs font-mono">{table.tableId}</div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <a
+                          href={`/menu/${businessId}/${table.tableId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-white bg-green-600/80 px-3 py-2 rounded-lg hover:bg-green-600 transition-all active:scale-95 font-medium"
+                        >
+                          👁️ צפה בתפריט
+                        </a>
+                        <button
+                          onClick={() => generateQR(table.tableId)}
+                          className="text-xs text-white bg-neutral-700/80 px-3 py-2 rounded-lg hover:bg-neutral-600 transition-all active:scale-95 font-medium"
+                        >
+                          📱 צפה ב-QR
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTable(table.tableId)}
+                          className="text-xs text-red-300 bg-red-900/30 px-3 py-2 rounded-lg hover:bg-red-900/40 transition-all active:scale-95 font-medium border border-red-700/30"
+                        >
+                          🗑️ מחק
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1193,42 +1239,42 @@ export default function DashboardPage() {
             </div>
 
             {qrDataUrl && selectedTable ? (
-              <div className="border border-neutral-800 rounded-lg p-4 space-y-3">
-                <div className="bg-green-950/30 border border-green-500/40 rounded px-3 py-2 mb-3">
-                  <h3 className="text-sm font-semibold text-green-400 mb-1">
+              <div className="bg-neutral-900/60 backdrop-blur-sm border border-neutral-800/50 rounded-2xl p-5 lg:p-6 space-y-4 shadow-xl">
+                <div className="bg-gradient-to-r from-green-900/40 to-emerald-900/40 border border-green-500/50 rounded-xl px-4 py-3">
+                  <h3 className="text-sm font-bold text-green-300 mb-1">
                     ✅ קוד QR מוכן להדפסה
                   </h3>
-                  <p className="text-[10px] text-green-300/80">
+                  <p className="text-xs text-green-200/80">
                     עבור: {tables.find((t) => t.tableId === selectedTable)?.label}
                   </p>
                 </div>
-                <div className="flex flex-col items-center gap-3">
-                  <div className="bg-white p-3 rounded-lg">
-                    <img src={qrDataUrl} alt="QR Code" className="w-48 h-48" />
+                <div className="flex flex-col items-center gap-4">
+                  <div className="bg-white p-4 rounded-xl shadow-2xl">
+                    <img src={qrDataUrl} alt="QR Code" className="w-48 h-48 lg:w-64 lg:h-64" />
                   </div>
-                  <div className="flex gap-2 w-full">
+                  <div className="flex flex-col sm:flex-row gap-3 w-full">
                     <a
                       href={qrDataUrl}
                       download={`qr-${selectedTable}.png`}
-                      className="flex-1 text-xs text-center text-white bg-green-600 px-3 py-2 rounded hover:bg-green-500 font-semibold"
+                      className="flex-1 text-sm text-center text-white bg-gradient-to-r from-green-600 to-green-500 px-4 py-3 rounded-lg hover:from-green-500 hover:to-green-400 font-semibold transition-all shadow-lg hover:shadow-xl active:scale-95"
                     >
                       📥 הורד QR להדפסה
                     </a>
                   </div>
-                  <p className="text-[10px] text-neutral-400 text-center">
+                  <p className="text-xs text-neutral-400 text-center leading-relaxed">
                     הדפיסו את הקוד והניחו אותו על השולחן.<br />
                     הלקוחות יסרקו את הקוד עם הטלפון ויגיעו ישירות לתפריט.
                   </p>
                 </div>
-                <div className="mt-4 pt-3 border-t border-neutral-800">
-                  <p className="text-[10px] text-neutral-400 mb-1">קישור ישיר לתפריט:</p>
-                  <div className="flex items-center gap-2">
+                <div className="mt-4 pt-4 border-t border-neutral-800/50">
+                  <p className="text-xs text-neutral-300 mb-2 font-medium">קישור ישיר לתפריט:</p>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                     <input
                       type="text"
                       readOnly
                       id={`menu-url-${selectedTable}`}
-                      value={businessId && selectedTable ? `/menu/${businessId}/${selectedTable}` : ''}
-                      className="flex-1 text-[10px] bg-neutral-900 border border-neutral-700 px-2 py-1 rounded text-neutral-300"
+                      value={businessId && selectedTable ? `${window.location.origin}/menu/${businessId}/${selectedTable}` : ''}
+                      className="flex-1 text-xs bg-neutral-800/80 border border-neutral-700/50 px-4 py-2.5 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                       onClick={(e) => (e.target as HTMLInputElement).select()}
                     />
                     <button
@@ -1250,16 +1296,16 @@ export default function DashboardPage() {
                           }
                         }
                       }}
-                      className="text-[10px] text-white bg-neutral-700 px-2 py-1 rounded hover:bg-neutral-600"
+                      className="text-sm text-white bg-neutral-700/80 px-4 py-2.5 rounded-lg hover:bg-neutral-600 transition-all active:scale-95 font-medium whitespace-nowrap"
                     >
-                      העתק
+                      📋 העתק
                     </button>
                   </div>
                   <a
                     href={`/menu/${businessId}/${selectedTable}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block mt-2 text-xs text-green-400 hover:text-green-300 text-center"
+                    className="block mt-3 text-sm text-green-400 hover:text-green-300 text-center font-medium transition-colors"
                   >
                     → פתח בתפריט לקוח (חלון חדש)
                   </a>
@@ -1279,15 +1325,17 @@ export default function DashboardPage() {
       )}
 
       {activeTab === 'settings' && (
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold">הגדרות עסק</h2>
-          <p className="text-xs text-neutral-400 mb-3">
-            ניהול פרטי העסק, סטטוס המנוי והגדרות התנהגות ה-AI.
-          </p>
+        <section className="space-y-6">
+          <div>
+            <h2 className="text-xl lg:text-2xl font-bold mb-2">⚙️ הגדרות עסק</h2>
+            <p className="text-sm text-neutral-400">
+              ניהול פרטי העסק, סטטוס המנוי והגדרות התנהגות ה-AI.
+            </p>
+          </div>
 
           {/* Subscription Overview + Billing */}
           {businessInfo?.subscription && (
-            <div className="border border-neutral-800 rounded-lg p-4 bg-neutral-900/60 text-xs flex flex-col gap-3">
+            <div className="bg-neutral-900/60 backdrop-blur-sm border border-neutral-800/50 rounded-2xl p-5 lg:p-6 shadow-xl">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-[11px] text-neutral-400 mb-1">סטטוס מנוי</div>
@@ -1402,39 +1450,39 @@ export default function DashboardPage() {
                   setLoading(false);
                 }
               }}
-              className="space-y-4 border border-neutral-800 rounded-lg p-4 bg-neutral-900/50 text-xs"
+              className="space-y-5 bg-neutral-900/60 backdrop-blur-sm border border-neutral-800/50 rounded-2xl p-5 lg:p-6 shadow-xl"
             >
-              <div>
-                <label className="block mb-1 text-neutral-300">שם העסק</label>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-neutral-200">שם העסק</label>
                 <input
                   name="name"
                   defaultValue={businessInfo.name}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2"
+                  className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                   required
                 />
               </div>
 
-              <div>
-                <label className="block mb-1 text-neutral-300">
-                  לוגו העסק (URL) <span className="text-neutral-500 text-xs">(אופציונלי)</span>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-neutral-200">
+                  לוגו העסק (URL) <span className="text-neutral-500 text-xs font-normal">(אופציונלי)</span>
                 </label>
                 <input
                   name="logoUrl"
                   type="url"
                   placeholder="https://example.com/logo.png"
                   defaultValue={businessInfo.logoUrl || ''}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2"
+                  className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                 />
-                <p className="text-xs text-neutral-500 mt-1">
+                <p className="text-xs text-neutral-400 mt-1">
                   הזן URL של תמונת הלוגו. אם לא מוזן, יוצג שם העסק בטקסט.
                 </p>
                 {businessInfo.logoUrl && (
-                  <div className="mt-2">
-                    <p className="text-xs text-neutral-400 mb-1">תצוגה מקדימה:</p>
+                  <div className="mt-3 p-3 bg-neutral-800/40 rounded-lg">
+                    <p className="text-xs text-neutral-300 mb-2 font-medium">תצוגה מקדימה:</p>
                     <img
                       src={businessInfo.logoUrl}
                       alt="Logo preview"
-                      className="max-h-20 max-w-full object-contain rounded"
+                      className="max-h-24 max-w-full object-contain rounded-lg border border-neutral-700/50"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
@@ -1443,12 +1491,12 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              <div>
-                <label className="block mb-1 text-neutral-300">סוג העסק</label>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-neutral-200">סוג העסק</label>
                 <select
                   name="type"
                   defaultValue={businessInfo.type}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2"
+                  className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                   required
                 >
                   <option value="bar">בר</option>
@@ -1458,12 +1506,12 @@ export default function DashboardPage() {
                 </select>
               </div>
 
-              <div>
-                <label className="block mb-1 text-neutral-300">תבנית עיצוב</label>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-neutral-200">תבנית עיצוב</label>
                 <select
                   name="template"
                   defaultValue={businessInfo.template}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2"
+                  className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                   required
                 >
                   <optgroup label="בר">
@@ -1484,12 +1532,12 @@ export default function DashboardPage() {
                 </select>
               </div>
 
-              <div>
-                <label className="block mb-1 text-neutral-300">סגנון תפריט</label>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-neutral-200">סגנון תפריט</label>
                 <select
                   name="menuStyle"
                   defaultValue={businessInfo.menuStyle || 'elegant'}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2"
+                  className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                 >
                   <option value="elegant">אלגנטי - עיצוב מעודן ומרווח</option>
                   <option value="compact">קומפקטי - צפוף וחסכוני במקום</option>
@@ -1500,54 +1548,54 @@ export default function DashboardPage() {
                 </p>
               </div>
 
-              <div>
-                <label className="block mb-1 text-neutral-300">
+              <div className="space-y-3 p-4 bg-blue-900/10 border border-blue-700/20 rounded-xl">
+                <label className="block text-sm font-medium text-neutral-200">
                   💼 שעות פעילות למנות עסקיות
                 </label>
-                <p className="text-[10px] text-neutral-500 mb-2">
+                <p className="text-xs text-neutral-400 leading-relaxed">
                   הגדירו שעות פעילות למנות עסקיות. מחוץ לשעות האלו, לקוחות לא יוכלו להזמין מנות עסקיות.
                 </p>
-                <div className="flex items-center gap-3 mb-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
+                <div className="flex items-center gap-3 pt-2">
+                  <label className="flex items-center gap-3 cursor-pointer group">
                     <input
                       type="checkbox"
                       name="businessHoursEnabled"
                       defaultChecked={businessInfo.businessHours !== null && businessInfo.businessHours !== undefined}
-                      className="w-4 h-4 rounded border-neutral-700 bg-neutral-800 text-white"
+                      className="w-5 h-5 rounded border-2 border-neutral-600 bg-neutral-800/80 text-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all cursor-pointer"
                     />
-                    <span className="text-sm text-neutral-300">הפעל הגבלת שעות</span>
+                    <span className="text-sm font-medium text-neutral-200 group-hover:text-white transition-colors">הפעל הגבלת שעות</span>
                   </label>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <label className="block mb-1 text-[10px] text-neutral-400">שעת התחלה</label>
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div className="space-y-2">
+                    <label className="block text-xs font-medium text-neutral-300">שעת התחלה</label>
                     <input
                       type="time"
                       name="businessHoursStart"
                       defaultValue={businessInfo.businessHours?.start || '10:00'}
-                      className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2"
+                      className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                     />
                   </div>
-                  <div className="flex-1">
-                    <label className="block mb-1 text-[10px] text-neutral-400">שעת סיום</label>
+                  <div className="space-y-2">
+                    <label className="block text-xs font-medium text-neutral-300">שעת סיום</label>
                     <input
                       type="time"
                       name="businessHoursEnd"
                       defaultValue={businessInfo.businessHours?.end || '18:00'}
-                      className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2"
+                      className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                     />
                   </div>
                 </div>
-                <p className="text-[10px] text-neutral-500 mt-2">
+                <p className="text-xs text-neutral-400 mt-2">
                   דוגמה: 10:00-18:00 - מנות עסקיות זמינות רק בשעות האלו
                 </p>
               </div>
 
-              <div>
-                <label className="block mb-1 text-neutral-300">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-neutral-200">
                   🤖 הוראות מותאמות אישית ל-AI
                 </label>
-                <p className="text-[10px] text-neutral-500 mb-2">
+                <p className="text-xs text-neutral-400 leading-relaxed">
                   הגדירו הוראות ספציפיות ל-AI כדי לענות על שאלות נפוצות של לקוחות.
                   <br />
                   דוגמאות: "בסושי - מנות X, Y חייבות להיות אפויות, לא נא", "אין אפשרות להסיר גבינה מפיצה מרגריטה"
@@ -1556,18 +1604,20 @@ export default function DashboardPage() {
                   name="aiInstructions"
                   defaultValue={businessInfo.aiInstructions || ''}
                   rows={8}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2 text-xs font-mono"
+                  className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all resize-y"
                   placeholder="לדוגמה:&#10;בסושי - המנות 'סלמון אפוי' ו'טונה אפויה' חייבות להיות אפויות, לא נא.&#10;אין אפשרות להסיר גבינה מפיצה מרגריטה.&#10;כל המנות ללא גלוטן מסומנות בתפריט."
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="rounded-md bg-white text-black px-4 py-2 text-xs font-semibold disabled:opacity-60"
-              >
-                {loading ? 'שומר...' : 'שמור שינויים'}
-              </button>
+              <div className="pt-4 border-t border-neutral-800/50">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-3 text-sm font-semibold disabled:opacity-60 hover:from-blue-500 hover:to-blue-400 transition-all shadow-lg hover:shadow-xl active:scale-95"
+                >
+                  {loading ? '⏳ שומר...' : '💾 שמור שינויים'}
+                </button>
+              </div>
             </form>
           )}
 
@@ -1578,11 +1628,13 @@ export default function DashboardPage() {
       )}
 
       {activeTab === 'printer' && (
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold">הגדרות מדפסת / BON</h2>
-          <p className="text-xs text-neutral-400 mb-3">
-            הגדירו את המדפסת או מערכת ה-BON שלכם כדי לקבל הזמנות אוטומטית.
-          </p>
+        <section className="space-y-6">
+          <div>
+            <h2 className="text-xl lg:text-2xl font-bold mb-2">🖨️ הגדרות מדפסת / BON</h2>
+            <p className="text-sm text-neutral-400">
+              הגדירו את המדפסת או מערכת ה-BON שלכם כדי לקבל הזמנות אוטומטית.
+            </p>
+          </div>
 
           {businessInfo && (
             <form
@@ -1637,27 +1689,27 @@ export default function DashboardPage() {
                   setLoading(false);
                 }
               }}
-              className="space-y-4 border border-neutral-800 rounded-lg p-4 bg-neutral-900/50 text-xs"
+              className="space-y-5 bg-neutral-900/60 backdrop-blur-sm border border-neutral-800/50 rounded-2xl p-5 lg:p-6 shadow-xl"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3 p-4 bg-neutral-800/40 rounded-lg">
                 <input
                   type="checkbox"
                   name="enabled"
                   id="printer-enabled"
                   defaultChecked={businessInfo.printerConfig?.enabled || false}
-                  className="rounded"
+                  className="w-5 h-5 rounded border-2 border-neutral-600 bg-neutral-800/80 text-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all cursor-pointer"
                 />
-                <label htmlFor="printer-enabled" className="text-neutral-300">
+                <label htmlFor="printer-enabled" className="text-sm font-medium text-neutral-200 cursor-pointer">
                   הפעל שליחה אוטומטית למדפסת
                 </label>
               </div>
 
-              <div>
-                <label className="block mb-1 text-neutral-300">סוג חיבור</label>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-neutral-200">סוג חיבור</label>
                 <select
                   name="type"
                   defaultValue={businessInfo.printerConfig?.type || 'http'}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2"
+                  className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                   required
                 >
                   <option value="http">HTTP/HTTPS (REST API)</option>
@@ -1666,38 +1718,38 @@ export default function DashboardPage() {
                 </select>
               </div>
 
-              <div>
-                <label className="block mb-1 text-neutral-300">
-                  כתובת IP / URL <span className="text-neutral-500">(למשל: 192.168.1.100 או https://printer.example.com)</span>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-neutral-200">
+                  כתובת IP / URL <span className="text-neutral-500 text-xs font-normal">(למשל: 192.168.1.100 או https://printer.example.com)</span>
                 </label>
                 <input
                   name="endpoint"
                   type="text"
                   defaultValue={businessInfo.printerConfig?.endpoint || ''}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2"
+                  className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                   placeholder="192.168.1.100"
                 />
               </div>
 
               {businessInfo.printerConfig?.type === 'tcp' && (
-                <div>
-                  <label className="block mb-1 text-neutral-300">פורט</label>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-neutral-200">פורט</label>
                   <input
                     name="port"
                     type="number"
                     defaultValue={businessInfo.printerConfig?.port || 9100}
-                    className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2"
+                    className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                     placeholder="9100"
                   />
                 </div>
               )}
 
-              <div>
-                <label className="block mb-1 text-neutral-300">סוג Payload</label>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-neutral-200">סוג Payload</label>
                 <select
                   name="payloadType"
                   defaultValue={businessInfo.printerConfig?.payloadType || 'json'}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2"
+                  className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                   required
                 >
                   <option value="json">JSON</option>
@@ -1706,13 +1758,13 @@ export default function DashboardPage() {
                 </select>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-neutral-800/50">
                 <button
                   type="submit"
                   disabled={loading}
-                  className="rounded-md bg-white text-black px-4 py-2 text-xs font-semibold disabled:opacity-60"
+                  className="flex-1 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-3 text-sm font-semibold disabled:opacity-60 hover:from-blue-500 hover:to-blue-400 transition-all shadow-lg hover:shadow-xl active:scale-95"
                 >
-                  {loading ? 'שומר...' : 'שמור הגדרות'}
+                  {loading ? '⏳ שומר...' : '💾 שמור הגדרות'}
                 </button>
                 <button
                   type="button"
@@ -1749,26 +1801,31 @@ export default function DashboardPage() {
                     }
                   }}
                   disabled={loading || !businessInfo?.printerConfig?.endpoint}
-                  className="rounded-md bg-green-600 text-white px-4 py-2 text-xs font-semibold disabled:opacity-60 hover:bg-green-500"
+                  className="flex-1 sm:flex-initial rounded-lg bg-gradient-to-r from-green-600 to-green-500 text-white px-6 py-3 text-sm font-semibold disabled:opacity-60 hover:from-green-500 hover:to-green-400 transition-all shadow-lg hover:shadow-xl active:scale-95"
                 >
-                  בדוק חיבור למדפסת
+                  🔍 בדוק חיבור למדפסת
                 </button>
               </div>
             </form>
           )}
 
           {!businessInfo && (
-            <p className="text-xs text-neutral-500">טוען הגדרות מדפסת...</p>
+            <div className="text-center py-12">
+              <div className="text-4xl mb-3 opacity-30">🖨️</div>
+              <p className="text-sm text-neutral-400 font-medium">טוען הגדרות מדפסת...</p>
+            </div>
           )}
         </section>
       )}
 
       {activeTab === 'pos' && (
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold">אינטגרציית POS (קופה)</h2>
-          <p className="text-xs text-neutral-400 mb-3">
-            הגדירו את ה-API של מערכת הקופה שלכם כדי לקבל הזמנות אוטומטית.
-          </p>
+        <section className="space-y-6">
+          <div>
+            <h2 className="text-xl lg:text-2xl font-bold mb-2">💳 אינטגרציית POS (קופה)</h2>
+            <p className="text-sm text-neutral-400">
+              הגדירו את ה-API של מערכת הקופה שלכם כדי לקבל הזמנות אוטומטית.
+            </p>
+          </div>
 
           {businessInfo && (
             <form
@@ -1832,29 +1889,29 @@ export default function DashboardPage() {
                   setLoading(false);
                 }
               }}
-              className="space-y-4 border border-neutral-800 rounded-lg p-4 bg-neutral-900/50 text-xs"
+              className="space-y-5 bg-neutral-900/60 backdrop-blur-sm border border-neutral-800/50 rounded-2xl p-5 lg:p-6 shadow-xl"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3 p-4 bg-neutral-800/40 rounded-lg">
                 <input
                   type="checkbox"
                   name="enabled"
                   id="pos-enabled"
                   defaultChecked={businessInfo.posConfig?.enabled || false}
-                  className="rounded"
+                  className="w-5 h-5 rounded border-2 border-neutral-600 bg-neutral-800/80 text-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all cursor-pointer"
                 />
-                <label htmlFor="pos-enabled" className="text-neutral-300">
+                <label htmlFor="pos-enabled" className="text-sm font-medium text-neutral-200 cursor-pointer">
                   הפעל שליחה אוטומטית ל-POS
                 </label>
               </div>
 
-              <div>
-                <label className="block mb-1 text-neutral-300">
-                  ספק POS <span className="text-neutral-500">(בחר את מערכת הקופה שלך)</span>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-neutral-200">
+                  ספק POS <span className="text-neutral-500 text-xs font-normal">(בחר את מערכת הקופה שלך)</span>
                 </label>
                 <select
                   name="provider"
                   defaultValue={businessInfo.posConfig?.provider || 'generic'}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2"
+                  className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                 >
                   <option value="generic">Generic HTTP (ברירת מחדל)</option>
                   <option value="casbit">Caspit</option>
@@ -1862,22 +1919,22 @@ export default function DashboardPage() {
                 </select>
               </div>
 
-              <div>
-                <label className="block mb-1 text-neutral-300">
-                  כתובת API (Endpoint URL) <span className="text-neutral-500">(למשל: https://pos.example.com/api/orders)</span>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-neutral-200">
+                  כתובת API (Endpoint URL) <span className="text-neutral-500 text-xs font-normal">(למשל: https://pos.example.com/api/orders)</span>
                 </label>
                 <input
                   name="endpoint"
                   type="text"
                   defaultValue={businessInfo.posConfig?.endpoint || ''}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2"
+                  className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                   placeholder="https://pos.example.com/api/orders"
                 />
               </div>
 
-              <div>
-                <label className="block mb-1 text-neutral-300">Headers (כותרות HTTP)</label>
-                <div id="headers-container" className="space-y-2">
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-neutral-200">Headers (כותרות HTTP)</label>
+                <div id="headers-container" className="space-y-3">
                   {Object.entries(businessInfo.posConfig?.headers || {}).map(([key, value], index) => (
                     <div key={index} data-header-row className="flex gap-2">
                       <input
@@ -1885,14 +1942,14 @@ export default function DashboardPage() {
                         type="text"
                         defaultValue={key}
                         placeholder="Key (למשל: Authorization)"
-                        className="flex-1 rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2"
+                        className="flex-1 rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                       />
                       <input
                         data-header-value
                         type="text"
                         defaultValue={value}
                         placeholder="Value"
-                        className="flex-1 rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2"
+                        className="flex-1 rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                       />
                       <button
                         type="button"
@@ -1900,7 +1957,7 @@ export default function DashboardPage() {
                           e.preventDefault();
                           (e.currentTarget.closest('[data-header-row]') as HTMLElement)?.remove();
                         }}
-                        className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-500"
+                        className="px-4 py-3 bg-red-600/80 text-white rounded-lg hover:bg-red-600 transition-all active:scale-95 font-medium"
                       >
                         ×
                       </button>
@@ -1912,13 +1969,13 @@ export default function DashboardPage() {
                         data-header-key
                         type="text"
                         placeholder="Key (למשל: Authorization)"
-                        className="flex-1 rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2"
+                        className="flex-1 rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                       />
                       <input
                         data-header-value
                         type="text"
                         placeholder="Value"
-                        className="flex-1 rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2"
+                        className="flex-1 rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                       />
                       <button
                         type="button"
@@ -1926,7 +1983,7 @@ export default function DashboardPage() {
                           e.preventDefault();
                           (e.currentTarget.closest('[data-header-row]') as HTMLElement)?.remove();
                         }}
-                        className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-500"
+                        className="px-4 py-3 bg-red-600/80 text-white rounded-lg hover:bg-red-600 transition-all active:scale-95 font-medium"
                       >
                         ×
                       </button>
@@ -1943,22 +2000,22 @@ export default function DashboardPage() {
                       newRow.setAttribute('data-header-row', '');
                       newRow.className = 'flex gap-2';
                       newRow.innerHTML = `
-                        <input data-header-key type="text" placeholder="Key" class="flex-1 rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2" />
-                        <input data-header-value type="text" placeholder="Value" class="flex-1 rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2" />
-                        <button type="button" class="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-500" onclick="this.closest('[data-header-row]').remove()">×</button>
+                        <input data-header-key type="text" placeholder="Key" class="flex-1 rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all" />
+                        <input data-header-value type="text" placeholder="Value" class="flex-1 rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all" />
+                        <button type="button" class="px-4 py-3 bg-red-600/80 text-white rounded-lg hover:bg-red-600 transition-all active:scale-95 font-medium" onclick="this.closest('[data-header-row]').remove()">×</button>
                       `;
                       container.appendChild(newRow);
                     }
                   }}
-                  className="mt-2 px-3 py-1 text-xs bg-neutral-700 text-neutral-300 rounded-md hover:bg-neutral-600"
+                  className="mt-2 px-4 py-2 text-sm bg-neutral-700/80 text-neutral-200 rounded-lg hover:bg-neutral-600 transition-all active:scale-95 font-medium"
                 >
-                  + הוסף Header
+                  ➕ הוסף Header
                 </button>
               </div>
 
-              <div>
-                <label className="block mb-1 text-neutral-300">
-                  Timeout (מילישניות) <span className="text-neutral-500">(100-60000)</span>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-neutral-200">
+                  Timeout (מילישניות) <span className="text-neutral-500 text-xs font-normal">(100-60000)</span>
                 </label>
                 <input
                   name="timeoutMs"
@@ -1966,17 +2023,17 @@ export default function DashboardPage() {
                   min="100"
                   max="60000"
                   defaultValue={businessInfo.posConfig?.timeoutMs || 5000}
-                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2"
+                  className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                 />
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-neutral-800/50">
                 <button
                   type="submit"
                   disabled={loading}
-                  className="rounded-md bg-white text-black px-4 py-2 text-xs font-semibold disabled:opacity-60"
+                  className="flex-1 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-3 text-sm font-semibold disabled:opacity-60 hover:from-blue-500 hover:to-blue-400 transition-all shadow-lg hover:shadow-xl active:scale-95"
                 >
-                  {loading ? 'שומר...' : 'שמור הגדרות'}
+                  {loading ? '⏳ שומר...' : '💾 שמור הגדרות'}
                 </button>
                 <button
                   type="button"
@@ -2007,94 +2064,119 @@ export default function DashboardPage() {
                     }
                   }}
                   disabled={loading || !businessInfo?.posConfig?.endpoint}
-                  className="rounded-md bg-green-600 text-white px-4 py-2 text-xs font-semibold disabled:opacity-60 hover:bg-green-500"
+                  className="flex-1 sm:flex-initial rounded-lg bg-gradient-to-r from-green-600 to-green-500 text-white px-6 py-3 text-sm font-semibold disabled:opacity-60 hover:from-green-500 hover:to-green-400 transition-all shadow-lg hover:shadow-xl active:scale-95"
                 >
-                  בדוק חיבור ל-POS
+                  🔍 בדוק חיבור ל-POS
                 </button>
               </div>
             </form>
           )}
 
           {!businessInfo && (
-            <p className="text-xs text-neutral-500">טוען הגדרות POS...</p>
+            <div className="text-center py-12">
+              <div className="text-4xl mb-3 opacity-30">💳</div>
+              <p className="text-sm text-neutral-400 font-medium">טוען הגדרות POS...</p>
+            </div>
           )}
         </section>
       )}
 
       {activeTab === 'orders' && (
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
+        <section className="space-y-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold">הזמנות ורווחים</h2>
-              <p className="text-xs text-neutral-400 mb-3">
+              <h2 className="text-xl lg:text-2xl font-bold mb-2">📊 הזמנות ורווחים</h2>
+              <p className="text-sm text-neutral-400">
                 צפו בכל ההזמנות, סטטוסים וסיכומי הכנסות.
               </p>
-      </div>
+            </div>
             {revenueStats && (
-              <div className="flex gap-4 text-xs">
-                <div className="bg-neutral-900/60 border border-neutral-800 rounded-lg px-3 py-2">
-                  <div className="text-neutral-400">היום</div>
-                  <div className="text-white font-semibold">₪{revenueStats.today.toFixed(2)}</div>
+              <div className="flex gap-3">
+                <div className="bg-gradient-to-br from-green-900/40 to-emerald-900/40 border border-green-500/30 rounded-xl px-4 py-3 backdrop-blur-sm">
+                  <div className="text-xs text-green-300/80 mb-1">היום</div>
+                  <div className="text-lg font-bold text-white">₪{revenueStats.today.toFixed(2)}</div>
                 </div>
-                <div className="bg-neutral-900/60 border border-neutral-800 rounded-lg px-3 py-2">
-                  <div className="text-neutral-400">השבוע</div>
-                  <div className="text-white font-semibold">₪{revenueStats.week.toFixed(2)}</div>
+                <div className="bg-gradient-to-br from-blue-900/40 to-cyan-900/40 border border-blue-500/30 rounded-xl px-4 py-3 backdrop-blur-sm">
+                  <div className="text-xs text-blue-300/80 mb-1">השבוע</div>
+                  <div className="text-lg font-bold text-white">₪{revenueStats.week.toFixed(2)}</div>
                 </div>
-                <div className="bg-neutral-900/60 border border-neutral-800 rounded-lg px-3 py-2">
-                  <div className="text-neutral-400">החודש</div>
-                  <div className="text-white font-semibold">₪{revenueStats.month.toFixed(2)}</div>
+                <div className="bg-gradient-to-br from-purple-900/40 to-pink-900/40 border border-purple-500/30 rounded-xl px-4 py-3 backdrop-blur-sm">
+                  <div className="text-xs text-purple-300/80 mb-1">החודש</div>
+                  <div className="text-lg font-bold text-white">₪{revenueStats.month.toFixed(2)}</div>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="border border-neutral-800 rounded-lg overflow-hidden">
-            <div className="bg-neutral-900/70 text-[11px] text-neutral-400 px-3 py-2 grid grid-cols-5">
+          <div className="bg-neutral-900/60 backdrop-blur-sm border border-neutral-800/50 rounded-2xl overflow-hidden shadow-xl">
+            <div className="bg-gradient-to-r from-neutral-800/50 to-neutral-800/30 px-5 py-4 border-b border-neutral-800/50">
+              <h3 className="text-base font-bold text-white">📋 רשימת הזמנות</h3>
+              <p className="text-xs text-neutral-400 mt-1">{orders.length} הזמנות</p>
+            </div>
+            <div className="hidden lg:grid lg:grid-cols-5 gap-4 px-5 py-3 text-xs font-semibold text-neutral-300 border-b border-neutral-800/50">
               <div>תאריך ושעה</div>
               <div>שולחן</div>
               <div>פריטים</div>
               <div>סכום</div>
               <div>סטטוס</div>
             </div>
-            <div className="divide-y divide-neutral-800 text-xs">
+            <div className="divide-y divide-neutral-800/30">
               {orders.length === 0 && (
-                <div className="px-3 py-3 text-neutral-500 text-[11px] text-center">
-                  עדיין אין הזמנות. הזמנות יופיעו כאן כשהלקוחות יזמינו דרך התפריט.
+                <div className="px-5 py-12 text-center">
+                  <div className="text-4xl mb-3 opacity-30">📦</div>
+                  <p className="text-sm text-neutral-400 font-medium">
+                    עדיין אין הזמנות. הזמנות יופיעו כאן כשהלקוחות יזמינו דרך התפריט.
+                  </p>
                 </div>
               )}
               {orders.map((order) => (
                 <div
                   key={order.orderId}
-                  className="grid grid-cols-5 items-center px-3 py-2 hover:bg-neutral-900/50"
+                  className="px-4 lg:px-5 py-4 hover:bg-neutral-800/30 transition-colors"
                 >
-                  <div className="text-[11px] text-neutral-400">
-                    {new Date(order.createdAt).toLocaleString('he-IL')}
-                  </div>
-                  <div>{order.tableId}</div>
-                  <div className="text-[11px] text-neutral-400">
-                    {order.items?.length || 0} פריט{order.items?.length !== 1 ? 'ים' : ''}
-                  </div>
-                  <div className="font-semibold">₪{order.totalAmount?.toFixed(2) || '0.00'}</div>
-                  <div>
-                    <span
-                      className={`text-[10px] px-2 py-1 rounded ${
-                        order.status === 'printed'
-                          ? 'bg-green-900/40 text-green-400'
-                          : order.status === 'printer_error'
-                          ? 'bg-red-900/40 text-red-400'
+                  <div className="lg:grid lg:grid-cols-5 gap-4 items-center">
+                    <div className="mb-2 lg:mb-0">
+                      <div className="text-xs text-neutral-400 lg:hidden mb-1">תאריך ושעה</div>
+                      <div className="text-sm text-neutral-300">
+                        {new Date(order.createdAt).toLocaleString('he-IL')}
+                      </div>
+                    </div>
+                    <div className="mb-2 lg:mb-0">
+                      <div className="text-xs text-neutral-400 lg:hidden mb-1">שולחן</div>
+                      <div className="text-sm font-medium text-white">{order.tableId}</div>
+                    </div>
+                    <div className="mb-2 lg:mb-0">
+                      <div className="text-xs text-neutral-400 lg:hidden mb-1">פריטים</div>
+                      <div className="text-sm text-neutral-300">
+                        {order.items?.length || 0} פריט{order.items?.length !== 1 ? 'ים' : ''}
+                      </div>
+                    </div>
+                    <div className="mb-2 lg:mb-0">
+                      <div className="text-xs text-neutral-400 lg:hidden mb-1">סכום</div>
+                      <div className="text-base font-bold text-white">₪{order.totalAmount?.toFixed(2) || '0.00'}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-neutral-400 lg:hidden mb-1">סטטוס</div>
+                      <span
+                        className={`text-xs px-3 py-1.5 rounded-lg font-medium ${
+                          order.status === 'printed'
+                            ? 'bg-green-900/40 text-green-300 border border-green-700/30'
+                            : order.status === 'printer_error'
+                            ? 'bg-red-900/40 text-red-300 border border-red-700/30'
+                            : order.status === 'sent_to_printer'
+                            ? 'bg-yellow-900/40 text-yellow-300 border border-yellow-700/30'
+                            : 'bg-neutral-800/60 text-neutral-300 border border-neutral-700/30'
+                        }`}
+                      >
+                        {order.status === 'received'
+                          ? 'התקבלה'
                           : order.status === 'sent_to_printer'
-                          ? 'bg-yellow-900/40 text-yellow-400'
-                          : 'bg-neutral-800 text-neutral-400'
-                      }`}
-                    >
-                      {order.status === 'received'
-                        ? 'התקבלה'
-                        : order.status === 'sent_to_printer'
-                        ? 'נשלחה למדפסת'
-                        : order.status === 'printed'
-                        ? 'הודפסה'
-                        : 'שגיאת מדפסת'}
-                    </span>
+                          ? 'נשלחה למדפסת'
+                          : order.status === 'printed'
+                          ? 'הודפסה'
+                          : 'שגיאת מדפסת'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -2102,6 +2184,7 @@ export default function DashboardPage() {
           </div>
         </section>
       )}
+      </div>
     </main>
   );
 }
