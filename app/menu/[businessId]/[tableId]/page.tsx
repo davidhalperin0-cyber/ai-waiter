@@ -941,8 +941,8 @@ function CustomerMenuPageContent({
                         transition={{ delay: index * 0.05 }}
                         onClick={() => handleExpandItem(item)}
                       >
-                        {/* Image */}
-                        <div className={menuStyle.card.image}>
+                        {/* Image - Same size as featured items */}
+                        <div className={`${menuStyle.card.image} h-56 lg:h-72`}>
                           {item.imageUrl ? (
                             <img
                               src={item.imageUrl}
