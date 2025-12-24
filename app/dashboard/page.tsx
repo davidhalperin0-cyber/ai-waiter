@@ -640,7 +640,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 text-white pb-24 lg:pb-6">
+    <main id="main-content" className="min-h-screen bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 text-white pb-40 lg:pb-6">
       {/* Header - Modern Design */}
       <header className="sticky top-0 z-40 bg-neutral-950/80 backdrop-blur-xl border-b border-neutral-800/50 px-4 lg:px-6 py-4 lg:py-6">
         <div className="max-w-7xl mx-auto">

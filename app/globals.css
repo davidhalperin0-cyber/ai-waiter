@@ -23,6 +23,53 @@ body {
   outline-offset: 1px;
 }
 
+/* Font size accessibility */
+.a11y-font-large body {
+  font-size: 1.125rem; /* 18px */
+}
+
+.a11y-font-large h1 { font-size: 2.25rem; }
+.a11y-font-large h2 { font-size: 1.875rem; }
+.a11y-font-large h3 { font-size: 1.5rem; }
+.a11y-font-large p, .a11y-font-large span, .a11y-font-large div { font-size: 1.125rem; }
+.a11y-font-large button, .a11y-font-large a { font-size: 1.125rem; }
+
+.a11y-font-xlarge body {
+  font-size: 1.25rem; /* 20px */
+}
+
+.a11y-font-xlarge h1 { font-size: 2.5rem; }
+.a11y-font-xlarge h2 { font-size: 2rem; }
+.a11y-font-xlarge h3 { font-size: 1.75rem; }
+.a11y-font-xlarge p, .a11y-font-xlarge span, .a11y-font-xlarge div { font-size: 1.25rem; }
+.a11y-font-xlarge button, .a11y-font-xlarge a { font-size: 1.25rem; }
+
+/* Focus visibility */
+.a11y-focus-visible *:focus-visible {
+  outline: 3px solid #3b82f6 !important;
+  outline-offset: 2px !important;
+  border-radius: 2px;
+}
+
+.a11y-focus-visible button:focus-visible,
+.a11y-focus-visible a:focus-visible,
+.a11y-focus-visible input:focus-visible,
+.a11y-focus-visible select:focus-visible,
+.a11y-focus-visible textarea:focus-visible {
+  outline: 3px solid #3b82f6 !important;
+  outline-offset: 2px !important;
+}
+
+/* Underline links */
+.a11y-underline-links a {
+  text-decoration: underline !important;
+  text-underline-offset: 2px;
+}
+
+.a11y-underline-links a:hover {
+  text-decoration-thickness: 2px;
+}
+
 /* Mobile bottom navigation */
 @media (max-width: 1023px) {
   body {
@@ -43,6 +90,41 @@ html {
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* Screen reader only - for skip links (WCAG requirement) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.sr-only:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: inherit;
+  margin: inherit;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+.focus\:not-sr-only:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: inherit;
+  margin: inherit;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
 }
 
 
