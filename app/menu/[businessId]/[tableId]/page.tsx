@@ -747,35 +747,40 @@ function CustomerMenuPageContent({
                   )}
                 </motion.button>
 
-                {orderedCategories.map((cat) => (
-                  <motion.button
-                    key={cat}
-                    onClick={() => scrollToCategory(cat)}
-                    className="relative flex-shrink-0 group"
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <div
-                      className={`px-5 py-2.5 rounded-full text-xs font-medium tracking-wider transition-all duration-500 ${
-                        activeCategory === cat
-                          ? 'text-black z-10'
-                          : 'text-white/60 bg-white/5 border border-white/10'
-                      }`}
+                {orderedCategories.map((cat) => {
+                  // Get categoryEn from first item in category
+                  const categoryItems = itemsByCategory[cat] || [];
+                  const firstItem = categoryItems[0];
+                  const displayCategory = cat === 'business'
+                    ? (language === 'en' ? '💼 Business meals' : '💼 מנות עסקיות')
+                    : (language === 'en' && firstItem?.categoryEn ? firstItem.categoryEn : cat);
+                  
+                  return (
+                    <motion.button
+                      key={cat}
+                      onClick={() => scrollToCategory(cat)}
+                      className="relative flex-shrink-0 group"
+                      whileTap={{ scale: 0.95 }}
                     >
-                      {cat === 'business'
-                        ? language === 'en'
-                          ? '💼 Business meals'
-                          : '💼 מנות עסקיות'
-                        : cat}
-                    </div>
-                    {activeCategory === cat && (
-                      <motion.div
-                        layoutId="activeTab"
-                        className="absolute inset-0 bg-white rounded-full -z-10"
-                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                      />
-                    )}
-                  </motion.button>
-                ))}
+                      <div
+                        className={`px-5 py-2.5 rounded-full text-xs font-medium tracking-wider transition-all duration-500 ${
+                          activeCategory === cat
+                            ? 'text-black z-10'
+                            : 'text-white/60 bg-white/5 border border-white/10'
+                        }`}
+                      >
+                        {displayCategory}
+                      </div>
+                      {activeCategory === cat && (
+                        <motion.div
+                          layoutId="activeTab"
+                          className="absolute inset-0 bg-white rounded-full -z-10"
+                          transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                        />
+                      )}
+                    </motion.button>
+                  );
+                })}
               </div>
               
               {/* Fade masks */}
@@ -911,7 +916,14 @@ function CustomerMenuPageContent({
                         ? language === 'en'
                           ? '💼 Business Meals'
                           : '💼 מנות עסקיות'
-                        : category}
+                        : (() => {
+                            // Find the first item in this category to get categoryEn
+                            const firstItem = categoryItems[0];
+                            if (language === 'en' && firstItem?.categoryEn) {
+                              return firstItem.categoryEn;
+                            }
+                            return category;
+                          })()}
                     </h2>
                   </div>
 
@@ -1194,7 +1206,15 @@ function CustomerMenuPageContent({
                   )}
                 </motion.button>
 
-                {orderedCategories.map((cat, index) => (
+                {orderedCategories.map((cat, index) => {
+                  // Get categoryEn from first item in category
+                  const categoryItems = itemsByCategory[cat] || [];
+                  const firstItem = categoryItems[0];
+                  const displayCategory = cat === 'business'
+                    ? (language === 'en' ? '💼 Business Meals' : '💼 מנות עסקיות')
+                    : (language === 'en' && firstItem?.categoryEn ? firstItem.categoryEn : cat);
+                  
+                  return (
                   <motion.button
                     key={cat}
                     onClick={() => scrollToCategory(cat)}
@@ -1207,7 +1227,7 @@ function CustomerMenuPageContent({
                     <span className={`text-sm tracking-wide transition-all duration-300 ${
                       activeCategory === cat ? 'text-white font-medium' : 'text-white/40 group-hover:text-white/70'
                     }`}>
-                      {cat === 'business' ? '💼 מנות עסקיות' : cat}
+                      {displayCategory}
                     </span>
                     {activeCategory === cat && (
                       <motion.div
@@ -1217,7 +1237,8 @@ function CustomerMenuPageContent({
                       />
                     )}
                   </motion.button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </aside>

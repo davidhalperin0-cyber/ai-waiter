@@ -275,7 +275,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           businessId,
           category: newItem.category.trim(),
-          categoryEn: newItem.categoryEn?.trim() || undefined,
+          categoryEn: newItem.categoryEn?.trim() || null,
           name: newItem.name,
           nameEn: newItem.nameEn || undefined,
           price: priceNumber,
@@ -361,13 +361,15 @@ export default function DashboardPage() {
         ? newItem.allergensEn.split(',').map((a) => a.trim()).filter(Boolean)
         : [];
 
+      const categoryEnValue = newItem.categoryEn?.trim() || null;
+      
       const res = await fetch(`/api/menu/${encodeURIComponent(editingItem.name)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           businessId,
           category: newItem.category.trim(),
-          categoryEn: newItem.categoryEn?.trim() || undefined,
+          categoryEn: categoryEnValue,
           name: newItem.name,
           nameEn: newItem.nameEn?.trim() || undefined,
           price: priceNumber,
@@ -384,6 +386,10 @@ export default function DashboardPage() {
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.message || 'נכשל בעדכון פריט');
+      }
+      if (data.warning) {
+        console.warn('⚠️', data.warning);
+        toast.error('הקטגוריה לא נשמרה - יש להוסיף את ה-column category_en בדטה בייס');
       }
       setEditingItem(null);
       setNewItem({
@@ -582,6 +588,7 @@ export default function DashboardPage() {
 
   async function handleAutoTranslate(
     source: 'category' | 'name' | 'ingredients' | 'allergens',
+    showToast = true,
   ) {
     try {
       let text = '';
@@ -591,7 +598,7 @@ export default function DashboardPage() {
       if (source === 'allergens') text = newItem.allergens;
 
       if (!text.trim()) {
-        toast.error('אין טקסט בעברית לתרגום');
+        if (showToast) toast.error('אין טקסט בעברית לתרגום');
         return;
       }
 
@@ -611,7 +618,7 @@ export default function DashboardPage() {
 
       const translated: string = data.translated || '';
       if (!translated) {
-        toast.error('לא התקבל תרגום מהשרת');
+        if (showToast) toast.error('לא התקבל תרגום מהשרת');
         return;
       }
 
@@ -622,11 +629,131 @@ export default function DashboardPage() {
         if (source === 'allergens') return { ...prev, allergensEn: translated };
         return prev;
       });
-      toast.success('התרגום נוסף לשדה האנגלי, אפשר לערוך לפני שמירה');
+      if (showToast) toast.success('התרגום נוסף לשדה האנגלי, אפשר לערוך לפני שמירה');
     } catch (err: any) {
-      toast.error(err.message || 'תרגום נכשל');
+      if (showToast) toast.error(err.message || 'תרגום נכשל');
     }
   }
+
+  // Auto-translate category when it changes (only if categoryEn is empty)
+  useEffect(() => {
+    // Only auto-translate if category has text and categoryEn is empty
+    if (newItem.category && newItem.category.trim() && !newItem.categoryEn?.trim()) {
+      // Small delay to avoid translating on every keystroke
+      const timeoutId = setTimeout(async () => {
+        try {
+          const res = await fetch('/api/ai/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: newItem.category.trim(),
+              target: 'category',
+            }),
+          });
+
+          const data = await res.json();
+          if (res.ok && data.translated) {
+            setNewItem((prev) => ({ ...prev, categoryEn: data.translated }));
+          }
+        } catch (err) {
+          // Silent fail for auto-translate
+          console.error('Auto-translate failed:', err);
+        }
+      }, 1000); // Wait 1 second after user stops typing
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [newItem.category, newItem.categoryEn]);
+
+  // Auto-translate name when it changes (only if nameEn is empty)
+  useEffect(() => {
+    // Only auto-translate if name has text and nameEn is empty
+    if (newItem.name && newItem.name.trim() && !newItem.nameEn?.trim()) {
+      // Small delay to avoid translating on every keystroke
+      const timeoutId = setTimeout(async () => {
+        try {
+          const res = await fetch('/api/ai/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: newItem.name.trim(),
+              target: 'name',
+            }),
+          });
+
+          const data = await res.json();
+          if (res.ok && data.translated) {
+            setNewItem((prev) => ({ ...prev, nameEn: data.translated }));
+          }
+        } catch (err) {
+          // Silent fail for auto-translate
+          console.error('Auto-translate failed:', err);
+        }
+      }, 1000); // Wait 1 second after user stops typing
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [newItem.name, newItem.nameEn]);
+
+  // Auto-translate ingredients when it changes (only if ingredientsEn is empty)
+  useEffect(() => {
+    // Only auto-translate if ingredients has text and ingredientsEn is empty
+    if (newItem.ingredients && newItem.ingredients.trim() && !newItem.ingredientsEn?.trim()) {
+      // Small delay to avoid translating on every keystroke
+      const timeoutId = setTimeout(async () => {
+        try {
+          const res = await fetch('/api/ai/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: newItem.ingredients.trim(),
+              target: 'ingredients',
+            }),
+          });
+
+          const data = await res.json();
+          if (res.ok && data.translated) {
+            setNewItem((prev) => ({ ...prev, ingredientsEn: data.translated }));
+          }
+        } catch (err) {
+          // Silent fail for auto-translate
+          console.error('Auto-translate failed:', err);
+        }
+      }, 1000); // Wait 1 second after user stops typing
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [newItem.ingredients, newItem.ingredientsEn]);
+
+  // Auto-translate allergens when it changes (only if allergensEn is empty)
+  useEffect(() => {
+    // Only auto-translate if allergens has text and allergensEn is empty
+    if (newItem.allergens && newItem.allergens.trim() && !newItem.allergensEn?.trim()) {
+      // Small delay to avoid translating on every keystroke
+      const timeoutId = setTimeout(async () => {
+        try {
+          const res = await fetch('/api/ai/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: newItem.allergens.trim(),
+              target: 'allergens',
+            }),
+          });
+
+          const data = await res.json();
+          if (res.ok && data.translated) {
+            setNewItem((prev) => ({ ...prev, allergensEn: data.translated }));
+          }
+        } catch (err) {
+          // Silent fail for auto-translate
+          console.error('Auto-translate failed:', err);
+        }
+      }, 1000); // Wait 1 second after user stops typing
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [newItem.allergens, newItem.allergensEn]);
 
   if (!businessId) {
   return (
@@ -2044,57 +2171,61 @@ export default function DashboardPage() {
                 <label className="block text-sm font-medium text-neutral-200">Headers (כותרות HTTP)</label>
                 <div id="headers-container" className="space-y-3">
                   {Object.entries(businessInfo.posConfig?.headers || {}).map(([key, value], index) => (
-                    <div key={index} data-header-row className="flex gap-2">
-                      <input
-                        data-header-key
-                        type="text"
-                        defaultValue={key}
-                        placeholder="Key (למשל: Authorization)"
-                        className="flex-1 rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
-                      />
+                    <div key={index} data-header-row className="flex flex-col gap-2 relative">
+                      <div className="flex gap-2">
+                        <input
+                          data-header-key
+                          type="text"
+                          defaultValue={key}
+                          placeholder="Key (למשל: Authorization)"
+                          className="flex-1 rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            (e.currentTarget.closest('[data-header-row]') as HTMLElement)?.remove();
+                          }}
+                          className="px-4 py-3 bg-red-600/80 text-white rounded-lg hover:bg-red-600 transition-all active:scale-95 font-medium"
+                        >
+                          ×
+                        </button>
+                      </div>
                       <input
                         data-header-value
                         type="text"
                         defaultValue={value}
                         placeholder="Value"
-                        className="flex-1 rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                        className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                       />
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          (e.currentTarget.closest('[data-header-row]') as HTMLElement)?.remove();
-                        }}
-                        className="px-4 py-3 bg-red-600/80 text-white rounded-lg hover:bg-red-600 transition-all active:scale-95 font-medium"
-                      >
-                        ×
-                      </button>
                     </div>
                   ))}
                   {(!businessInfo.posConfig?.headers || Object.keys(businessInfo.posConfig.headers).length === 0) && (
-                    <div data-header-row className="flex gap-2">
-                      <input
-                        data-header-key
-                        type="text"
-                        placeholder="Key (למשל: Authorization)"
-                        className="flex-1 rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
-                      />
+                    <div data-header-row className="flex flex-col gap-2 relative">
+                      <div className="flex gap-2">
+                        <input
+                          data-header-key
+                          type="text"
+                          placeholder="Key (למשל: Authorization)"
+                          className="flex-1 rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            (e.currentTarget.closest('[data-header-row]') as HTMLElement)?.remove();
+                          }}
+                          className="px-4 py-3 bg-red-600/80 text-white rounded-lg hover:bg-red-600 transition-all active:scale-95 font-medium"
+                        >
+                          ×
+                        </button>
+                      </div>
                       <input
                         data-header-value
                         type="text"
                         placeholder="Value"
-                        className="flex-1 rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                        className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                       />
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          (e.currentTarget.closest('[data-header-row]') as HTMLElement)?.remove();
-                        }}
-                        className="px-4 py-3 bg-red-600/80 text-white rounded-lg hover:bg-red-600 transition-all active:scale-95 font-medium"
-                      >
-                        ×
-                      </button>
                     </div>
                   )}
                 </div>
@@ -2106,11 +2237,13 @@ export default function DashboardPage() {
                     if (container) {
                       const newRow = document.createElement('div');
                       newRow.setAttribute('data-header-row', '');
-                      newRow.className = 'flex gap-2';
+                      newRow.className = 'flex flex-col gap-2 relative';
                       newRow.innerHTML = `
-                        <input data-header-key type="text" placeholder="Key" class="flex-1 rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all" />
-                        <input data-header-value type="text" placeholder="Value" class="flex-1 rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all" />
-                        <button type="button" class="px-4 py-3 bg-red-600/80 text-white rounded-lg hover:bg-red-600 transition-all active:scale-95 font-medium" onclick="this.closest('[data-header-row]').remove()">×</button>
+                        <div class="flex gap-2">
+                          <input data-header-key type="text" placeholder="Key (למשל: Authorization)" class="flex-1 rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all" />
+                          <button type="button" class="px-4 py-3 bg-red-600/80 text-white rounded-lg hover:bg-red-600 transition-all active:scale-95 font-medium" onclick="this.closest('[data-header-row]').remove()">×</button>
+                        </div>
+                        <input data-header-value type="text" placeholder="Value" class="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all" />
                       `;
                       container.appendChild(newRow);
                     }

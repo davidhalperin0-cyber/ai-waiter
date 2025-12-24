@@ -35,11 +35,13 @@ export async function PUT(
 
     const updateData: any = {};
     if (category !== undefined) updateData.category = category;
+    // Always update categoryEn if it's provided (even if null or empty)
     if (categoryEn !== undefined) {
       if (categoryEn === null || categoryEn === '') {
         (updateData as any).category_en = null;
       } else if (typeof categoryEn === 'string') {
-        (updateData as any).category_en = categoryEn.trim() || null;
+        const trimmed = categoryEn.trim();
+        (updateData as any).category_en = trimmed || null;
       } else {
         (updateData as any).category_en = categoryEn;
       }
@@ -121,9 +123,11 @@ export async function PUT(
           );
         }
 
+        console.error('⚠️ category_en column may not exist in database. Please add it with: ALTER TABLE "menuItems" ADD COLUMN IF NOT EXISTS "category_en" TEXT;');
         return NextResponse.json(
           {
             message: 'Updated (some optional columns not found - please run SQL migrations)',
+            warning: 'category_en column may not exist. Please add it to the database.',
           },
           { status: 200 },
         );
