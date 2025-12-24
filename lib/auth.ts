@@ -21,13 +21,22 @@ export interface AuthPayload extends JWTPayload {
 }
 
 export async function signAuthToken(payload: AuthPayload): Promise<string> {
-  const secretKey = getSecretKey();
-  const jwt = await new SignJWT(payload)
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('7d')
-    .sign(secretKey);
-  return jwt;
+  if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET is not set - cannot create authentication token');
+  }
+  
+  try {
+    const secretKey = getSecretKey();
+    const jwt = await new SignJWT(payload)
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('7d')
+      .sign(secretKey);
+    return jwt;
+  } catch (error: any) {
+    console.error('Error signing JWT token', error);
+    throw new Error(`Failed to sign token: ${error?.message || 'Unknown error'}`);
+  }
 }
 
 export async function verifyAuthToken(token: string): Promise<AuthPayload | null> {

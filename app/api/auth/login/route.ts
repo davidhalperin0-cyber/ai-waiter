@@ -5,6 +5,23 @@ import { signAuthToken } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
+    // Check environment variables
+    if (!process.env.JWT_SECRET) {
+      console.error('JWT_SECRET is not set');
+      return NextResponse.json({ 
+        message: 'Server configuration error',
+        details: process.env.NODE_ENV === 'development' ? 'JWT_SECRET is not set' : undefined
+      }, { status: 500 });
+    }
+
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('Supabase environment variables are not set');
+      return NextResponse.json({ 
+        message: 'Server configuration error',
+        details: process.env.NODE_ENV === 'development' ? 'Supabase env vars not set' : undefined
+      }, { status: 500 });
+    }
+
     const body = await req.json();
     const { email, password } = body as { email?: string; password?: string };
 
@@ -27,7 +44,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
     }
 
-    const isValid = await bcrypt.compare(password, business.passwordHash);
+    if (!business.passwordHash) {
+      console.error('Business has no password hash');
+      return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
+    }
+
+    let isValid = false;
+    try {
+      isValid = await bcrypt.compare(password, business.passwordHash);
+    } catch (bcryptError: any) {
+      console.error('Bcrypt compare error', bcryptError);
+      return NextResponse.json({ message: 'Authentication error' }, { status: 500 });
+    }
+
     if (!isValid) {
       return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
     }
@@ -36,11 +65,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Business is disabled' }, { status: 403 });
     }
 
-    const token = await signAuthToken({
-      businessId: business.businessId,
-      email: business.email,
-      role: 'business',
-    });
+    let token: string;
+    try {
+      token = await signAuthToken({
+        businessId: business.businessId,
+        email: business.email,
+        role: 'business',
+      });
+    } catch (tokenError: any) {
+      console.error('Token creation error', tokenError);
+      return NextResponse.json({ 
+        message: 'Failed to create authentication token',
+        details: process.env.NODE_ENV === 'development' ? tokenError?.message : undefined
+      }, { status: 500 });
+    }
 
     const res = NextResponse.json(
       { businessId: business.businessId, role: 'business' },
@@ -56,9 +94,17 @@ export async function POST(req: NextRequest) {
     });
 
     return res;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Login error', error);
-    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
+    console.error('Error details:', {
+      message: error?.message,
+      stack: error?.stack,
+      name: error?.name
+    });
+    return NextResponse.json({ 
+      message: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+    }, { status: 500 });
   }
 }
 

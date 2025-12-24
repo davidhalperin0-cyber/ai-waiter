@@ -96,8 +96,8 @@ export async function POST(req: NextRequest) {
     };
 
     // Optional English fields
-    if (nameEn) {
-      item.name_en = nameEn;
+    if (nameEn && nameEn.trim()) {
+      item.name_en = nameEn.trim();
     }
     if (ingredientsEn && Array.isArray(ingredientsEn) && ingredientsEn.length > 0) {
       item.ingredients_en = ingredientsEn;
@@ -105,8 +105,8 @@ export async function POST(req: NextRequest) {
     if (allergensEn && Array.isArray(allergensEn) && allergensEn.length > 0) {
       item.allergens_en = allergensEn;
     }
-    if (categoryEn) {
-      item.category_en = categoryEn;
+    if (categoryEn && categoryEn.trim()) {
+      item.category_en = categoryEn.trim();
     }
 
     // Add isBusiness if provided (only if column exists)

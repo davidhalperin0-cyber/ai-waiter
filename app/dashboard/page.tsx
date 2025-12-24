@@ -273,7 +273,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           businessId,
           category: newItem.category.trim(),
-          categoryEn: newItem.categoryEn.trim() || undefined,
+          categoryEn: newItem.categoryEn?.trim() || undefined,
           name: newItem.name,
           nameEn: newItem.nameEn || undefined,
           price: priceNumber,
