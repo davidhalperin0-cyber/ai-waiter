@@ -9,10 +9,16 @@ export const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || '';
  * @returns true if the user is a super admin, false otherwise
  */
 export async function isSuperAdmin(token: string | undefined): Promise<boolean> {
-  if (!token) return false;
+  if (!token) {
+    console.warn('isSuperAdmin: No token provided');
+    return false;
+  }
   
   const payload = await verifyAuthToken(token);
-  if (!payload) return false;
+  if (!payload) {
+    console.warn('isSuperAdmin: Token verification failed');
+    return false;
+  }
   
   // Check if email matches super admin email
   if (!SUPER_ADMIN_EMAIL) {
@@ -20,7 +26,21 @@ export async function isSuperAdmin(token: string | undefined): Promise<boolean> 
     return false;
   }
   
-  return payload.email === SUPER_ADMIN_EMAIL && payload.role === 'super_admin';
+  const emailMatch = payload.email?.trim() === SUPER_ADMIN_EMAIL.trim();
+  const roleMatch = payload.role === 'super_admin';
+  
+  if (!emailMatch || !roleMatch) {
+    console.warn('isSuperAdmin: Validation failed', {
+      emailMatch,
+      roleMatch,
+      payloadEmail: payload.email,
+      expectedEmail: SUPER_ADMIN_EMAIL,
+      payloadRole: payload.role
+    });
+    return false;
+  }
+  
+  return true;
 }
 
 /**

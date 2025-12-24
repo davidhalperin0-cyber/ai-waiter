@@ -7,8 +7,25 @@ import { isSuperAdmin } from '@/lib/superAdminAuth';
 export async function GET(req: NextRequest) {
   try {
     // Check super admin authentication
-    const token = req.cookies.get('auth')?.value;
-    if (!(await isSuperAdmin(token))) {
+    // Try multiple ways to get the token (cookies, headers)
+    let token = req.cookies.get('auth')?.value;
+    
+    // Fallback: check Authorization header
+    if (!token) {
+      const authHeader = req.headers.get('authorization');
+      if (authHeader?.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+      }
+    }
+    
+    if (!token) {
+      console.error('No auth token found in cookies or headers');
+      return NextResponse.json({ message: 'Unauthorized - No authentication token' }, { status: 403 });
+    }
+    
+    const isAdmin = await isSuperAdmin(token);
+    if (!isAdmin) {
+      console.error('Super admin check failed');
       return NextResponse.json({ message: 'Unauthorized - Super admin access required' }, { status: 403 });
     }
 

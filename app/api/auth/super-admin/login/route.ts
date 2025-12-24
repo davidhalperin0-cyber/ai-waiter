@@ -64,6 +64,8 @@ export async function POST(req: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       path: '/',
       maxAge: 60 * 60 * 24 * 7, // 7 days
+      // Don't set domain in production to allow cross-subdomain cookies
+      ...(process.env.NODE_ENV === 'production' ? {} : {}),
     });
 
     console.log('Super admin login successful for:', trimmedEmail);

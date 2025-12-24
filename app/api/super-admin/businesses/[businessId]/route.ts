@@ -10,9 +10,40 @@ export async function PUT(
 ) {
   try {
     // Check super admin authentication
-    const token = req.cookies.get('auth')?.value;
-    if (!(await isSuperAdmin(token))) {
-      return NextResponse.json({ message: 'Unauthorized - Super admin access required' }, { status: 403 });
+    // Try multiple ways to get the token (cookies, headers)
+    let token = req.cookies.get('auth')?.value;
+    
+    // Fallback: check Authorization header
+    if (!token) {
+      const authHeader = req.headers.get('authorization');
+      if (authHeader?.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+      }
+    }
+    
+    if (!token) {
+      console.error('No auth token found in cookies or headers');
+      console.error('Available cookies:', Array.from(req.cookies.getAll()).map(c => c.name));
+      return NextResponse.json({ message: 'Unauthorized - No authentication token' }, { status: 403 });
+    }
+    
+    const isAdmin = await isSuperAdmin(token);
+    if (!isAdmin) {
+      console.error('Super admin check failed for token:', token.substring(0, 20) + '...');
+      // Try to verify the token to see what's in it
+      const { verifyAuthToken } = await import('@/lib/auth');
+      const payload = await verifyAuthToken(token);
+      console.error('Token payload:', payload);
+      console.error('SUPER_ADMIN_EMAIL from env:', process.env.SUPER_ADMIN_EMAIL ? 'SET' : 'NOT SET');
+      return NextResponse.json({ 
+        message: 'Unauthorized - Super admin access required',
+        debug: process.env.NODE_ENV === 'development' ? {
+          hasToken: !!token,
+          tokenPreview: token.substring(0, 20),
+          payload: payload,
+          expectedEmail: process.env.SUPER_ADMIN_EMAIL
+        } : undefined
+      }, { status: 403 });
     }
 
     const businessId = params.businessId;
