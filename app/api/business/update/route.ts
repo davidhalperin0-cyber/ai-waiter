@@ -47,7 +47,6 @@ export async function PUT(req: NextRequest) {
         optionalFieldsUpdate.subscription = {
           status: 'trial',
           planType: 'menu_only',
-          tablesAllowed: 0,
           menuOnlyMessage: menuOnlyMessage?.trim() || null,
         };
       } else {

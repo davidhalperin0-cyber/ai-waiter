@@ -111,7 +111,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   nextBillingDate.setDate(nextBillingDate.getDate() + 30);
   const nextBillingDateISO = nextBillingDate.toISOString();
 
-  // Get current subscription to preserve tablesAllowed
+  // Get current subscription to preserve other fields
   const { data: business, error: fetchError } = await supabaseAdmin
     .from('businesses')
     .select('subscription')
@@ -124,14 +124,11 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   }
 
   const currentSubscription = (business.subscription as any) || {};
-  const tablesRequested = session.metadata?.tablesRequested
-    ? parseInt(session.metadata.tablesRequested, 10)
-    : currentSubscription.tablesAllowed || 10;
 
   // Update only the subscription JSONB field
   const updatedSubscription = {
+    ...currentSubscription,
     status: 'active' as const,
-    tablesAllowed: tablesRequested,
     nextBillingDate: nextBillingDateISO,
   };
 
@@ -148,7 +145,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     throw updateError;
   }
 
-  console.log('Subscription activated', { businessId, tablesRequested });
+  console.log('Subscription activated', { businessId });
 }
 
 // Handle invoice.payment_failed

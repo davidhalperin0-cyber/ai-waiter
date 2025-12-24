@@ -11,7 +11,6 @@ interface Business {
   subscription: {
     status: string;
     planType?: 'full' | 'menu_only';
-    tablesAllowed: number;
   };
   createdAt: string;
   ordersCount: number;
@@ -99,35 +98,7 @@ export default function SuperAdminPage() {
     }
   }
 
-  async function updateSubscription(businessId: string, tablesAllowed: number) {
-    try {
-      setLoading(true);
-      const business = businesses.find((b) => b.businessId === businessId);
-      if (!business) return;
-
-      const res = await fetch(`/api/super-admin/businesses/${businessId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          subscription: {
-            ...business.subscription,
-            tablesAllowed,
-          },
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        await loadBusinesses();
-        alert('מספר השולחנות עודכן בהצלחה!');
-      } else {
-        alert(data.message || 'נכשל בעדכון מספר השולחנות');
-      }
-    } catch (err: any) {
-      alert(err.message || 'נכשל בעדכון מספר השולחנות');
-    } finally {
-      setLoading(false);
-    }
-  }
+  // updateSubscription function removed - no longer based on number of tables
 
   async function updateSubscriptionStatus(businessId: string, newStatus: string) {
     try {
@@ -173,8 +144,6 @@ export default function SuperAdminPage() {
           subscription: {
             ...business.subscription,
             planType: newPlanType,
-            // אם משנים ל-menu_only, לא צריך tablesAllowed
-            ...(newPlanType === 'menu_only' ? { tablesAllowed: 0 } : {}),
           },
         }),
       });
@@ -409,12 +378,12 @@ export default function SuperAdminPage() {
         <section className="space-y-4">
           <h2 className="text-lg font-semibold">תמחור</h2>
           <p className="text-xs text-neutral-400 mb-4">
-            הגדירו את התמחור החודשי לכל שולחן. העסקים ישלמו לפי מספר השולחנות שלהם.
+            הגדירו את התמחור החודשי למנוי. העסקים ישלמו את המחיר הזה כל חודש.
           </p>
 
           <div className="border border-neutral-800 rounded-lg p-4 bg-neutral-900/50 space-y-4 text-xs">
             <div>
-              <label className="block mb-1 text-neutral-300">מחיר חודשי לכל שולחן (₪)</label>
+              <label className="block mb-1 text-neutral-300">מחיר חודשי למנוי (₪)</label>
               <input
                 type="number"
                 step="0.01"
@@ -423,35 +392,11 @@ export default function SuperAdminPage() {
                   setPricingConfig({ pricePerTable: Number(e.target.value) })
                 }
                 className="w-full max-w-xs rounded-md bg-neutral-800 border border-neutral-700 px-3 py-2"
-                placeholder="50"
+                placeholder="500"
               />
               <p className="text-[10px] text-neutral-500 mt-1">
-                זה המחיר הבסיסי לכל שולחן. העסקים ישלמו: מספר שולחנות × מחיר זה (Stripe).
+                זה המחיר החודשי למנוי. העסקים ישלמו את המחיר הזה כל חודש (Stripe).
               </p>
-            </div>
-
-            <div className="pt-4 border-t border-neutral-800">
-              <h3 className="font-semibold mb-2">דוגמאות תמחור:</h3>
-              <div className="space-y-2 text-[11px]">
-                <div className="flex justify-between">
-                  <span className="text-neutral-400">5 שולחנות:</span>
-                  <span className="font-semibold">
-                    ₪{(pricingConfig.pricePerTable * 5).toFixed(2)}/חודש
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-400">10 שולחנות:</span>
-                  <span className="font-semibold">
-                    ₪{(pricingConfig.pricePerTable * 10).toFixed(2)}/חודש
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-400">20 שולחנות:</span>
-                  <span className="font-semibold">
-                    ₪{(pricingConfig.pricePerTable * 20).toFixed(2)}/חודש
-                  </span>
-                </div>
-              </div>
             </div>
 
             <button
@@ -465,41 +410,7 @@ export default function SuperAdminPage() {
             </button>
           </div>
 
-          {businesses.length > 0 && (
-            <div className="mt-6 border border-neutral-800 rounded-lg p-4 bg-neutral-900/50">
-              <h3 className="font-semibold mb-3 text-xs">עדכון מספר שולחנות לעסק</h3>
-              <div className="space-y-2 text-xs">
-                {businesses.map((business) => (
-                  <div
-                    key={business.businessId}
-                    className="flex items-center justify-between gap-2 p-2 bg-neutral-800 rounded"
-                  >
-                    <div className="flex-1">
-                      <div className="font-semibold">{business.name}</div>
-                      <div className="text-[10px] text-neutral-400">
-                        נוכחי: {business.subscription.tablesAllowed} שולחנות
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min="1"
-                        defaultValue={business.subscription.tablesAllowed}
-                        onBlur={(e) => {
-                          const newValue = Number(e.target.value);
-                          if (newValue !== business.subscription.tablesAllowed) {
-                            updateSubscription(business.businessId, newValue);
-                          }
-                        }}
-                        className="w-20 rounded-md bg-neutral-900 border border-neutral-700 px-2 py-1 text-xs"
-                      />
-                      <span className="text-[10px] text-neutral-400">שולחנות</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Tables management removed - no longer based on number of tables */}
         </section>
       )}
     </main>

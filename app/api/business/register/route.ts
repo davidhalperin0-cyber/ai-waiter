@@ -54,7 +54,6 @@ export async function POST(req: NextRequest) {
       subscription: {
         status: 'trial',
         planType: 'full', // Default to full plan
-        tablesAllowed: 10,
       },
       // createdAt is handled by DEFAULT NOW() in the database
     };

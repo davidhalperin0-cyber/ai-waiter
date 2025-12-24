@@ -56,7 +56,8 @@ export interface Business {
   isEnabled: boolean;
   subscription: {
     status: 'trial' | 'active' | 'expired' | 'past_due';
-    tablesAllowed: number;
+    planType?: 'full' | 'menu_only';
+    menuOnlyMessage?: string | null;
     nextBillingDate?: string;
   };
   printerConfig?: PrinterConfig;

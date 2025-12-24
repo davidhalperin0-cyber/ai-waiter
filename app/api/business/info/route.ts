@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
       menuStyle: business.menuStyle || null,
       email: business.email,
       isEnabled: business.isEnabled ?? true,
-      subscription: business.subscription || { status: 'trial', tablesAllowed: 10 },
+      subscription: business.subscription || { status: 'trial' },
       printerConfig: business.printerConfig || {
         enabled: false,
         type: 'http',

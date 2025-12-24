@@ -6,7 +6,6 @@ export interface Subscription {
   status: 'trial' | 'active' | 'expired' | 'past_due';
   planType?: 'full' | 'menu_only'; // 'full' = כל התכונות, 'menu_only' = רק תפריט
   menuOnlyMessage?: string | null; // Custom message for menu-only plan (shown to customers)
-  tablesAllowed: number;
   nextBillingDate?: string | null;
 }
 

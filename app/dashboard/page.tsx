@@ -480,12 +480,7 @@ export default function DashboardPage() {
     e.preventDefault();
     if (!businessId || !newTable.tableId || !newTable.label) return;
 
-    // בדיקה מול המנוי: אם יש מגבלה על מספר השולחנות – לא מאפשרים לעבור אותה
-    const tablesAllowed = businessInfo?.subscription?.tablesAllowed;
-    if (typeof tablesAllowed === 'number' && tables.length >= tablesAllowed) {
-      toast.error('הגעת למספר המקסימלי של שולחנות במנוי. פנו למנהל המערכת להגדלת המנוי.');
-      return;
-    }
+    // No limit on number of tables - removed tablesAllowed restriction
 
     try {
       setLoading(true);
@@ -690,7 +685,7 @@ export default function DashboardPage() {
         <nav className="hidden lg:flex gap-2 border-b border-neutral-800/50 mb-6 overflow-x-auto scrollbar-hide">
           {[
             { id: 'menu', label: '📋 ניהול תפריט', icon: '📋', showFor: ['full', 'menu_only'] as const },
-            { id: 'tables', label: '🪑 שולחנות וקודי QR', icon: '🪑', showFor: ['full'] as const },
+            { id: 'tables', label: '🪑 שולחנות, QR ו-NFC', icon: '🪑', showFor: ['full', 'menu_only'] as const },
             { id: 'settings', label: '⚙️ הגדרות עסק', icon: '⚙️', showFor: ['full', 'menu_only'] as const },
             { id: 'printer', label: '🖨️ הגדרות מדפסת', icon: '🖨️', showFor: ['full'] as const },
             { id: 'pos', label: '💳 אינטגרציית POS', icon: '💳', showFor: ['full'] as const },
@@ -723,7 +718,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-3 gap-1 p-2">
             {[
               { id: 'menu', label: 'תפריט', icon: '📋', showFor: ['full', 'menu_only'] as const },
-              { id: 'tables', label: 'שולחנות', icon: '🪑', showFor: ['full'] as const },
+              { id: 'tables', label: 'שולחנות', icon: '🪑', showFor: ['full', 'menu_only'] as const },
               { id: 'settings', label: 'הגדרות', icon: '⚙️', showFor: ['full', 'menu_only'] as const },
             ]
               .filter((tab) => {
@@ -1149,9 +1144,9 @@ export default function DashboardPage() {
       {activeTab === 'tables' && (
         <section className="space-y-6">
           <div>
-            <h2 className="text-xl lg:text-2xl font-bold mb-2">🪑 שולחנות וקודי QR</h2>
+            <h2 className="text-xl lg:text-2xl font-bold mb-2">🪑 שולחנות, QR ו-NFC</h2>
             <p className="text-sm text-neutral-400">
-              הגדירו שולחנות ויצרו קודי QR אוטומטיים לכל שולחן.
+              הגדירו שולחנות ויצרו קודי QR ותגי NFC אוטומטיים לכל שולחן.
             </p>
           </div>
 
@@ -1283,6 +1278,67 @@ export default function DashboardPage() {
                     הלקוחות יסרקו את הקוד עם הטלפון ויגיעו ישירות לתפריט.
                   </p>
                 </div>
+                
+                {/* NFC Tag Section */}
+                <div className="mt-6 pt-6 border-t border-neutral-800/50">
+                  <div className="bg-gradient-to-r from-blue-900/40 to-indigo-900/40 border border-blue-500/50 rounded-xl px-4 py-3 mb-4">
+                    <h3 className="text-sm font-bold text-blue-300 mb-1">
+                      📡 תג NFC
+                    </h3>
+                    <p className="text-xs text-blue-200/80">
+                      הגדירו תג NFC לשולחן זה
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    <p className="text-xs text-neutral-300 mb-2 font-medium">URL לתג NFC:</p>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        id={`nfc-url-${selectedTable}`}
+                        value={businessId && selectedTable ? `${window.location.origin}/menu/${businessId}/${selectedTable}` : ''}
+                        className="flex-1 text-xs bg-neutral-800/80 border border-neutral-700/50 px-4 py-2.5 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                        onClick={(e) => (e.target as HTMLInputElement).select()}
+                      />
+                      <button
+                        onClick={async () => {
+                          if (!businessId || !selectedTable) return;
+                          const url = `${window.location.origin}/menu/${businessId}/${selectedTable}`;
+                          try {
+                            await navigator.clipboard.writeText(url);
+                            toast.success('הקישור הועתק ללוח!');
+                          } catch (err) {
+                            const input = document.getElementById(`nfc-url-${selectedTable}`) as HTMLInputElement;
+                            if (input) {
+                              input.select();
+                              document.execCommand('copy');
+                              toast.success('הקישור הועתק ללוח!');
+                            } else {
+                              toast.error('לא הצלחנו להעתיק את הקישור, נסו ידנית.');
+                            }
+                          }
+                        }}
+                        className="text-sm text-white bg-neutral-700/80 px-4 py-2.5 rounded-lg hover:bg-neutral-600 transition-all active:scale-95 font-medium whitespace-nowrap"
+                      >
+                        📋 העתק
+                      </button>
+                    </div>
+                    <div className="bg-neutral-800/50 border border-neutral-700/30 rounded-lg p-4 space-y-2">
+                      <p className="text-xs font-semibold text-neutral-200 mb-2">📋 הוראות הגדרת NFC:</p>
+                      <ol className="text-[11px] text-neutral-400 space-y-1.5 list-decimal list-inside leading-relaxed">
+                        <li>רכשו תגי NFC (NTAG213 או NTAG215 מומלצים)</li>
+                        <li>השתמשו באפליקציית NFC Tools או NFC TagWriter</li>
+                        <li>בחרו "כתוב URL" או "Write URL"</li>
+                        <li>הדביקו את הקישור למעלה</li>
+                        <li>הניחו את הטלפון על התג עד שהכתיבה מסתיימת</li>
+                        <li>הדביקו את התג על השולחן</li>
+                      </ol>
+                      <p className="text-[11px] text-neutral-500 mt-3 pt-3 border-t border-neutral-700/30">
+                        💡 <strong>טיפ:</strong> בדקו את התג לפני הדבקה - סרקו אותו עם הטלפון כדי לוודא שהוא פותח את התפריט הנכון.
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 <div className="mt-4 pt-4 border-t border-neutral-800/50">
                   <p className="text-xs text-neutral-300 mb-2 font-medium">קישור ישיר לתפריט:</p>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -1372,15 +1428,12 @@ export default function DashboardPage() {
                   )}
                 </div>
                 <div className="text-right">
-                  <div className="text-[11px] text-neutral-400 mb-1">שולחנות בתוכנית</div>
+                  <div className="text-[11px] text-neutral-400 mb-1">שולחנות פעילים</div>
                   <div className="text-sm font-semibold">
-                    {tables.length}/{businessInfo.subscription.tablesAllowed ?? 'לא מוגבל'}
+                    {tables.length} שולחנות
                   </div>
                   <div className="text-[11px] text-neutral-500">
-                    {businessInfo.subscription.tablesAllowed &&
-                    tables.length > businessInfo.subscription.tablesAllowed
-                      ? 'חריגה ממספר השולחנות המותרים'
-                      : 'כולל כל השולחנות עם QR פעיל'}
+                    כולל כל השולחנות עם QR פעיל
                   </div>
                 </div>
               </div>
@@ -1397,7 +1450,7 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              <BillingControls businessId={businessId} currentTablesAllowed={businessInfo.subscription.tablesAllowed} />
+              {/* Billing controls removed - no longer based on number of tables */}
             </div>
           )}
 
@@ -2244,73 +2297,5 @@ export default function DashboardPage() {
   );
 }
 
-interface BillingControlsProps {
-  businessId: string | null;
-  currentTablesAllowed?: number;
-}
-
-function BillingControls({ businessId, currentTablesAllowed }: BillingControlsProps) {
-  const [desiredTables, setDesiredTables] = useState<number>(currentTablesAllowed || 1);
-  const [loading, setLoading] = useState(false);
-
-  async function startCheckout() {
-    if (!businessId) return;
-    if (!desiredTables || desiredTables <= 0) {
-      toast.error('יש להזין מספר שולחנות גדול מאפס');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const res = await fetch('/api/billing/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ businessId, tablesRequested: desiredTables }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || 'נכשל ביצירת תהליך חיוב');
-      }
-      if (data.url) {
-        window.location.href = data.url as string;
-      } else {
-        toast.error('לא התקבלה כתובת תשלום מ-Stripe');
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'נכשל ביצירת תהליך חיוב');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="flex flex-wrap gap-3 justify-between items-center mt-2">
-      <div className="flex items-center gap-2">
-        <label className="text-[11px] text-neutral-400">
-          מספר שולחנות במנוי (50₪ לחודש לכל שולחן):
-        </label>
-        <input
-          type="number"
-          min={1}
-          value={desiredTables}
-          onChange={(e) => setDesiredTables(Number(e.target.value))}
-          className="w-20 rounded-md bg-neutral-900 border border-neutral-700 px-2 py-1 text-[11px]"
-        />
-      </div>
-      <div className="flex items-center gap-3 text-[11px]">
-        <span className="text-neutral-400">
-          סכום חודשי משוער: ₪{(desiredTables * 50).toFixed(2)}
-        </span>
-        <button
-          type="button"
-          onClick={startCheckout}
-          disabled={loading || !businessId}
-          className="rounded-md bg-green-600 text-white px-3 py-1 font-semibold disabled:opacity-60 hover:bg-green-500"
-        >
-          {loading ? 'מעביר ל-Stripe...' : 'שדרג / חדש מנוי'}
-        </button>
-      </div>
-    </div>
-  );
-}
+// BillingControls component removed - no longer based on number of tables
 

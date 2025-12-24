@@ -714,6 +714,9 @@ function CustomerMenuPageContent({
             </motion.div>
           )}
 
+          {/* Don't show menu if subscription is expired or business is disabled */}
+          {!subscriptionExpired && !businessDisabled ? (
+            <>
           {/* Mobile Categories Navigation - Redesigned Dynamic Ribbon */}
           <nav className="lg:hidden sticky top-0 z-30 mb-8 -mx-4">
             <div className="relative overflow-hidden pt-4 pb-6">
@@ -1484,6 +1487,8 @@ function CustomerMenuPageContent({
             </motion.footer>
           )}
         </AnimatePresence>
+            </>
+          ) : null}
         </div>
     </main>
     </ThemeWrapper>
