@@ -1169,7 +1169,7 @@ export default function DashboardPage() {
                   className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                   placeholder="table-1"
                   required
-                  pattern="[a-zA-Z0-9-_]+"
+                  pattern="[a-zA-Z0-9_-]+"
                   title="רק אותיות, מספרים, מקפים ותחתונים (ללא רווחים)"
                 />
               </div>
