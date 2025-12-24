@@ -46,6 +46,8 @@ export default function DashboardPage() {
     aiInstructions?: string;
     subscription?: {
       status: string;
+      planType?: 'full' | 'menu_only';
+      menuOnlyMessage?: string;
       tablesAllowed?: number;
       nextBillingDate?: string;
     };
@@ -687,13 +689,18 @@ export default function DashboardPage() {
         {/* Desktop Navigation - Horizontal Scroll */}
         <nav className="hidden lg:flex gap-2 border-b border-neutral-800/50 mb-6 overflow-x-auto scrollbar-hide">
           {[
-            { id: 'menu', label: '📋 ניהול תפריט', icon: '📋' },
-            { id: 'tables', label: '🪑 שולחנות וקודי QR', icon: '🪑' },
-            { id: 'settings', label: '⚙️ הגדרות עסק', icon: '⚙️' },
-            { id: 'printer', label: '🖨️ הגדרות מדפסת', icon: '🖨️' },
-            { id: 'pos', label: '💳 אינטגרציית POS', icon: '💳' },
-            { id: 'orders', label: '📊 הזמנות ורווחים', icon: '📊' },
-          ].map((tab) => (
+            { id: 'menu', label: '📋 ניהול תפריט', icon: '📋', showFor: ['full', 'menu_only'] as const },
+            { id: 'tables', label: '🪑 שולחנות וקודי QR', icon: '🪑', showFor: ['full'] as const },
+            { id: 'settings', label: '⚙️ הגדרות עסק', icon: '⚙️', showFor: ['full', 'menu_only'] as const },
+            { id: 'printer', label: '🖨️ הגדרות מדפסת', icon: '🖨️', showFor: ['full'] as const },
+            { id: 'pos', label: '💳 אינטגרציית POS', icon: '💳', showFor: ['full'] as const },
+            { id: 'orders', label: '📊 הזמנות ורווחים', icon: '📊', showFor: ['full'] as const },
+          ]
+            .filter((tab) => {
+              const planType = (businessInfo?.subscription?.planType || 'full') as 'full' | 'menu_only';
+              return (tab.showFor as readonly ('full' | 'menu_only')[]).includes(planType);
+            })
+            .map((tab) => (
             <button
               key={tab.id}
               onClick={() => {
@@ -715,10 +722,15 @@ export default function DashboardPage() {
         <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-neutral-900/95 backdrop-blur-xl border-t border-neutral-800/50 shadow-2xl">
           <div className="grid grid-cols-3 gap-1 p-2">
             {[
-              { id: 'menu', label: 'תפריט', icon: '📋' },
-              { id: 'tables', label: 'שולחנות', icon: '🪑' },
-              { id: 'settings', label: 'הגדרות', icon: '⚙️' },
-            ].map((tab) => (
+              { id: 'menu', label: 'תפריט', icon: '📋', showFor: ['full', 'menu_only'] as const },
+              { id: 'tables', label: 'שולחנות', icon: '🪑', showFor: ['full'] as const },
+              { id: 'settings', label: 'הגדרות', icon: '⚙️', showFor: ['full', 'menu_only'] as const },
+            ]
+              .filter((tab) => {
+                const planType = (businessInfo?.subscription?.planType || 'full') as 'full' | 'menu_only';
+                return (tab.showFor as readonly ('full' | 'menu_only')[]).includes(planType);
+              })
+              .map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
@@ -735,10 +747,15 @@ export default function DashboardPage() {
           </div>
           <div className="grid grid-cols-3 gap-1 p-2 border-t border-neutral-800/30">
             {[
-              { id: 'printer', label: 'מדפסת', icon: '🖨️' },
-              { id: 'pos', label: 'POS', icon: '💳' },
-              { id: 'orders', label: 'הזמנות', icon: '📊', action: () => businessId && loadOrders() },
-            ].map((tab) => (
+              { id: 'printer', label: 'מדפסת', icon: '🖨️', showFor: ['full'] as const },
+              { id: 'pos', label: 'POS', icon: '💳', showFor: ['full'] as const },
+              { id: 'orders', label: 'הזמנות', icon: '📊', showFor: ['full'] as const, action: () => businessId && loadOrders() },
+            ]
+              .filter((tab) => {
+                const planType = (businessInfo?.subscription?.planType || 'full') as 'full' | 'menu_only';
+                return (tab.showFor as readonly ('full' | 'menu_only')[]).includes(planType);
+              })
+              .map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => {
@@ -1397,6 +1414,14 @@ export default function DashboardPage() {
                 const template = formData.get('template') as string;
                 const menuStyle = formData.get('menuStyle') as string;
                 const aiInstructions = formData.get('aiInstructions') as string;
+                const menuOnlyMessage = formData.get('menuOnlyMessage') as string;
+                console.log('📝 Form submitted with menuOnlyMessage:', {
+                  menuOnlyMessage,
+                  menuOnlyMessageLength: menuOnlyMessage?.length,
+                  planType: businessInfo.subscription?.planType,
+                  willSend: businessInfo.subscription?.planType === 'menu_only',
+                  trimmed: menuOnlyMessage?.trim(),
+                });
                 const businessHoursStart = formData.get('businessHoursStart') as string;
                 const businessHoursEnd = formData.get('businessHoursEnd') as string;
                 const businessHoursEnabled = formData.get('businessHoursEnabled') === 'on';
@@ -1425,12 +1450,23 @@ export default function DashboardPage() {
                       menuStyle: menuStyle || undefined,
                       aiInstructions: aiInstructions || undefined,
                       businessHours: businessHours || null,
+                      menuOnlyMessage: businessInfo.subscription?.planType === 'menu_only'
+                        ? (menuOnlyMessage?.trim() || null)
+                        : undefined,
                     }),
                   });
                   const data = await res.json();
                   if (!res.ok) {
                     throw new Error(data.message || 'נכשל בעדכון פרטי העסק');
                   }
+                  // Update menuOnlyMessage in subscription if it was updated
+                  const updatedSubscription = businessInfo.subscription?.planType === 'menu_only' && menuOnlyMessage !== undefined
+                    ? {
+                        ...businessInfo.subscription,
+                        menuOnlyMessage: menuOnlyMessage.trim() || undefined,
+                      }
+                    : businessInfo.subscription;
+
                   setBusinessInfo({ 
                     name,
                     logoUrl: logoUrl || undefined,
@@ -1439,6 +1475,7 @@ export default function DashboardPage() {
                     menuStyle: menuStyle || 'elegant', 
                     aiInstructions: aiInstructions || '',
                     businessHours: businessHours,
+                    subscription: updatedSubscription,
                     printerConfig: businessInfo.printerConfig,
                   });
                   toast.success('פרטי העסק עודכנו בהצלחה!');
@@ -1590,6 +1627,24 @@ export default function DashboardPage() {
                   דוגמה: 10:00-18:00 - מנות עסקיות זמינות רק בשעות האלו
                 </p>
               </div>
+
+              {businessInfo.subscription?.planType === 'menu_only' && (
+                <div className="space-y-2 p-4 bg-neutral-800/30 border border-neutral-700/30 rounded-xl">
+                  <label className="block text-sm font-medium text-neutral-200">
+                    📋 הודעה מותאמת אישית לתפריט דיגיטלי
+                  </label>
+                  <p className="text-xs text-neutral-400 leading-relaxed mb-3">
+                    הודעה שתוצג ללקוחות בתפריט הדיגיטלי. השאירו ריק כדי לא להציג הודעה.
+                  </p>
+                  <textarea
+                    name="menuOnlyMessage"
+                    defaultValue={businessInfo.subscription?.menuOnlyMessage || ''}
+                    rows={4}
+                    className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all resize-y"
+                    placeholder="לדוגמה:&#10;ברוכים הבאים לתפריט הדיגיטלי שלנו!&#10;להזמנות, אנא צרו קשר בטלפון: 03-1234567&#10;או הגיעו אלינו ישירות."
+                  />
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-neutral-200">

@@ -61,6 +61,14 @@ export async function GET(req: NextRequest) {
     // Check subscription status
     const subscription = business.subscription as Subscription;
     
+    console.log('📋 Subscription data:', {
+      hasSubscription: !!subscription,
+      planType: subscription?.planType,
+      menuOnlyMessage: subscription?.menuOnlyMessage,
+      subscriptionKeys: subscription ? Object.keys(subscription) : [],
+      fullSubscription: subscription,
+    });
+    
     // Auto-expire safety net: if status is "active" but nextBillingDate is in the past
     if (shouldAutoExpire(subscription)) {
       // Update subscription to expired
@@ -85,6 +93,8 @@ export async function GET(req: NextRequest) {
           menuStyle: business.menuStyle || null,
           businessHours: business.businessHours || null,
           subscriptionStatus: 'expired',
+          planType: subscription.planType || 'full',
+          menuOnlyMessage: subscription.menuOnlyMessage || null,
         },
         { status: 403 },
       );
@@ -101,23 +111,32 @@ export async function GET(req: NextRequest) {
           menuStyle: business.menuStyle || null,
           businessHours: business.businessHours || null,
           subscriptionStatus: 'expired',
+          planType: subscription.planType || 'full',
+          menuOnlyMessage: subscription.menuOnlyMessage || null,
         },
         { status: 403 },
       );
     }
 
-    return NextResponse.json(
-      {
-        businessId: business.businessId,
-        name: business.name,
-        logoUrl: business.logoUrl || null,
-        template: business.template || 'generic',
-        menuStyle: business.menuStyle || null,
-        businessHours: business.businessHours || null,
-        subscriptionStatus: 'active',
-      },
-      { status: 200 },
-    );
+    const response = {
+      businessId: business.businessId,
+      name: business.name,
+      logoUrl: business.logoUrl || null,
+      template: business.template || 'generic',
+      menuStyle: business.menuStyle || null,
+      businessHours: business.businessHours || null,
+      subscriptionStatus: 'active',
+      planType: subscription.planType || 'full', // Include planType in response
+      menuOnlyMessage: subscription.menuOnlyMessage || null, // Custom message for menu-only plan
+    };
+    
+    console.log('📋 Returning menu info:', {
+      planType: response.planType,
+      menuOnlyMessage: response.menuOnlyMessage,
+      hasMessage: !!response.menuOnlyMessage,
+    });
+    
+    return NextResponse.json(response, { status: 200 });
   } catch (error) {
     console.error('Error fetching business info', error);
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });

@@ -10,6 +10,7 @@ interface Business {
   isEnabled: boolean;
   subscription: {
     status: string;
+    planType?: 'full' | 'menu_only';
     tablesAllowed: number;
   };
   createdAt: string;
@@ -159,6 +160,38 @@ export default function SuperAdminPage() {
     }
   }
 
+  async function updatePlanType(businessId: string, newPlanType: 'full' | 'menu_only') {
+    try {
+      setLoading(true);
+      const business = businesses.find((b) => b.businessId === businessId);
+      if (!business) return;
+
+      const res = await fetch(`/api/super-admin/businesses/${businessId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subscription: {
+            ...business.subscription,
+            planType: newPlanType,
+            // אם משנים ל-menu_only, לא צריך tablesAllowed
+            ...(newPlanType === 'menu_only' ? { tablesAllowed: 0 } : {}),
+          },
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await loadBusinesses();
+        alert(`סוג החבילה עודכן ל-${newPlanType === 'full' ? 'חבילה מלאה' : 'תפריט בלבד'}!`);
+      } else {
+        alert(data.message || 'נכשל בעדכון סוג החבילה');
+      }
+    } catch (err: any) {
+      alert(err.message || 'נכשל בעדכון סוג החבילה');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-neutral-950 text-white p-6 space-y-6">
       <header>
@@ -297,7 +330,17 @@ export default function SuperAdminPage() {
                         {business.isEnabled ? 'פעיל' : 'מושבת'}
                       </span>
                     </div>
-                    <div>
+                    <div className="flex gap-2 items-center">
+                      <span
+                        className={`text-[10px] px-2 py-1 rounded ${
+                          (business.subscription.planType || 'full') === 'full'
+                            ? 'bg-purple-900/40 text-purple-400'
+                            : 'bg-orange-900/40 text-orange-400'
+                        }`}
+                        title="סוג חבילה"
+                      >
+                        {(business.subscription.planType || 'full') === 'full' ? 'חבילה מלאה' : 'תפריט בלבד'}
+                      </span>
                       <span
                         className={`text-[10px] px-2 py-1 rounded ${
                           business.subscription.status === 'active'
@@ -318,7 +361,17 @@ export default function SuperAdminPage() {
                           : business.subscription.status}
                       </span>
                     </div>
-                    <div className="text-right flex gap-2 justify-end items-center">
+                    <div className="text-right flex gap-2 justify-end items-center flex-wrap">
+                      <select
+                        value={business.subscription.planType || 'full'}
+                        onChange={(e) => updatePlanType(business.businessId, e.target.value as 'full' | 'menu_only')}
+                        disabled={loading}
+                        className="text-[10px] px-2 py-1 rounded bg-neutral-800 border border-neutral-700 disabled:opacity-60"
+                        title="סוג חבילה"
+                      >
+                        <option value="full">חבילה מלאה</option>
+                        <option value="menu_only">תפריט בלבד</option>
+                      </select>
                       <select
                         value={business.subscription.status}
                         onChange={(e) => updateSubscriptionStatus(business.businessId, e.target.value)}

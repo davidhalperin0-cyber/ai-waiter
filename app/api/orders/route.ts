@@ -74,6 +74,14 @@ export async function POST(req: NextRequest) {
 
     const subscription = business.subscription as Subscription;
     
+    // Check if planType is menu_only - block orders
+    if (subscription.planType === 'menu_only') {
+      return NextResponse.json(
+        { message: 'Orders are not available in menu-only plan. Please upgrade to full plan.' },
+        { status: 403 },
+      );
+    }
+    
     // Auto-expire safety net: if status is "active" but nextBillingDate is in the past
     if (shouldAutoExpire(subscription)) {
       // Update subscription to expired

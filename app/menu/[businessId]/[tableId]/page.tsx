@@ -47,6 +47,8 @@ function CustomerMenuPageContent({
     template: 'bar-modern' | 'bar-classic' | 'bar-mid' | 'pizza-modern' | 'pizza-classic' | 'pizza-mid' | 'sushi' | 'generic' | 'gold';
     menuStyle?: MenuStyleVariant;
     subscriptionStatus?: string;
+    planType?: 'full' | 'menu_only';
+    menuOnlyMessage?: string; // Custom message for menu-only plan
     businessHours?: {
       start: string;
       end: string;
@@ -88,14 +90,30 @@ function CustomerMenuPageContent({
         );
         const infoData = await infoRes.json();
 
+        console.log('📋 Menu info loaded:', {
+          planType: infoData.planType,
+          menuOnlyMessage: infoData.menuOnlyMessage,
+          hasMessage: !!infoData.menuOnlyMessage,
+        });
+
         const newBusinessInfo = {
           name: infoData.name || 'העסק',
           logoUrl: infoData.logoUrl,
           template: (infoData.template || 'generic') as 'bar-modern' | 'bar-classic' | 'bar-mid' | 'pizza-modern' | 'pizza-classic' | 'pizza-mid' | 'sushi' | 'generic' | 'gold',
           menuStyle: (infoData.menuStyle || 'elegant') as MenuStyleVariant,
           subscriptionStatus: infoData.subscriptionStatus || 'active',
+          planType: (infoData.planType || 'full') as 'full' | 'menu_only',
+          menuOnlyMessage: infoData.menuOnlyMessage || null,
           businessHours: infoData.businessHours || null,
         };
+        
+        console.log('📋 Setting businessInfo state:', {
+          planType: newBusinessInfo.planType,
+          menuOnlyMessage: newBusinessInfo.menuOnlyMessage,
+          menuOnlyMessageType: typeof newBusinessInfo.menuOnlyMessage,
+          menuOnlyMessageLength: newBusinessInfo.menuOnlyMessage?.length,
+          hasMessage: !!newBusinessInfo.menuOnlyMessage,
+        });
 
         if (infoRes.status === 403) {
           if (infoData.subscriptionStatus === 'disabled') {
@@ -372,6 +390,14 @@ function CustomerMenuPageContent({
   }
 
   async function handleAddToCart(item: MenuItem) {
+    // Check if planType is menu_only - block adding to cart
+    if (businessInfo?.planType === 'menu_only') {
+      toast.error(language === 'en' 
+        ? 'Orders are not available. This is a digital menu only. Please contact the restaurant to place an order.'
+        : 'הזמנות אינן זמינות. זהו תפריט דיגיטלי בלבד. אנא צרו קשר עם המסעדה להזמנה.'
+      );
+      return;
+    }
     if (subscriptionExpired || businessDisabled) {
       toast.error('לא ניתן להוסיף פריטים לעגלה - העסק אינו יכול לקבל הזמנות כרגע');
       return;
@@ -611,6 +637,42 @@ function CustomerMenuPageContent({
         </header>
 
         <div className="px-4">
+          {/* Menu Only Plan Message */}
+          {(() => {
+            const shouldShow = businessInfo?.planType === 'menu_only' && !subscriptionExpired && !businessDisabled && businessInfo?.menuOnlyMessage && businessInfo.menuOnlyMessage.trim().length > 0;
+            console.log('🔍 Menu message check:', {
+              planType: businessInfo?.planType,
+              planTypeMatch: businessInfo?.planType === 'menu_only',
+              subscriptionExpired,
+              businessDisabled,
+              menuOnlyMessage: businessInfo?.menuOnlyMessage,
+              menuOnlyMessageType: typeof businessInfo?.menuOnlyMessage,
+              menuOnlyMessageLength: businessInfo?.menuOnlyMessage?.length,
+              menuOnlyMessageTrimmed: businessInfo?.menuOnlyMessage?.trim(),
+              menuOnlyMessageTrimmedLength: businessInfo?.menuOnlyMessage?.trim()?.length,
+              hasMessage: !!businessInfo?.menuOnlyMessage,
+              hasNonEmptyMessage: !!(businessInfo?.menuOnlyMessage && businessInfo.menuOnlyMessage.trim().length > 0),
+              shouldShow,
+              allConditions: {
+                planType: businessInfo?.planType === 'menu_only',
+                notExpired: !subscriptionExpired,
+                notDisabled: !businessDisabled,
+                hasMessage: !!(businessInfo?.menuOnlyMessage && businessInfo.menuOnlyMessage.trim().length > 0),
+              },
+            });
+            return shouldShow ? (
+              <motion.div
+                className="mb-8 rounded-[2rem] border border-neutral-700/50 bg-neutral-900/40 backdrop-blur-xl p-8 text-center"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+              >
+                <div className="text-sm text-white/80 leading-relaxed max-w-2xl mx-auto whitespace-pre-line">
+                  {businessInfo.menuOnlyMessage}
+                </div>
+              </motion.div>
+            ) : null;
+          })()}
+
           {/* Business Disabled / Subscription Expired Message */}
           {(subscriptionExpired || businessDisabled) && (
             <motion.div
@@ -807,8 +869,8 @@ function CustomerMenuPageContent({
                       />
                     ))}
                   </div>
-                </div>
-              </section>
+        </div>
+      </section>
             )}
 
             {/* All Categories - Continuous Scroll */}
@@ -948,25 +1010,27 @@ function CustomerMenuPageContent({
                             <span className={`${menuStyle.typography.price} lg:hidden`}>
                               ₪{item.price.toFixed(2)}
                             </span>
-                            <motion.button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAddToCart(item);
-                              }}
-                              className={`${menuStyle.button.primary} ${
-                                menuStyleVariant === 'compact' ? 'lg:block' : 'w-full lg:w-auto'
-                              }`}
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                            >
-                              {language === 'en'
-                                ? menuStyleVariant === 'elegant'
-                                  ? 'Add'
-                                  : 'Add to cart'
-                                : menuStyleVariant === 'elegant'
-                                ? 'הוסף'
-                                : 'הוסף לעגלה'}
-                            </motion.button>
+                            {businessInfo?.planType !== 'menu_only' && (
+                              <motion.button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAddToCart(item);
+                                }}
+                                className={`${menuStyle.button.primary} ${
+                                  menuStyleVariant === 'compact' ? 'lg:block' : 'w-full lg:w-auto'
+                                }`}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                              >
+                                {language === 'en'
+                                  ? menuStyleVariant === 'elegant'
+                                    ? 'Add'
+                                    : 'Add to cart'
+                                  : menuStyleVariant === 'elegant'
+                                  ? 'הוסף'
+                                  : 'הוסף לעגלה'}
+                              </motion.button>
+                            )}
                           </div>
                         </div>
                       </motion.article>
@@ -1072,19 +1136,21 @@ function CustomerMenuPageContent({
 
                         {/* Fixed Bottom Action Section */}
                         <div className="flex-shrink-0 p-6 lg:p-8 border-t border-white/20 bg-neutral-950/90 backdrop-blur-sm">
-                          <motion.button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAddToCart(item);
-                              handleCollapseItem();
-                            }}
-                            className={menuStyle.expanded.button}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                          >
-                            {language === 'en' ? 'Add to cart' : 'הוסף לעגלה'} - ₪
-                            {item.price.toFixed(2)}
-                          </motion.button>
+                          {businessInfo?.planType !== 'menu_only' && (
+                            <motion.button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddToCart(item);
+                                handleCollapseItem();
+                              }}
+                              className={menuStyle.expanded.button}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                            >
+                              {language === 'en' ? 'Add to cart' : 'הוסף לעגלה'} - ₪
+                              {item.price.toFixed(2)}
+                            </motion.button>
+                          )}
                         </div>
                       </div>
                     </motion.div>
@@ -1178,12 +1244,12 @@ function CustomerMenuPageContent({
                 >
                   <div className={`${menuStyle.expanded.container} flex-1 min-h-0 flex flex-col`}>
                     {/* Close Button */}
-                    <button
+          <button
                       onClick={handleCollapseItem}
                       className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 transition"
-                    >
+          >
                       <span className="text-2xl">×</span>
-                    </button>
+          </button>
 
                     {/* Title and Price - Fixed at top */}
                     <div className="flex-shrink-0 p-6 pb-4 border-b border-white/10">
@@ -1199,7 +1265,7 @@ function CustomerMenuPageContent({
                       </div>
                       <span className={menuStyle.badge.category}>
                         {expandedItem.category}
-                      </span>
+          </span>
                     </div>
 
                     {/* Scrollable Content Area - Image and Details */}
@@ -1275,7 +1341,7 @@ function CustomerMenuPageContent({
                           <div className="mb-4">
                             <span className={menuStyle.badge.pregnancy}>
                               <span>🤰</span>
-                              <span className="font-semibold">
+          <span className="font-semibold">
                                 {language === 'en' ? 'Pregnancy-safe' : 'מתאים להריון'}
                               </span>
                             </span>
@@ -1286,19 +1352,21 @@ function CustomerMenuPageContent({
 
                     {/* Fixed Bottom Action Section */}
                     <div className="flex-shrink-0 p-6 border-t border-white/20 bg-white/10 backdrop-blur-sm">
-                      <motion.button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAddToCart(expandedItem);
-                          handleCollapseItem();
-                        }}
-                        className={menuStyle.expanded.button}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        {language === 'en' ? 'Add to cart' : 'הוסף לעגלה'} - ₪
-                        {expandedItem.price.toFixed(2)}
-                      </motion.button>
+                      {businessInfo?.planType !== 'menu_only' && (
+                        <motion.button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddToCart(expandedItem);
+                            handleCollapseItem();
+                          }}
+                          className={menuStyle.expanded.button}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          {language === 'en' ? 'Add to cart' : 'הוסף לעגלה'} - ₪
+                          {expandedItem.price.toFixed(2)}
+                        </motion.button>
+                      )}
                     </div>
                   </div>
                 </motion.div>
@@ -1308,7 +1376,7 @@ function CustomerMenuPageContent({
 
         {/* Upsell Suggestion - Subtle and contextual */}
         <AnimatePresence>
-          {upsellSuggestion && (
+          {upsellSuggestion && businessInfo?.planType !== 'menu_only' && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1353,7 +1421,7 @@ function CustomerMenuPageContent({
 
         {/* Footer - Floating Premium Design */}
         <AnimatePresence>
-          {totalItems > 0 && (
+          {totalItems > 0 && businessInfo?.planType !== 'menu_only' && (
             <motion.footer
               className="fixed bottom-6 inset-x-4 lg:inset-x-auto lg:right-8 lg:w-96 z-40"
               initial={{ y: 100, opacity: 0 }}
@@ -1373,8 +1441,8 @@ function CustomerMenuPageContent({
                     <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold block">סה"כ</span>
                     <span className="text-xl font-light tracking-wider text-white">
                       ₪{totalPrice.toFixed(2)}
-                    </span>
-                  </div>
+          </span>
+        </div>
                 </div>
 
         <Link
