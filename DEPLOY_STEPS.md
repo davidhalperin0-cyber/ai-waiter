@@ -134,3 +134,4 @@
 2. שנה את `SUPER_ADMIN_PASSWORD` למשהו חזק יותר
 3. עדכן את `NEXT_PUBLIC_APP_URL` ב-Vercel ל-URL החדש
 
+

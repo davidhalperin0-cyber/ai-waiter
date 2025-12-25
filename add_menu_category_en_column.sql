@@ -7,3 +7,4 @@ ADD COLUMN IF NOT EXISTS "category_en" TEXT;
 COMMENT ON COLUMN "menuItems"."category_en" IS 'English display name for the menu category';
 
 
+

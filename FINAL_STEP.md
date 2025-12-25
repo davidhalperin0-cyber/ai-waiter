@@ -46,3 +46,4 @@ git push -u origin main
 
 **זה הכל!** נסה את הסקריפט - זה הכי קל! 🎉
 
+

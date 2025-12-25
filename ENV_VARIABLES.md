@@ -78,3 +78,4 @@ NEXT_PUBLIC_APP_URL=https://your-domain.vercel.app
 
 אם יש שגיאות, בדוק את הלוגים ב-Vercel Dashboard → Deployments → [הדפלוי האחרון] → Functions.
 
+

@@ -17,3 +17,4 @@ COMMENT ON COLUMN "menuItems"."ingredients_en" IS 'Ingredients list in English (
 COMMENT ON COLUMN "menuItems"."allergens_en" IS 'Allergens list in English (array of text)';
 
 
+

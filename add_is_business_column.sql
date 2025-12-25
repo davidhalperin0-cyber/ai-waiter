@@ -10,3 +10,4 @@ COMMENT ON COLUMN "menuItems"."isBusiness" IS 'Marks menu item as business packa
 -- Create index for faster filtering
 CREATE INDEX IF NOT EXISTS idx_menuItems_isBusiness ON "menuItems"("isBusiness") WHERE "isBusiness" = true;
 
+

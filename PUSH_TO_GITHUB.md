@@ -81,3 +81,4 @@ https://github.com/davidhalperin0-cyber/ai-waiter
 - אם יש שגיאת אימות - השתמש ב-Personal Access Token
 - אחרי הדחיפה הראשונה, כל commit חדש יעלה אוטומטית ל-Vercel (אם תגדיר את זה)
 
+
