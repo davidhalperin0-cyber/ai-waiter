@@ -30,6 +30,42 @@ CREATE TABLE IF NOT EXISTS businesses (
   "aiInstructions" TEXT,
   "logoUrl" TEXT,
   "businessHours" JSONB DEFAULT NULL,
+  "customContent" JSONB DEFAULT '{
+    "promotions": [],
+    "events": {
+      "enabled": false,
+      "title": "",
+      "description": "",
+      "formFields": []
+    },
+    "contact": {
+      "enabled": false,
+      "title": "",
+      "description": "",
+      "phone": "",
+      "email": "",
+      "whatsapp": "",
+      "instagram": "",
+      "facebook": ""
+    },
+    "loyaltyClub": {
+      "enabled": false,
+      "title": "",
+      "description": "",
+      "benefits": []
+    },
+    "reviews": {
+      "enabled": false,
+      "title": "",
+      "description": ""
+    },
+    "delivery": {
+      "enabled": false,
+      "title": "",
+      "description": "",
+      "link": ""
+    }
+  }'::jsonb,
   "createdAt" TIMESTAMPTZ DEFAULT NOW(),
   CONSTRAINT valid_subscription_status CHECK (
     (subscription->>'status') IN ('trial', 'active', 'expired', 'past_due')
@@ -45,6 +81,7 @@ COMMENT ON COLUMN businesses.menuStyle IS 'Menu content styling variant: elegant
 COMMENT ON COLUMN businesses."aiInstructions" IS 'Custom instructions for AI assistant (e.g., "Sushi items X, Y must be cooked, not raw")';
 COMMENT ON COLUMN businesses."logoUrl" IS 'URL to business logo image';
 COMMENT ON COLUMN businesses."businessHours" IS 'Operating hours for business menu items. Format: {"start": "10:00", "end": "18:00"} or null for always available.';
+COMMENT ON COLUMN businesses."customContent" IS 'Custom content sections for menu: promotions, events, contact info, loyalty club, reviews, delivery options';
 
 -- ============================================
 -- 2. Tables Table

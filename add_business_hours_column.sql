@@ -9,3 +9,4 @@ ADD COLUMN IF NOT EXISTS "businessHours" JSONB DEFAULT NULL;
 COMMENT ON COLUMN businesses."businessHours" IS 'Operating hours for business menu items. Format: {"start": "10:00", "end": "18:00"} or null for always available.';
 
 
+

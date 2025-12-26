@@ -82,3 +82,4 @@ https://github.com/davidhalperin0-cyber/ai-waiter
 - אחרי הדחיפה הראשונה, כל commit חדש יעלה אוטומטית ל-Vercel (אם תגדיר את זה)
 
 
+

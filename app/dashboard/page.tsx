@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
 import toast from 'react-hot-toast';
+import CustomContentEditor from '@/components/CustomContentEditor';
 
 interface DashboardMenuItem {
   businessId: string;
@@ -36,7 +37,7 @@ export default function DashboardPage() {
   const [tables, setTables] = useState<DashboardTable[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'menu' | 'tables' | 'settings' | 'printer' | 'orders' | 'pos'>('menu');
+  const [activeTab, setActiveTab] = useState<'menu' | 'tables' | 'settings' | 'printer' | 'orders' | 'pos' | 'content'>('menu');
   const [businessInfo, setBusinessInfo] = useState<{
     name: string;
     type: string;
@@ -70,6 +71,46 @@ export default function DashboardPage() {
     businessHours?: {
       start: string;
       end: string;
+    } | null;
+    customContent?: {
+      menuButtonImageUrl?: string;
+      promotions?: Array<{
+        id: string;
+        title: string;
+        titleEn?: string;
+        description: string;
+        descriptionEn?: string;
+        imageUrl?: string;
+        validUntil?: string;
+        enabled: boolean;
+      }>;
+      contact?: {
+        enabled: boolean;
+        title: string;
+        titleEn?: string;
+        description: string;
+        descriptionEn?: string;
+        phone?: string;
+        email?: string;
+        whatsapp?: string;
+        instagram?: string;
+        facebook?: string;
+      };
+      loyaltyClub?: {
+        enabled: boolean;
+        title: string;
+        titleEn?: string;
+        description: string;
+        descriptionEn?: string;
+        benefits?: Array<{
+          text: string;
+          textEn?: string;
+        }>;
+      };
+      reviews?: {
+        enabled: boolean;
+        googleReviewsUrl?: string;
+      };
     } | null;
   } | null>(null);
   const [orders, setOrders] = useState<any[]>([]);
@@ -163,6 +204,7 @@ export default function DashboardPage() {
           aiInstructions: data.business.aiInstructions || '',
           businessHours: data.business.businessHours || null,
           subscription: data.business.subscription,
+          customContent: data.business.customContent || null,
           printerConfig: data.business.printerConfig || {
             enabled: false,
             type: 'http',
@@ -813,6 +855,7 @@ export default function DashboardPage() {
           {[
             { id: 'menu', label: '📋 ניהול תפריט', icon: '📋', showFor: ['full', 'menu_only'] as const },
             { id: 'tables', label: '🪑 שולחנות, QR ו-NFC', icon: '🪑', showFor: ['full', 'menu_only'] as const },
+            { id: 'content', label: '✨ תוכן נוסף', icon: '✨', showFor: ['full', 'menu_only'] as const },
             { id: 'settings', label: '⚙️ הגדרות עסק', icon: '⚙️', showFor: ['full', 'menu_only'] as const },
             { id: 'printer', label: '🖨️ הגדרות מדפסת', icon: '🖨️', showFor: ['full'] as const },
             { id: 'pos', label: '💳 אינטגרציית POS', icon: '💳', showFor: ['full'] as const },
@@ -846,6 +889,7 @@ export default function DashboardPage() {
             {[
               { id: 'menu', label: 'תפריט', icon: '📋', showFor: ['full', 'menu_only'] as const },
               { id: 'tables', label: 'שולחנות', icon: '🪑', showFor: ['full', 'menu_only'] as const },
+              { id: 'content', label: 'תוכן', icon: '✨', showFor: ['full', 'menu_only'] as const },
               { id: 'settings', label: 'הגדרות', icon: '⚙️', showFor: ['full', 'menu_only'] as const },
             ]
               .filter((tab) => {
@@ -1521,6 +1565,31 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+        </section>
+      )}
+
+      {activeTab === 'content' && (
+        <section className="space-y-6">
+          <div>
+            <h2 className="text-xl lg:text-2xl font-bold mb-2">✨ תוכן נוסף - דף נחיתה</h2>
+            <p className="text-sm text-neutral-400">
+              נהלו את תוכן דף הנחיתה: תמונת רקע לכפתור התפריט, פרטי קשר, מועדון לקוחות וביקורות.
+            </p>
+          </div>
+
+          {businessId && businessInfo && (
+            <CustomContentEditor 
+              businessId={businessId} 
+              initialContent={businessInfo.customContent || null}
+              onSave={async () => {
+                await loadBusinessInfo();
+              }}
+            />
+          )}
+
+          {!businessInfo && (
+            <p className="text-xs text-neutral-500">טוען פרטי עסק...</p>
+          )}
         </section>
       )}
 

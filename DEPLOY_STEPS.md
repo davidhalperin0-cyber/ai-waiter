@@ -135,3 +135,4 @@
 3. עדכן את `NEXT_PUBLIC_APP_URL` ב-Vercel ל-URL החדש
 
 
+

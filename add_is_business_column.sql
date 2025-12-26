@@ -11,3 +11,4 @@ COMMENT ON COLUMN "menuItems"."isBusiness" IS 'Marks menu item as business packa
 CREATE INDEX IF NOT EXISTS idx_menuItems_isBusiness ON "menuItems"("isBusiness") WHERE "isBusiness" = true;
 
 
+

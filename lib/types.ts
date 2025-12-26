@@ -18,6 +18,70 @@ export interface PosConfig {
   timeoutMs: number;
 }
 
+export interface CustomContent {
+  menuButtonImageUrl?: string; // Optional image for menu button background
+  promotions?: Array<{
+    id: string;
+    title: string;
+    titleEn?: string;
+    description: string;
+    descriptionEn?: string;
+    imageUrl?: string;
+    validUntil?: string;
+    enabled: boolean;
+  }>;
+  events?: {
+    enabled: boolean;
+    title: string;
+    titleEn?: string;
+    description: string;
+    descriptionEn?: string;
+    formFields?: Array<{
+      name: string;
+      label: string;
+      labelEn?: string;
+      type: 'text' | 'email' | 'tel' | 'textarea' | 'select';
+      required: boolean;
+      options?: string[];
+    }>;
+  };
+  contact?: {
+    enabled: boolean;
+    title: string;
+    titleEn?: string;
+    description: string;
+    descriptionEn?: string;
+    phone?: string;
+    email?: string;
+    whatsapp?: string;
+    instagram?: string;
+    facebook?: string;
+  };
+  loyaltyClub?: {
+    enabled: boolean;
+    title: string;
+    titleEn?: string;
+    description: string;
+    descriptionEn?: string;
+    benefits?: Array<{
+      text: string;
+      textEn?: string;
+    }>;
+  };
+  reviews?: {
+    enabled: boolean;
+    googleReviewsUrl?: string;
+  };
+  delivery?: {
+    enabled: boolean;
+    title: string;
+    titleEn?: string;
+    description: string;
+    descriptionEn?: string;
+    link?: string;
+  };
+}
+
 /**
  * Canonical Order Model - SINGLE SOURCE OF TRUTH
  * This model is NEVER modified per POS.
@@ -67,6 +131,7 @@ export interface Business {
     start: string; // Format: "HH:MM" (e.g., "10:00")
     end: string; // Format: "HH:MM" (e.g., "18:00")
   } | null; // null means business items are always available
+  customContent?: CustomContent; // Custom content sections for menu
   createdAt: string;
 }
 

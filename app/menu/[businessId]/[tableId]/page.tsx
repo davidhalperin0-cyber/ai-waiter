@@ -53,6 +53,71 @@ function CustomerMenuPageContent({
       start: string;
       end: string;
     } | null;
+    customContent?: {
+      promotions?: Array<{
+        id: string;
+        title: string;
+        titleEn?: string;
+        description: string;
+        descriptionEn?: string;
+        imageUrl?: string;
+        validUntil?: string;
+        enabled: boolean;
+      }>;
+      events?: {
+        enabled: boolean;
+        title: string;
+        titleEn?: string;
+        description: string;
+        descriptionEn?: string;
+        formFields?: Array<{
+          name: string;
+          label: string;
+          labelEn?: string;
+          type: 'text' | 'email' | 'tel' | 'textarea' | 'select';
+          required: boolean;
+          options?: string[];
+        }>;
+      };
+      contact?: {
+        enabled: boolean;
+        title: string;
+        titleEn?: string;
+        description: string;
+        descriptionEn?: string;
+        phone?: string;
+        email?: string;
+        whatsapp?: string;
+        instagram?: string;
+        facebook?: string;
+      };
+      loyaltyClub?: {
+        enabled: boolean;
+        title: string;
+        titleEn?: string;
+        description: string;
+        descriptionEn?: string;
+        benefits?: Array<{
+          text: string;
+          textEn?: string;
+        }>;
+      };
+      reviews?: {
+        enabled: boolean;
+        title: string;
+        titleEn?: string;
+        description: string;
+        descriptionEn?: string;
+      };
+      delivery?: {
+        enabled: boolean;
+        title: string;
+        titleEn?: string;
+        description: string;
+        descriptionEn?: string;
+        link?: string;
+      };
+    };
   } | null>(null);
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const [businessDisabled, setBusinessDisabled] = useState(false);
@@ -105,6 +170,7 @@ function CustomerMenuPageContent({
           planType: (infoData.planType || 'full') as 'full' | 'menu_only',
           menuOnlyMessage: infoData.menuOnlyMessage || null,
           businessHours: infoData.businessHours || null,
+          customContent: infoData.customContent || null,
         };
         
         console.log('📋 Setting businessInfo state:', {
@@ -1176,6 +1242,7 @@ function CustomerMenuPageContent({
                 </section>
               );
             })}
+
           </div>
 
           {/* Categories Sidebar - Desktop Premium Design */}
