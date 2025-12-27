@@ -75,6 +75,19 @@ export async function PUT(
           return NextResponse.json({ message: 'Invalid subscription format' }, { status: 400 });
         }
       }
+      
+      // CRITICAL: If setting status to 'active', ensure nextBillingDate is not in the past
+      // This prevents auto-expire from immediately changing it back to 'expired'
+      if (subscriptionObj.status === 'active' && subscriptionObj.nextBillingDate) {
+        const nextBillingDate = new Date(subscriptionObj.nextBillingDate);
+        const now = new Date();
+        if (nextBillingDate < now) {
+          console.warn('⚠️ nextBillingDate is in the past, removing it to prevent auto-expire');
+          // Remove nextBillingDate if it's in the past, or set it to future
+          subscriptionObj.nextBillingDate = null;
+        }
+      }
+      
       updateData.subscription = subscriptionObj;
       console.log('📝 Setting subscription to:', JSON.stringify(subscriptionObj, null, 2));
     }

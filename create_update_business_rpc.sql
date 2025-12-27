@@ -21,17 +21,17 @@ AS $$
 BEGIN
   UPDATE businesses
   SET subscription = p_subscription
-  WHERE "businessId" = p_business_id;
+  WHERE businesses."businessId" = p_business_id;
   
   RETURN QUERY
   SELECT 
-    b.id,
-    b."businessId",
-    b.name,
-    b."isEnabled",
-    b.subscription
-  FROM businesses b
-  WHERE b."businessId" = p_business_id;
+    businesses.id,
+    businesses."businessId",
+    businesses.name,
+    businesses."isEnabled",
+    businesses.subscription
+  FROM businesses
+  WHERE businesses."businessId" = p_business_id;
 END;
 $$;
 
