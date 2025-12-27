@@ -43,6 +43,13 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    console.log('📋 Raw businesses from DB:', businesses?.map(b => ({
+      businessId: b.businessId,
+      name: b.name,
+      subscription: b.subscription,
+      subscriptionType: typeof b.subscription,
+    })));
+
     // Get stats for each business (orders count, tables count)
     const businessesWithStats = await Promise.all(
       (businesses || []).map(async (business) => {
@@ -79,12 +86,19 @@ export async function GET(req: NextRequest) {
             subscription = { status: 'trial', planType: 'full' };
           }
 
-          return {
+          const result = {
             ...business,
             subscription,
             ordersCount: ordersRes.count || 0,
             tablesCount: tablesRes.count || 0,
           };
+          console.log('📋 Processed business:', {
+            businessId: result.businessId,
+            name: result.name,
+            subscription: result.subscription,
+            subscriptionType: typeof result.subscription,
+          });
+          return result;
         } catch (err: any) {
           console.error('Error fetching stats for business', business.businessId, err);
           return {
