@@ -518,7 +518,7 @@ export default function SuperAdminPage() {
                     </div>
                     <div className="text-right flex gap-2 justify-end items-center flex-wrap">
                       <select
-                        key={`planType-${business.businessId}-${business.subscription?.planType || 'full'}`}
+                        key={`planType-${business.businessId}-${business.subscription?.planType || 'full'}-${refreshKey}`}
                         value={business.subscription?.planType || 'full'}
                         onChange={(e) => {
                           console.log('📝 Select onChange triggered - planType:', e.target.value);
