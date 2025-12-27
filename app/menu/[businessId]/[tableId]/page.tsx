@@ -133,7 +133,41 @@ function CustomerMenuPageContent({
   } | null>(null);
   const [hasNewChatMessage, setHasNewChatMessage] = useState(false);
   const [language, setLanguage] = useState<'he' | 'en'>('he');
+  const [categoryTranslations, setCategoryTranslations] = useState<Record<string, string>>({});
 
+  async function translateCategory(category: string): Promise<string> {
+    if (language === 'he') return category;
+  
+    if (categoryTranslations[category]) {
+      return categoryTranslations[category];
+    }
+  
+    try {
+      const res = await fetch('/api/ai/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: category,
+          target: 'category',
+        }),
+      });
+  
+      if (!res.ok) throw new Error('translate failed');
+  
+      const data = await res.json();
+      const translated = data.translated || category;
+  
+      setCategoryTranslations((prev) => ({
+        ...prev,
+        [category]: translated,
+      }));
+  
+      return translated;
+    } catch {
+      return category;
+    }
+  }
+  
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const totalPrice = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
@@ -386,16 +420,24 @@ function CustomerMenuPageContent({
   }, [menuItems, businessInfo?.businessHours]);
 
   // Get all categories in order (business first if exists, then others)
-  const orderedCategories = useMemo(() => {
-    const cats = categories.filter(cat => cat !== 'business');
-    const businessHoursActive = isBusinessHoursActive();
-    const hasBusinessItems = itemsByCategory['business'] && itemsByCategory['business'].length > 0;
-    
-    if (hasBusinessItems && businessHoursActive) {
-      return ['business', ...cats];
-    }
-    return cats;
-  }, [categories, itemsByCategory]);
+ // Get all categories in order (business first if exists, then others)
+const orderedCategories = useMemo(() => {
+  const businessHoursActive = isBusinessHoursActive();
+
+  // Separate business and regular categories
+  const regularCategories = categories.filter(cat => cat !== 'business');
+
+  const hasBusinessItems =
+    Array.isArray(itemsByCategory['business']) &&
+    itemsByCategory['business'].length > 0;
+
+  // Show business category first only if allowed
+  if (hasBusinessItems && businessHoursActive) {
+    return ['business', ...regularCategories];
+  }
+
+  return regularCategories;
+}, [categories, itemsByCategory, businessInfo?.businessHours, currentServerTime]);
 
   // Scroll-based active category detection
   useEffect(() => {
@@ -819,7 +861,7 @@ function CustomerMenuPageContent({
                   const firstItem = categoryItems[0];
                   const displayCategory = cat === 'business'
                     ? (language === 'en' ? '💼 Business meals' : '💼 מנות עסקיות')
-                    : (language === 'en' && firstItem?.categoryEn ? firstItem.categoryEn : cat);
+                    : (language === 'en' && firstItem?.category ? firstItem.category : cat);
                   
                   return (
                     <motion.button
@@ -978,18 +1020,16 @@ function CustomerMenuPageContent({
                   {/* Category Header */}
                   <div className="mb-6 pt-8">
                     <h2 className={menuStyle.typography.sectionTitle}>
-                      {category === 'business'
-                        ? language === 'en'
-                          ? '💼 Business Meals'
-                          : '💼 מנות עסקיות'
-                        : (() => {
-                            // Find the first item in this category to get categoryEn
-                            const firstItem = categoryItems[0];
-                            if (language === 'en' && firstItem?.categoryEn) {
-                              return firstItem.categoryEn;
-                            }
-                            return category;
-                          })()}
+                    <h2 className={menuStyle.typography.sectionTitle}>
+  {category === 'business'
+    ? language === 'en'
+      ? '💼 Business Meals'
+      : '💼 מנות עסקיות'
+    : language === 'en'
+      ? categoryTranslations[category] || category
+      : category}
+</h2>
+
                     </h2>
                   </div>
 
@@ -1276,10 +1316,15 @@ function CustomerMenuPageContent({
                 {orderedCategories.map((cat, index) => {
                   // Get categoryEn from first item in category
                   const categoryItems = itemsByCategory[cat] || [];
-                  const firstItem = categoryItems[0];
-                  const displayCategory = cat === 'business'
-                    ? (language === 'en' ? '💼 Business Meals' : '💼 מנות עסקיות')
-                    : (language === 'en' && firstItem?.categoryEn ? firstItem.categoryEn : cat);
+                  const displayCategory =
+                  cat === 'business'
+                    ? language === 'en'
+                      ? '💼 Business Meals'
+                      : '💼 מנות עסקיות'
+                    : language === 'en'
+                      ? categoryTranslations[cat] || cat
+                      : cat;
+                
                   
                   return (
                   <motion.button

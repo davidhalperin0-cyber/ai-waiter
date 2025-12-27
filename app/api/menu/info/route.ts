@@ -300,7 +300,7 @@ export async function GET(req: NextRequest) {
       customContentType: typeof response.customContent,
       customContentKeys: response.customContent ? Object.keys(response.customContent) : [],
       customContentString: JSON.stringify(response.customContent),
-      debug: response._debug,
+      
     });
     
     // Final check - if customContent is still null, log detailed warning

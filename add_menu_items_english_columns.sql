@@ -19,3 +19,4 @@ COMMENT ON COLUMN "menuItems"."allergens_en" IS 'Allergens list in English (arra
 
 
 
+

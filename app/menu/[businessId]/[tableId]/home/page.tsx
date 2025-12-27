@@ -298,8 +298,8 @@ function HomePageContent({
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                     >
-                      <PhoneIcon className="w-6 h-6 text-white/40 group-hover:text-white/80 transition-all duration-300" strokeWidth={1.5} />
-                    </motion.a>
+<PhoneIcon className="w-6 h-6 text-white/40 group-hover:text-white/80 transition-all duration-300" />
+</motion.a>
                   )}
                   {contact.whatsapp && (
                     <motion.a
@@ -362,8 +362,8 @@ function HomePageContent({
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.7 }}
                 >
-                  <LoyaltyIcon className="w-4 h-4" strokeWidth={1.5} />
-                  <span>
+<LoyaltyIcon className="w-4 h-4" />
+<span>
                     {language === 'en' 
                       ? businessInfo.customContent.loyaltyClub.titleEn || 'Loyalty'
                       : businessInfo.customContent.loyaltyClub.title || 'מועדון לקוחות'}

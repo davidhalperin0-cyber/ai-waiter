@@ -27,3 +27,4 @@ WHERE table_name = 'businesses' AND column_name = 'printerConfig';
 
 
 
+
