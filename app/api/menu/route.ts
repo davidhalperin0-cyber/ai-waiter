@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { MenuItem } from '@/lib/types';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
