@@ -1,14 +1,17 @@
 import { SignJWT, jwtVerify, JWTPayload } from 'jose';
 
-const JWT_SECRET = process.env.JWT_SECRET;
-
-if (!JWT_SECRET) {
-  throw new Error("JWT_SECRET is not set");
+// Lazy initialization to avoid build-time errors
+function getJWTSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("JWT_SECRET is not set");
+  }
+  return secret;
 }
 
 // Convert JWT_SECRET to Uint8Array for jose
 const getSecretKey = () => {
-  return new TextEncoder().encode(JWT_SECRET);
+  return new TextEncoder().encode(getJWTSecret());
 };
 
 export type AuthRole = "business" | "super_admin";
@@ -21,10 +24,6 @@ export interface AuthPayload extends JWTPayload {
 }
 
 export async function signAuthToken(payload: AuthPayload): Promise<string> {
-  if (!JWT_SECRET) {
-    throw new Error('JWT_SECRET is not set - cannot create authentication token');
-  }
-  
   try {
     const secretKey = getSecretKey();
     const jwt = await new SignJWT(payload)
@@ -35,20 +34,23 @@ export async function signAuthToken(payload: AuthPayload): Promise<string> {
     return jwt;
   } catch (error: any) {
     console.error('Error signing JWT token', error);
+    if (error.message?.includes('JWT_SECRET')) {
+      throw new Error('JWT_SECRET is not set - cannot create authentication token');
+    }
     throw new Error(`Failed to sign token: ${error?.message || 'Unknown error'}`);
   }
 }
 
 export async function verifyAuthToken(token: string): Promise<AuthPayload | null> {
   try {
-    if (!JWT_SECRET) {
-      console.error('JWT_SECRET is not set in verifyAuthToken');
-      return null;
-    }
     const secretKey = getSecretKey();
     const { payload } = await jwtVerify(token, secretKey);
     return payload as AuthPayload;
   } catch (error: any) {
+    if (error.message?.includes('JWT_SECRET')) {
+      console.error('JWT_SECRET is not set in verifyAuthToken');
+      return null;
+    }
     console.error('Token verification error:', error.message);
     return null;
   }
