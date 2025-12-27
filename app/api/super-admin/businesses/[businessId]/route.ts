@@ -86,16 +86,41 @@ export async function PUT(
 
     console.log('📝 Update payload:', JSON.stringify(updateData, null, 2));
 
-    // CRITICAL FIX: Use RPC function to update JSONB properly
-    // Supabase client sometimes has issues with JSONB updates
-    // We'll use a direct SQL update via RPC
+    // CRITICAL FIX: Try using RPC function first if updating subscription
+    // This bypasses any RLS or trigger issues
+    let { error, data } = null as any;
     
-    // First, try the standard update
-    let { error, data } = await supabaseAdmin
-      .from('businesses')
-      .update(updateData)
-      .eq('businessId', businessId)
-      .select();
+    if (subscription !== undefined && !isEnabled) {
+      // Try RPC function for subscription updates
+      const subscriptionObj = typeof subscription === 'string' ? JSON.parse(subscription) : subscription;
+      console.log('🔄 Trying RPC function for subscription update...');
+      const rpcResult = await supabaseAdmin.rpc('update_business_subscription', {
+        p_business_id: businessId,
+        p_subscription: subscriptionObj,
+      });
+      
+      if (!rpcResult.error && rpcResult.data && rpcResult.data.length > 0) {
+        console.log('✅ RPC function succeeded!');
+        data = rpcResult.data;
+        error = null;
+      } else {
+        console.log('⚠️ RPC function failed or not available, falling back to standard update');
+        console.log('RPC error:', rpcResult.error);
+      }
+    }
+    
+    // If RPC didn't work or we're updating isEnabled, use standard update
+    if (!data || error) {
+      console.log('🔄 Using standard update...');
+      const updateResult = await supabaseAdmin
+        .from('businesses')
+        .update(updateData)
+        .eq('businessId', businessId)
+        .select();
+      
+      error = updateResult.error;
+      data = updateResult.data;
+    }
     
     if (error) {
       console.error('❌ Supabase update error:', error);
