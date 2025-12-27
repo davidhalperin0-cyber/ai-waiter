@@ -86,12 +86,11 @@ export async function PUT(
 
     console.log('📝 Update payload:', JSON.stringify(updateData, null, 2));
 
-    // CRITICAL FIX: Use RPC function to update JSONB fields properly
-    // Supabase sometimes has issues with JSONB updates via standard .update()
-    // We'll use a direct SQL update via RPC or raw query
+    // SIMPLE FIX: Do a direct update and return the result
+    // Since manual SQL updates work, the issue is likely with how Supabase client handles JSONB
+    // Let's use a simpler approach - just update and return
     
-    // First, try standard update
-    let { error, data } = await supabaseAdmin
+    const { error, data } = await supabaseAdmin
       .from('businesses')
       .update(updateData)
       .eq('businessId', businessId)
@@ -105,140 +104,13 @@ export async function PUT(
       return NextResponse.json({ message: 'Database error', details: error.message }, { status: 500 });
     }
 
-    // CRITICAL: Force a fresh read after update to verify it was saved
-    // Wait longer to ensure transaction is fully committed
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Fetch fresh data to verify the update was actually saved
-    const { data: freshData, error: freshError } = await supabaseAdmin
-      .from('businesses')
-      .select('*')
-      .eq('businessId', businessId)
-      .maybeSingle();
-    
-    if (freshError) {
-      console.error('❌ Error fetching fresh data after update:', freshError);
-    } else {
-      console.log('✅ Fresh data after update:', JSON.stringify(freshData, null, 2));
-      
-      // Check if the update actually took effect
-      if (freshData) {
-        if (isEnabled !== undefined && freshData.isEnabled !== isEnabled) {
-          console.error('❌ CRITICAL: isEnabled update did NOT take effect!', {
-            requested: isEnabled,
-            actual: freshData.isEnabled,
-          });
-          // Retry the update
-          const { error: retryError } = await supabaseAdmin
-            .from('businesses')
-            .update({ isEnabled })
-            .eq('businessId', businessId);
-          if (retryError) {
-            console.error('❌ Retry update failed:', retryError);
-          } else {
-            console.log('✅ Retry update for isEnabled succeeded');
-          }
-        }
-        
-        if (subscription !== undefined) {
-          const requestedSub = typeof subscription === 'string' ? JSON.parse(subscription) : subscription;
-          const actualSub = typeof freshData.subscription === 'string' 
-            ? JSON.parse(freshData.subscription) 
-            : freshData.subscription;
-          
-          if (actualSub.status !== requestedSub.status || actualSub.planType !== requestedSub.planType) {
-            console.error('❌ CRITICAL: Subscription update did NOT take effect!', {
-              requested: requestedSub,
-              actual: actualSub,
-            });
-            // Retry the update
-            const { error: retryError } = await supabaseAdmin
-              .from('businesses')
-              .update({ subscription: requestedSub })
-              .eq('businessId', businessId);
-            if (retryError) {
-              console.error('❌ Retry update failed:', retryError);
-            } else {
-              console.log('✅ Retry update for subscription succeeded');
-            }
-          }
-        }
-      }
-    }
-    
-    // Use fresh data if available, otherwise use original data
-    if (freshData) {
-      data = [freshData];
-    }
-
     console.log('✅ Business updated successfully');
-    console.log('✅ Updated data from select:', JSON.stringify(data, null, 2));
+    console.log('✅ Updated data:', JSON.stringify(data, null, 2));
 
-    // Wait a bit to ensure transaction is committed
-    await new Promise(resolve => setTimeout(resolve, 200));
-
-    // Verify the update by fetching fresh data - use a new query to bypass cache
-    // Add a timestamp to force fresh query
-    const timestamp = Date.now();
-    const { data: verifyData, error: verifyError } = await supabaseAdmin
-      .from('businesses')
-      .select('isEnabled, subscription, businessId')
-      .eq('businessId', businessId)
-      .maybeSingle();
-
-    if (verifyError) {
-      console.error('❌ Verification error:', verifyError);
-    } else {
-      console.log('✅ Verification - isEnabled:', verifyData?.isEnabled);
-      console.log('✅ Verification - subscription:', JSON.stringify(verifyData?.subscription, null, 2));
-      
-      if (subscription && verifyData?.subscription) {
-        // Parse subscription if it's a string
-        const requestedSub = typeof subscription === 'string' ? JSON.parse(subscription) : subscription;
-        const actualSub = typeof verifyData.subscription === 'string' 
-          ? JSON.parse(verifyData.subscription) 
-          : verifyData.subscription;
-        
-        const statusMatch = actualSub.status === requestedSub.status;
-        const planTypeMatch = actualSub.planType === requestedSub.planType;
-        
-        console.log('✅ Subscription status match:', statusMatch, {
-          requested: requestedSub.status,
-          actual: actualSub.status,
-        });
-        console.log('✅ Subscription planType match:', planTypeMatch, {
-          requested: requestedSub.planType,
-          actual: actualSub.planType,
-        });
-        
-        if (!statusMatch || !planTypeMatch) {
-          console.error('❌ Subscription mismatch detected! Retrying update...', {
-            statusMatch,
-            planTypeMatch,
-            requested: requestedSub,
-            actual: actualSub,
-          });
-          
-          // Retry the update - sometimes Supabase needs a retry for JSONB
-          const { error: retryError, data: retryData } = await supabaseAdmin
-            .from('businesses')
-            .update(updateData)
-            .eq('businessId', businessId)
-            .select();
-            
-          if (retryError) {
-            console.error('❌ Retry update failed:', retryError);
-          } else {
-            console.log('✅ Retry update successful:', JSON.stringify(retryData, null, 2));
-          }
-        }
-      }
-    }
-
-    // Return the updated data in the response so frontend can use it
+    // Return the updated data immediately
     return NextResponse.json({ 
       message: 'Business updated successfully',
-      business: data?.[0] || verifyData 
+      business: data?.[0]
     }, { status: 200 });
   } catch (error) {
     console.error('Error updating business', error);
