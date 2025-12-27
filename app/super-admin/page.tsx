@@ -133,10 +133,24 @@ export default function SuperAdminPage() {
         body: JSON.stringify({ isEnabled: !currentStatus }),
       });
       const data = await res.json();
-      if (res.ok) {
+      if (res.ok && data.business) {
+        // Update local state with verified data
+        setBusinesses(prevBusinesses => {
+          const updated = prevBusinesses.map(b => {
+            if (b.businessId === businessId) {
+              return {
+                ...b,
+                isEnabled: data.business.isEnabled,
+              };
+            }
+            return { ...b };
+          });
+          return updated;
+        });
+        setRefreshKey(prev => prev + 1);
+        await new Promise(resolve => setTimeout(resolve, 500));
         await loadBusinesses();
         await loadStats();
-        alert('סטטוס העסק עודכן בהצלחה!');
       } else {
         alert(data.message || 'נכשל בעדכון סטטוס העסק');
       }
@@ -199,42 +213,39 @@ export default function SuperAdminPage() {
       const data = await res.json();
       console.log('📝 Update response:', { ok: res.ok, data });
       
-      if (res.ok) {
-        // Update local state immediately for better UX - create completely new objects
+      if (res.ok && data.business) {
+        // Update local state with the verified data from server
         setBusinesses(prevBusinesses => {
           const updated = prevBusinesses.map(b => {
             if (b.businessId === businessId) {
-              const currentSub = typeof b.subscription === 'string' 
-                ? JSON.parse(b.subscription) 
-                : (b.subscription || { status: 'trial', planType: 'full' });
-              // Create completely new object to force React re-render
+              // Use the verified data from server
+              const verifiedSub = typeof data.business.subscription === 'string'
+                ? JSON.parse(data.business.subscription)
+                : data.business.subscription;
               const newBusiness = {
                 ...b,
-                subscription: {
-                  status: newStatus,
-                  planType: currentSub.planType || 'full',
-                }
+                isEnabled: data.business.isEnabled ?? b.isEnabled,
+                subscription: verifiedSub || { status: newStatus, planType: subscriptionObj.planType || 'full' },
               };
-              console.log('📝 Updated business in state:', {
+              console.log('✅ Updated business in state with verified data:', {
                 businessId: newBusiness.businessId,
                 oldSubscription: b.subscription,
                 newSubscription: newBusiness.subscription,
               });
               return newBusiness;
             }
-            return { ...b }; // Create new object for all businesses
+            return { ...b };
           });
-          console.log('📝 Updated businesses state - total:', updated.length);
           return updated;
         });
         
-        // Add small delay to ensure database update is complete, then reload
-        await new Promise(resolve => setTimeout(resolve, 300));
-        console.log('📝 Reloading businesses from server...');
+        // Force re-render
+        setRefreshKey(prev => prev + 1);
+        
+        // Reload from server to ensure we have the latest data
+        await new Promise(resolve => setTimeout(resolve, 500));
         await loadBusinesses();
         await loadStats();
-        console.log('📝 Reload complete');
-        // Don't show alert - let the UI update speak for itself
       } else {
         alert(data.message || 'נכשל בעדכון סטטוס המנוי');
       }
@@ -295,48 +306,39 @@ export default function SuperAdminPage() {
       const data = await res.json();
       console.log('📝 Update response:', { ok: res.ok, data });
       
-      if (res.ok) {
-        // Update local state immediately for better UX - create completely new objects
+      if (res.ok && data.business) {
+        // Update local state with the verified data from server
         setBusinesses(prevBusinesses => {
           const updated = prevBusinesses.map(b => {
             if (b.businessId === businessId) {
-              const currentSub = typeof b.subscription === 'string' 
-                ? JSON.parse(b.subscription) 
-                : (b.subscription || { status: 'trial', planType: 'full' });
-              // Create completely new object to force React re-render
+              // Use the verified data from server
+              const verifiedSub = typeof data.business.subscription === 'string'
+                ? JSON.parse(data.business.subscription)
+                : data.business.subscription;
               const newBusiness = {
                 ...b,
-                subscription: {
-                  status: currentSub.status || 'trial',
-                  planType: newPlanType,
-                }
+                isEnabled: data.business.isEnabled ?? b.isEnabled,
+                subscription: verifiedSub || { status: subscriptionObj.status || 'trial', planType: newPlanType },
               };
-              console.log('📝 Updated business in state:', {
+              console.log('✅ Updated business in state with verified data:', {
                 businessId: newBusiness.businessId,
                 oldSubscription: b.subscription,
                 newSubscription: newBusiness.subscription,
               });
               return newBusiness;
             }
-            return { ...b }; // Create new object for all businesses
+            return { ...b };
           });
-          console.log('📝 Updated businesses state - total:', updated.length);
           return updated;
         });
         
-        // Force re-render by updating refresh key
+        // Force re-render
         setRefreshKey(prev => prev + 1);
         
-        // Add small delay to ensure database update is complete, then reload
-        await new Promise(resolve => setTimeout(resolve, 300));
-        console.log('📝 Reloading businesses from server...');
+        // Reload from server to ensure we have the latest data
+        await new Promise(resolve => setTimeout(resolve, 500));
         await loadBusinesses();
         await loadStats();
-        console.log('📝 Reload complete');
-        
-        // Force another re-render after reload
-        setRefreshKey(prev => prev + 1);
-        // Don't show alert - let the UI update speak for itself
       } else {
         alert(data.message || 'נכשל בעדכון סוג החבילה');
       }
