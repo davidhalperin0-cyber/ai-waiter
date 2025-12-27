@@ -110,7 +110,7 @@ export async function PUT(
     await new Promise(resolve => setTimeout(resolve, 200));
     
     // Fetch the updated business to verify
-    const { data: verifyData, error: verifyError } = await supabaseAdmin
+    let { data: verifyData, error: verifyError } = await supabaseAdmin
       .from('businesses')
       .select('*')
       .eq('businessId', businessId)
@@ -132,6 +132,16 @@ export async function PUT(
           .eq('businessId', businessId);
         if (retryError) {
           console.error('❌ Retry failed:', retryError);
+        } else {
+          // Fetch again after retry
+          const { data: retryData } = await supabaseAdmin
+            .from('businesses')
+            .select('*')
+            .eq('businessId', businessId)
+            .maybeSingle();
+          if (retryData) {
+            verifyData = retryData;
+          }
         }
       }
       
