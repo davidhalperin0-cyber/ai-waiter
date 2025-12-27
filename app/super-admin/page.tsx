@@ -105,9 +105,14 @@ export default function SuperAdminPage() {
           subscription: b.subscription,
           subscriptionType: typeof b.subscription,
         })));
-        // Force state update by creating new array
-        setBusinesses([...businessesWithParsedSubscription]);
-        console.log('📋 State updated with', businessesWithParsedSubscription.length, 'businesses');
+        // Force state update by creating new array with new object references
+        const newBusinesses = businessesWithParsedSubscription.map(b => ({ ...b }));
+        setBusinesses(newBusinesses);
+        console.log('📋 State updated with', newBusinesses.length, 'businesses');
+        console.log('📋 Updated businesses:', newBusinesses.map(b => ({
+          name: b.name,
+          subscription: b.subscription,
+        })));
       } else {
         setError(data.message || 'נכשל בטעינת עסקים');
       }
