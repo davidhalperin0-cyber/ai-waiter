@@ -856,8 +856,9 @@ const orderedCategories = useMemo(() => {
               </div>
 
               {/* Categories Grid */}
-              <div className="grid grid-cols-3 gap-2">
-                {(categoriesExpanded ? orderedCategories : orderedCategories.slice(0, 3)).map((cat) => {
+              {orderedCategories.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {(categoriesExpanded ? orderedCategories : orderedCategories.slice(0, 3)).map((cat) => {
                   // Get categoryEn from first item in category
                   const categoryItems = itemsByCategory[cat] || [];
                   const firstItem = categoryItems[0];
@@ -890,8 +891,9 @@ const orderedCategories = useMemo(() => {
                       )}
                     </motion.button>
                   );
-                })}
-              </div>
+                  })}
+                </div>
+              )}
 
               {/* Expand/Collapse Button */}
               {orderedCategories.length > 3 && (
