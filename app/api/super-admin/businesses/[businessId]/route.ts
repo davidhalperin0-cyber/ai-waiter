@@ -314,6 +314,71 @@ export async function PUT(
           ? JSON.parse(verifyData.subscription) 
           : verifyData.subscription;
         
+        console.log('🔍 FINAL CHECK - Comparing:', {
+          requestedStatus: requestedSub.status,
+          actualStatus: finalSub.status,
+          requestedPlanType: requestedSub.planType,
+          actualPlanType: finalSub.planType,
+          requestedNextBillingDate: requestedSub.nextBillingDate,
+          actualNextBillingDate: finalSub.nextBillingDate,
+          fullRequested: requestedSub,
+          fullActual: finalSub,
+        });
+        
+        // Check if nextBillingDate is causing the issue
+        if (finalSub.status === 'expired' && requestedSub.status === 'active') {
+          if (finalSub.nextBillingDate) {
+            const nextBillingDate = new Date(finalSub.nextBillingDate);
+            const now = new Date();
+            if (nextBillingDate < now) {
+              console.error('❌ FINAL CHECK FAILED: nextBillingDate in past is causing auto-expire!');
+              console.error('❌ This means something is changing the status back to expired');
+              console.error('❌ Possible causes: database trigger, another API call, or auto-expire logic');
+              
+              // Try one more time with nextBillingDate explicitly removed
+              console.log('🔄 Attempting final fix with nextBillingDate removed...');
+              const finalFixSubscription = {
+                ...requestedSub,
+                nextBillingDate: null,
+              };
+              
+              const { error: finalFixError } = await supabaseAdmin
+                .from('businesses')
+                .update({ subscription: finalFixSubscription })
+                .eq('businessId', businessId);
+              
+              if (finalFixError) {
+                console.error('❌ Final fix failed:', finalFixError);
+              } else {
+                console.log('✅ Final fix applied, waiting and checking again...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                const { data: finalCheckData } = await supabaseAdmin
+                  .from('businesses')
+                  .select('*')
+                  .eq('businessId', businessId)
+                  .maybeSingle();
+                
+                if (finalCheckData) {
+                  const finalCheckSub = typeof finalCheckData.subscription === 'string' 
+                    ? JSON.parse(finalCheckData.subscription) 
+                    : finalCheckData.subscription;
+                  
+                  if (finalCheckSub.status === requestedSub.status) {
+                    console.log('✅ Final fix succeeded! Status is now:', finalCheckSub.status);
+                    return NextResponse.json({ 
+                      message: 'Business updated successfully',
+                      business: finalCheckData
+                    }, { status: 200 });
+                  } else {
+                    console.error('❌ Final fix still failed! Status is:', finalCheckSub.status);
+                    console.error('❌ This suggests a database trigger or external process is changing the value');
+                  }
+                }
+              }
+            }
+          }
+        }
+        
         if (finalSub.status !== requestedSub.status || finalSub.planType !== requestedSub.planType) {
           console.error('❌ FINAL CHECK FAILED: Subscription mismatch!', {
             requested: requestedSub,
@@ -324,7 +389,8 @@ export async function PUT(
             message: 'Update did not persist correctly',
             error: 'Subscription update failed to persist',
             requested: requestedSub,
-            actual: finalSub
+            actual: finalSub,
+            hint: 'Check if there is a database trigger or auto-expire logic changing the status back',
           }, { status: 500 });
         }
       }
