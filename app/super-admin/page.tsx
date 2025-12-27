@@ -106,12 +106,26 @@ export default function SuperAdminPage() {
       const business = businesses.find((b) => b.businessId === businessId);
       if (!business) return;
 
+      // Ensure subscription is an object (handle case where it might be a string)
+      let subscriptionObj = business.subscription;
+      if (typeof subscriptionObj === 'string') {
+        try {
+          subscriptionObj = JSON.parse(subscriptionObj);
+        } catch (e) {
+          console.error('Failed to parse subscription:', e);
+          subscriptionObj = { status: 'trial', planType: 'full' };
+        }
+      }
+      if (!subscriptionObj || typeof subscriptionObj !== 'object') {
+        subscriptionObj = { status: 'trial', planType: 'full' };
+      }
+
       const res = await fetch(`/api/super-admin/businesses/${businessId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subscription: {
-            ...business.subscription,
+            ...subscriptionObj,
             status: newStatus,
           },
         }),

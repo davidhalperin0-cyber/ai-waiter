@@ -54,7 +54,8 @@ export async function PUT(
     console.log('📝 Super admin updating business:', {
       businessId,
       isEnabled,
-      subscription: subscription ? JSON.stringify(subscription) : undefined,
+      subscription: subscription ? (typeof subscription === 'string' ? subscription : JSON.stringify(subscription)) : undefined,
+      subscriptionType: subscription ? typeof subscription : undefined,
     });
 
     const updateData: any = {};
@@ -63,8 +64,19 @@ export async function PUT(
       console.log('📝 Setting isEnabled to:', isEnabled);
     }
     if (subscription !== undefined) {
-      updateData.subscription = subscription;
-      console.log('📝 Setting subscription to:', JSON.stringify(subscription, null, 2));
+      // Handle case where subscription might be a string JSON
+      let subscriptionObj = subscription;
+      if (typeof subscription === 'string') {
+        try {
+          subscriptionObj = JSON.parse(subscription);
+          console.log('📝 Parsed subscription from string:', JSON.stringify(subscriptionObj, null, 2));
+        } catch (e) {
+          console.error('❌ Failed to parse subscription string:', e);
+          return NextResponse.json({ message: 'Invalid subscription format' }, { status: 400 });
+        }
+      }
+      updateData.subscription = subscriptionObj;
+      console.log('📝 Setting subscription to:', JSON.stringify(subscriptionObj, null, 2));
     }
 
     if (Object.keys(updateData).length === 0) {
