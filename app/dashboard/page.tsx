@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
 import toast from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
 import CustomContentEditor from '@/components/CustomContentEditor';
 
 interface DashboardMenuItem {
@@ -38,6 +39,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'menu' | 'tables' | 'settings' | 'printer' | 'orders' | 'pos' | 'content'>('menu');
+  const [menuExpanded, setMenuExpanded] = useState(false);
   const [businessInfo, setBusinessInfo] = useState<{
     name: string;
     type: string;
@@ -883,62 +885,120 @@ export default function DashboardPage() {
           ))}
         </nav>
 
-        {/* Mobile Bottom Navigation */}
+        {/* Mobile Bottom Navigation - Premium Expandable Grid */}
         <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-neutral-900/95 backdrop-blur-xl border-t border-neutral-800/50 shadow-2xl">
-          <div className="grid grid-cols-3 gap-1 p-2">
-            {[
-              { id: 'menu', label: 'תפריט', icon: '📋', showFor: ['full', 'menu_only'] as const },
-              { id: 'tables', label: 'שולחנות', icon: '🪑', showFor: ['full', 'menu_only'] as const },
+          {(() => {
+            // Build all menu items array
+            const allMenuItems = [
               { id: 'content', label: 'תוכן', icon: '✨', showFor: ['full', 'menu_only'] as const },
+              { id: 'tables', label: 'שולחנות', icon: '🪑', showFor: ['full', 'menu_only'] as const },
+              { id: 'menu', label: 'תפריט', icon: '📋', showFor: ['full', 'menu_only'] as const },
               { id: 'settings', label: 'הגדרות', icon: '⚙️', showFor: ['full', 'menu_only'] as const },
-            ]
-              .filter((tab) => {
-                const planType = (businessInfo?.subscription?.planType || 'full') as 'full' | 'menu_only';
-                return (tab.showFor as readonly ('full' | 'menu_only')[]).includes(planType);
-              })
-              .map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-lg transition-all duration-200 ${
-                  activeTab === tab.id
-                    ? 'bg-neutral-800 text-white'
-                    : 'text-neutral-400 active:bg-neutral-800/50'
-                }`}
-              >
-                <span className="text-xl">{tab.icon}</span>
-                <span className="text-[10px] font-medium">{tab.label}</span>
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-3 gap-1 p-2 border-t border-neutral-800/30">
-            {[
               { id: 'printer', label: 'מדפסת', icon: '🖨️', showFor: ['full'] as const },
               { id: 'pos', label: 'POS', icon: '💳', showFor: ['full'] as const },
               { id: 'orders', label: 'הזמנות', icon: '📊', showFor: ['full'] as const, action: () => businessId && loadOrders() },
-            ]
-              .filter((tab) => {
-                const planType = (businessInfo?.subscription?.planType || 'full') as 'full' | 'menu_only';
-                return (tab.showFor as readonly ('full' | 'menu_only')[]).includes(planType);
-              })
-              .map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id as any);
-                  if (tab.action) tab.action();
-                }}
-                className={`flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-lg transition-all duration-200 ${
-                  activeTab === tab.id
-                    ? 'bg-neutral-800 text-white'
-                    : 'text-neutral-400 active:bg-neutral-800/50'
-                }`}
-              >
-                <span className="text-xl">{tab.icon}</span>
-                <span className="text-[10px] font-medium">{tab.label}</span>
-              </button>
-            ))}
-          </div>
+            ];
+
+            // Filter by plan type
+            const planType = (businessInfo?.subscription?.planType || 'full') as 'full' | 'menu_only';
+            const visibleItems = allMenuItems.filter((tab) => 
+              (tab.showFor as readonly ('full' | 'menu_only')[]).includes(planType)
+            );
+
+            // Get items to display based on state
+            const initialItems = visibleItems.slice(0, 2);
+            const remainingItems = visibleItems.slice(2);
+            const hasMore = remainingItems.length > 0;
+
+            // Items to show: initial 2 + (More button if needed) OR all items if expanded
+            const itemsToShow = menuExpanded 
+              ? visibleItems 
+              : [...initialItems, ...(hasMore ? [{ id: 'more', label: 'עוד', icon: '➕', isMore: true }] : [])];
+
+            return (
+              <div className="overflow-hidden">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={menuExpanded ? 'expanded' : 'collapsed'}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="grid grid-cols-3 gap-1 p-2">
+                      {itemsToShow.map((tab: any, index: number) => {
+                        if (tab.isMore) {
+                          return (
+                            <motion.button
+                              key="more"
+                              onClick={() => setMenuExpanded(true)}
+                              className="flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-lg transition-all duration-200 text-neutral-400 active:bg-neutral-800/50 hover:bg-neutral-800/30"
+                              whileTap={{ scale: 0.95 }}
+                              initial={{ opacity: 0, scale: 0.9 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ duration: 0.2, delay: index * 0.05 }}
+                            >
+                              <span className="text-xl">➕</span>
+                              <span className="text-[10px] font-medium">עוד</span>
+                            </motion.button>
+                          );
+                        }
+
+                        return (
+                          <motion.button
+                            key={tab.id}
+                            onClick={() => {
+                              setActiveTab(tab.id as any);
+                              if (tab.action) tab.action();
+                              if (menuExpanded) setMenuExpanded(false);
+                            }}
+                            className={`flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-lg transition-all duration-200 ${
+                              activeTab === tab.id
+                                ? 'bg-neutral-800 text-white'
+                                : 'text-neutral-400 active:bg-neutral-800/50'
+                            }`}
+                            whileTap={{ scale: 0.95 }}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.2, delay: index * 0.05 }}
+                          >
+                            <span className="text-xl">{tab.icon}</span>
+                            <span className="text-[10px] font-medium">{tab.label}</span>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
+
+                {/* Close button when expanded */}
+                <AnimatePresence>
+                  {menuExpanded && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                      className="border-t border-neutral-800/30"
+                    >
+                      <button
+                        onClick={() => setMenuExpanded(false)}
+                        className="w-full flex items-center justify-center gap-2 py-3 px-2 text-neutral-400 hover:text-white transition-colors active:bg-neutral-800/30"
+                      >
+                        <span className="text-sm font-medium">סגור</span>
+                        <motion.span
+                          animate={{ rotate: 0 }}
+                          className="text-lg"
+                        >
+                          ↑
+                        </motion.span>
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })()}
         </nav>
 
         {activeTab === 'menu' && (
