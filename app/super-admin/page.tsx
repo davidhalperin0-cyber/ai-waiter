@@ -27,6 +27,7 @@ interface PlatformStats {
 }
 
 export default function SuperAdminPage() {
+  console.log('🎯 SuperAdminPage component rendered');
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -37,6 +38,7 @@ export default function SuperAdminPage() {
   });
 
   useEffect(() => {
+    console.log('🎯 useEffect triggered - loading stats and businesses');
     loadStats();
     loadBusinesses();
   }, []);
@@ -433,7 +435,9 @@ export default function SuperAdminPage() {
                       <select
                         value={business.subscription?.planType || 'full'}
                         onChange={(e) => {
-                          console.log('📝 Changing planType to:', e.target.value);
+                          console.log('📝 Select onChange triggered - planType:', e.target.value);
+                          console.log('📝 Business ID:', business.businessId);
+                          console.log('📝 Current subscription:', business.subscription);
                           updatePlanType(business.businessId, e.target.value as 'full' | 'menu_only');
                         }}
                         disabled={loading}
