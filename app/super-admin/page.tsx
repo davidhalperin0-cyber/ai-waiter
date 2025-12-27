@@ -144,6 +144,18 @@ export default function SuperAdminPage() {
         subscriptionObj = { status: 'trial', planType: 'full' };
       }
 
+      console.log('📝 Sending subscription update:', {
+        businessId,
+        newStatus,
+        subscriptionObj,
+        payload: {
+          subscription: {
+            ...subscriptionObj,
+            status: newStatus,
+          },
+        },
+      });
+
       const res = await fetch(`/api/super-admin/businesses/${businessId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -155,11 +167,15 @@ export default function SuperAdminPage() {
         }),
       });
       const data = await res.json();
+      console.log('📝 Update response:', { ok: res.ok, data });
+      
       if (res.ok) {
         // Add small delay to ensure database update is complete
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 200));
+        console.log('📝 Reloading businesses...');
         await loadBusinesses();
         await loadStats();
+        console.log('📝 Reload complete');
         alert(`סטטוס המנוי עודכן ל-${newStatus === 'active' ? 'פעיל' : newStatus === 'trial' ? 'ניסיון' : newStatus === 'expired' ? 'פג תוקף' : 'פיגור תשלום'}!`);
       } else {
         alert(data.message || 'נכשל בעדכון סטטוס המנוי');
@@ -191,6 +207,18 @@ export default function SuperAdminPage() {
         subscriptionObj = { status: 'trial', planType: 'full' };
       }
 
+      console.log('📝 Sending planType update:', {
+        businessId,
+        newPlanType,
+        subscriptionObj,
+        payload: {
+          subscription: {
+            ...subscriptionObj,
+            planType: newPlanType,
+          },
+        },
+      });
+
       const res = await fetch(`/api/super-admin/businesses/${businessId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -202,11 +230,15 @@ export default function SuperAdminPage() {
         }),
       });
       const data = await res.json();
+      console.log('📝 Update response:', { ok: res.ok, data });
+      
       if (res.ok) {
         // Add small delay to ensure database update is complete
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 200));
+        console.log('📝 Reloading businesses...');
         await loadBusinesses();
         await loadStats();
+        console.log('📝 Reload complete');
         alert(`סוג החבילה עודכן ל-${newPlanType === 'full' ? 'חבילה מלאה' : 'תפריט בלבד'}!`);
       } else {
         alert(data.message || 'נכשל בעדכון סוג החבילה');
