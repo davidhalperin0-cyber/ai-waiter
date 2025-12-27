@@ -585,7 +585,7 @@ export default function DashboardPage() {
   async function generateQR(tableId: string) {
     if (!businessId) return;
     try {
-      const url = `${window.location.origin}/menu/${businessId}/${tableId}`;
+      const url = `${window.location.origin}/menu/${businessId}/${tableId}/home`;
       const dataUrl = await QRCode.toDataURL(url);
       setQrDataUrl(dataUrl);
       setSelectedTable(tableId);
@@ -1467,14 +1467,14 @@ export default function DashboardPage() {
                         type="text"
                         readOnly
                         id={`nfc-url-${selectedTable}`}
-                        value={businessId && selectedTable ? `${window.location.origin}/menu/${businessId}/${selectedTable}` : ''}
+                        value={businessId && selectedTable ? `${window.location.origin}/menu/${businessId}/${selectedTable}/home` : ''}
                         className="flex-1 text-xs bg-neutral-800/80 border border-neutral-700/50 px-4 py-2.5 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                         onClick={(e) => (e.target as HTMLInputElement).select()}
                       />
                       <button
                         onClick={async () => {
                           if (!businessId || !selectedTable) return;
-                          const url = `${window.location.origin}/menu/${businessId}/${selectedTable}`;
+                          const url = `${window.location.origin}/menu/${businessId}/${selectedTable}/home`;
                           try {
                             await navigator.clipboard.writeText(url);
                             toast.success('הקישור הועתק ללוח!');

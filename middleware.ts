@@ -7,6 +7,21 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const isDashboard = pathname.startsWith("/dashboard");
   const isSuperAdmin = pathname.startsWith("/super-admin");
+  const isMenu = pathname.startsWith("/menu/");
+
+  // Redirect menu pages to home page if accessing directly (not /home or /chat)
+  if (isMenu) {
+    // Pattern: /menu/[businessId]/[tableId] - redirect to /home
+    // But don't redirect if already on /home or /chat
+    const menuPathMatch = pathname.match(/^\/menu\/([^/]+)\/([^/]+)$/);
+    if (menuPathMatch) {
+      // This is exactly /menu/[businessId]/[tableId] - redirect to /home
+      const redirectUrl = new URL(`${pathname}/home`, req.url);
+      return NextResponse.redirect(redirectUrl);
+    }
+    // Otherwise, continue (could be /home, /chat, or other sub-routes)
+    return NextResponse.next();
+  }
 
   // Protect dashboard routes
   if (isDashboard) {
@@ -91,7 +106,7 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/super-admin/:path*"],
+  matcher: ["/dashboard/:path*", "/super-admin/:path*", "/menu/:path*"],
 };
 
 
