@@ -195,17 +195,73 @@ export async function PUT(
           ? JSON.parse(verifyData.subscription) 
           : verifyData.subscription;
         
+        console.log('🔍 Comparing subscription:', {
+          requested: requestedSub,
+          actual: actualSub,
+          requestedStatus: requestedSub.status,
+          actualStatus: actualSub.status,
+          actualNextBillingDate: actualSub.nextBillingDate,
+        });
+        
+        // CRITICAL: Check if nextBillingDate in the past is causing auto-expire
+        if (actualSub.status === 'expired' && requestedSub.status === 'active') {
+          if (actualSub.nextBillingDate) {
+            const nextBillingDate = new Date(actualSub.nextBillingDate);
+            const now = new Date();
+            if (nextBillingDate < now) {
+              console.warn('⚠️ nextBillingDate is in the past! This is causing auto-expire!');
+              console.warn('⚠️ Removing nextBillingDate and retrying update...');
+              
+              // Update with nextBillingDate removed
+              const fixedSubscription = {
+                ...requestedSub,
+                nextBillingDate: null,
+              };
+              
+              const { error: fixError } = await supabaseAdmin
+                .from('businesses')
+                .update({ subscription: fixedSubscription })
+                .eq('businessId', businessId);
+              
+              if (fixError) {
+                console.error('❌ Failed to fix nextBillingDate:', fixError);
+              } else {
+                console.log('✅ Fixed nextBillingDate, fetching again...');
+                await new Promise(resolve => setTimeout(resolve, 500));
+                const { data: fixedData } = await supabaseAdmin
+                  .from('businesses')
+                  .select('*')
+                  .eq('businessId', businessId)
+                  .maybeSingle();
+                if (fixedData) {
+                  verifyData = fixedData;
+                  const fixedSub = typeof fixedData.subscription === 'string' 
+                    ? JSON.parse(fixedData.subscription) 
+                    : fixedData.subscription;
+                  console.log('✅ Fixed subscription:', fixedSub);
+                }
+              }
+            }
+          }
+        }
+        
         if (actualSub.status !== requestedSub.status || actualSub.planType !== requestedSub.planType) {
           console.error('❌ Subscription update failed! Retrying with multiple attempts...');
           console.error('❌ Requested:', requestedSub);
           console.error('❌ Actual:', actualSub);
           
-          // Try multiple retry attempts
+          // Try multiple retry attempts - ensure nextBillingDate is null for active status
           for (let attempt = 1; attempt <= 3; attempt++) {
             console.log(`🔄 Retry attempt ${attempt}/3...`);
+            const retrySubscription = {
+              ...requestedSub,
+              // Remove nextBillingDate if setting to active to prevent auto-expire
+              nextBillingDate: requestedSub.status === 'active' ? null : requestedSub.nextBillingDate,
+            };
+            
             const { error: retryError } = await supabaseAdmin
               .from('businesses')
-              .update({ subscription: requestedSub })
+              .update({ subscription: retrySubscription })
               .eq('businessId', businessId);
             
             if (retryError) {
