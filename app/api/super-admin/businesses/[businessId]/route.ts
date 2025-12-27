@@ -235,9 +235,15 @@ export async function PUT(
       message: 'Business updated successfully',
       business: verifyData || data?.[0]
     }, { status: 200 });
-  } catch (error) {
-    console.error('Error updating business', error);
-    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
+  } catch (error: any) {
+    console.error('❌ Error updating business:', error);
+    console.error('❌ Error stack:', error?.stack);
+    console.error('❌ Error message:', error?.message);
+    return NextResponse.json({ 
+      message: 'Internal server error',
+      error: error?.message || String(error),
+      stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
+    }, { status: 500 });
   }
 }
 

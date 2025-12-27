@@ -211,9 +211,7 @@ export default function SuperAdminPage() {
         }),
       });
       const data = await res.json();
-      console.log('📝 Update response:', { ok: res.ok, data });
-      console.log('📝 Response business data:', data.business);
-      console.log('📝 Response business subscription:', data.business?.subscription);
+      console.log('📝 Update response:', { ok: res.ok, status: res.status, data });
       
       if (res.ok) {
         // Wait a moment for the update to persist
@@ -227,7 +225,8 @@ export default function SuperAdminPage() {
         // Force re-render
         setRefreshKey(prev => prev + 1);
       } else {
-        alert(data.message || 'נכשל בעדכון סטטוס המנוי');
+        console.error('❌ Update failed:', data);
+        alert(data.message || data.error || 'נכשל בעדכון סטטוס המנוי');
       }
     } catch (err: any) {
       alert(err.message || 'נכשל בעדכון סטטוס המנוי');
