@@ -115,13 +115,31 @@ export async function PUT(
       console.log('✅ Verification - subscription:', JSON.stringify(verifyData?.subscription, null, 2));
       
       if (subscription && verifyData?.subscription) {
-        const statusMatch = verifyData.subscription.status === subscription.status;
+        // Parse subscription if it's a string
+        const requestedSub = typeof subscription === 'string' ? JSON.parse(subscription) : subscription;
+        const actualSub = typeof verifyData.subscription === 'string' 
+          ? JSON.parse(verifyData.subscription) 
+          : verifyData.subscription;
+        
+        const statusMatch = actualSub.status === requestedSub.status;
+        const planTypeMatch = actualSub.planType === requestedSub.planType;
+        
         console.log('✅ Subscription status match:', statusMatch, {
-          requested: subscription.status,
-          actual: verifyData.subscription.status,
+          requested: requestedSub.status,
+          actual: actualSub.status,
         });
-        if (!statusMatch) {
-          console.error('❌ Subscription status mismatch!');
+        console.log('✅ Subscription planType match:', planTypeMatch, {
+          requested: requestedSub.planType,
+          actual: actualSub.planType,
+        });
+        
+        if (!statusMatch || !planTypeMatch) {
+          console.error('❌ Subscription mismatch!', {
+            statusMatch,
+            planTypeMatch,
+            requested: requestedSub,
+            actual: actualSub,
+          });
         }
       }
     }
