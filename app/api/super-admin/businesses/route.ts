@@ -65,8 +65,23 @@ export async function GET(req: NextRequest) {
             console.error('Error counting tables for business', business.businessId, tablesRes.error);
           }
 
+          // Ensure subscription is an object (handle case where it might be a string)
+          let subscription = business.subscription;
+          if (typeof subscription === 'string') {
+            try {
+              subscription = JSON.parse(subscription);
+            } catch (e) {
+              console.warn('Failed to parse subscription for business', business.businessId, e);
+              subscription = { status: 'trial', planType: 'full' };
+            }
+          }
+          if (!subscription || typeof subscription !== 'object') {
+            subscription = { status: 'trial', planType: 'full' };
+          }
+
           return {
             ...business,
+            subscription,
             ordersCount: ordersRes.count || 0,
             tablesCount: tablesRes.count || 0,
           };

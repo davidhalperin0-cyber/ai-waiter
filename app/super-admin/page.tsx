@@ -62,10 +62,33 @@ export default function SuperAdminPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch('/api/super-admin/businesses');
+      const res = await fetch('/api/super-admin/businesses', {
+        cache: 'no-store', // Prevent caching
+      });
       const data = await res.json();
       if (res.ok) {
-        setBusinesses(data.businesses || []);
+        // Ensure subscription is parsed correctly for each business
+        const businessesWithParsedSubscription = (data.businesses || []).map((business: any) => {
+          let subscription = business.subscription;
+          if (typeof subscription === 'string') {
+            try {
+              subscription = JSON.parse(subscription);
+            } catch (e) {
+              console.error('Failed to parse subscription for business', business.businessId, e);
+              subscription = { status: 'trial', planType: 'full' };
+            }
+          }
+          if (!subscription || typeof subscription !== 'object') {
+            subscription = { status: 'trial', planType: 'full' };
+          }
+          return {
+            ...business,
+            subscription,
+          };
+        });
+        console.log('📋 Loaded businesses:', businessesWithParsedSubscription.length);
+        console.log('📋 First business subscription:', businessesWithParsedSubscription[0]?.subscription);
+        setBusinesses(businessesWithParsedSubscription);
       } else {
         setError(data.message || 'נכשל בטעינת עסקים');
       }
@@ -366,8 +389,11 @@ export default function SuperAdminPage() {
                     </div>
                     <div className="text-right flex gap-2 justify-end items-center flex-wrap">
                       <select
-                        value={business.subscription.planType || 'full'}
-                        onChange={(e) => updatePlanType(business.businessId, e.target.value as 'full' | 'menu_only')}
+                        value={business.subscription?.planType || 'full'}
+                        onChange={(e) => {
+                          console.log('📝 Changing planType to:', e.target.value);
+                          updatePlanType(business.businessId, e.target.value as 'full' | 'menu_only');
+                        }}
                         disabled={loading}
                         className="text-[10px] px-2 py-1 rounded bg-neutral-800 border border-neutral-700 disabled:opacity-60"
                         title="סוג חבילה"
@@ -376,8 +402,11 @@ export default function SuperAdminPage() {
                         <option value="menu_only">תפריט בלבד</option>
                       </select>
                       <select
-                        value={business.subscription.status}
-                        onChange={(e) => updateSubscriptionStatus(business.businessId, e.target.value)}
+                        value={business.subscription?.status || 'trial'}
+                        onChange={(e) => {
+                          console.log('📝 Changing status to:', e.target.value);
+                          updateSubscriptionStatus(business.businessId, e.target.value);
+                        }}
                         disabled={loading}
                         className="text-[10px] px-2 py-1 rounded bg-neutral-800 border border-neutral-700 disabled:opacity-60"
                         title="עדכן סטטוס מנוי"
