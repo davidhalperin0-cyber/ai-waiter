@@ -151,9 +151,9 @@ export async function PUT(
 
     // CRITICAL: Verify the update actually took effect by fetching fresh data
     // Wait a moment for transaction to commit
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 500));
     
-    // Fetch the updated business to verify
+    // Fetch the updated business to verify - use a fresh query
     let { data: verifyData, error: verifyError } = await supabaseAdmin
       .from('businesses')
       .select('*')
