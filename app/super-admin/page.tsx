@@ -324,12 +324,18 @@ export default function SuperAdminPage() {
           return updated;
         });
         
+        // Force re-render by updating refresh key
+        setRefreshKey(prev => prev + 1);
+        
         // Add small delay to ensure database update is complete, then reload
         await new Promise(resolve => setTimeout(resolve, 300));
         console.log('📝 Reloading businesses from server...');
         await loadBusinesses();
         await loadStats();
         console.log('📝 Reload complete');
+        
+        // Force another re-render after reload
+        setRefreshKey(prev => prev + 1);
         // Don't show alert - let the UI update speak for itself
       } else {
         alert(data.message || 'נכשל בעדכון סוג החבילה');
