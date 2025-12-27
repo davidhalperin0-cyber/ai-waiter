@@ -211,15 +211,31 @@ function HomePageContent({
             
             {/* 1. Top Padding (15vh) & Business Name - Brand Identity */}
             <div className="pt-[15vh] text-center w-full">
-              {businessInfo.logoUrl ? (
-                <motion.img
+              {businessInfo.logoUrl && businessInfo.logoUrl.trim() ? (
+                <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                  src={businessInfo.logoUrl}
-                  alt={businessInfo.name}
-                  className="h-20 max-h-[80px] w-auto mx-auto object-contain"
-                />
+                  className="relative"
+                >
+                  <img
+                    src={businessInfo.logoUrl}
+                    alt={businessInfo.name}
+                    className="h-20 max-h-[80px] w-auto mx-auto object-contain"
+                    onError={(e) => {
+                      // Hide image on error and show fallback
+                      (e.target as HTMLImageElement).style.display = 'none';
+                      const parent = (e.target as HTMLImageElement).parentElement;
+                      if (parent) {
+                        const fallback = document.createElement('h1');
+                        fallback.className = 'text-4xl md:text-5xl font-semibold tracking-tight text-white uppercase';
+                        fallback.style.fontFamily = 'var(--font-sans), system-ui, -apple-system, sans-serif';
+                        fallback.textContent = businessInfo.name;
+                        parent.appendChild(fallback);
+                      }
+                    }}
+                  />
+                </motion.div>
               ) : (
                 <motion.h1 
                   initial={{ opacity: 0, y: 10 }}

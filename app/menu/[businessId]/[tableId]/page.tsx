@@ -667,7 +667,7 @@ const orderedCategories = useMemo(() => {
           </div>
 
           <div className="flex flex-col items-center text-center">
-            {businessInfo?.logoUrl ? (
+            {businessInfo?.logoUrl && businessInfo.logoUrl.trim() ? (
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -680,12 +680,18 @@ const orderedCategories = useMemo(() => {
                   alt={businessInfo.name}
                   className="relative max-h-20 lg:max-h-24 w-auto object-contain drop-shadow-2xl"
                   onError={(e) => {
+                    // Hide image on error and show fallback
                     (e.target as HTMLImageElement).style.display = 'none';
-                    const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
-                    if (fallback) fallback.style.display = 'flex';
+                    const parent = (e.target as HTMLImageElement).parentElement;
+                    if (parent) {
+                      const fallback = parent.querySelector('.logo-fallback') as HTMLElement;
+                      if (fallback) {
+                        fallback.style.display = 'flex';
+                      }
+                    }
                   }}
                 />
-                <div className="hidden absolute inset-0 items-center justify-center text-3xl font-light tracking-widest uppercase">
+                <div className="hidden logo-fallback absolute inset-0 items-center justify-center text-3xl font-light tracking-widest uppercase">
                   {businessInfo?.name?.[0] || 'M'}
                 </div>
               </motion.div>
