@@ -36,6 +36,7 @@ export default function SuperAdminPage() {
   const [pricingConfig, setPricingConfig] = useState({
     pricePerTable: 50,
   });
+  const [refreshKey, setRefreshKey] = useState(0); // Force re-render key
 
   useEffect(() => {
     console.log('🎯 useEffect triggered - loading stats and businesses');
@@ -527,7 +528,7 @@ export default function SuperAdminPage() {
                         <option value="menu_only">תפריט בלבד</option>
                       </select>
                       <select
-                        key={`status-${business.businessId}-${business.subscription?.status || 'trial'}`}
+                        key={`status-${business.businessId}-${business.subscription?.status || 'trial'}-${refreshKey}`}
                         value={business.subscription?.status || 'trial'}
                         onChange={(e) => {
                           console.log('📝 Select onChange triggered - status:', e.target.value);
