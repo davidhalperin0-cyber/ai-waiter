@@ -497,6 +497,7 @@ export default function SuperAdminPage() {
                     </div>
                     <div className="text-right flex gap-2 justify-end items-center flex-wrap">
                       <select
+                        key={`planType-${business.businessId}-${business.subscription?.planType || 'full'}`}
                         value={business.subscription?.planType || 'full'}
                         onChange={(e) => {
                           console.log('📝 Select onChange triggered - planType:', e.target.value);
@@ -512,6 +513,7 @@ export default function SuperAdminPage() {
                         <option value="menu_only">תפריט בלבד</option>
                       </select>
                       <select
+                        key={`status-${business.businessId}-${business.subscription?.status || 'trial'}`}
                         value={business.subscription?.status || 'trial'}
                         onChange={(e) => {
                           console.log('📝 Select onChange triggered - status:', e.target.value);
