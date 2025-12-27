@@ -295,24 +295,31 @@ export default function SuperAdminPage() {
       console.log('📝 Update response:', { ok: res.ok, data });
       
       if (res.ok) {
-        // Update local state immediately for better UX
+        // Update local state immediately for better UX - create completely new objects
         setBusinesses(prevBusinesses => {
           const updated = prevBusinesses.map(b => {
             if (b.businessId === businessId) {
               const currentSub = typeof b.subscription === 'string' 
                 ? JSON.parse(b.subscription) 
-                : (b.subscription || {});
-              return { 
-                ...b, 
-                subscription: { 
-                  ...currentSub, 
-                  planType: newPlanType 
-                } 
+                : (b.subscription || { status: 'trial', planType: 'full' });
+              // Create completely new object to force React re-render
+              const newBusiness = {
+                ...b,
+                subscription: {
+                  status: currentSub.status || 'trial',
+                  planType: newPlanType,
+                }
               };
+              console.log('📝 Updated business in state:', {
+                businessId: newBusiness.businessId,
+                oldSubscription: b.subscription,
+                newSubscription: newBusiness.subscription,
+              });
+              return newBusiness;
             }
-            return b;
+            return { ...b }; // Create new object for all businesses
           });
-          console.log('📝 Updated businesses state:', updated.find(b => b.businessId === businessId)?.subscription);
+          console.log('📝 Updated businesses state - total:', updated.length);
           return updated;
         });
         
