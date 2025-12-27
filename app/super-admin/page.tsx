@@ -125,10 +125,15 @@ export default function SuperAdminPage() {
   // updateSubscription function removed - no longer based on number of tables
 
   async function updateSubscriptionStatus(businessId: string, newStatus: string) {
+    console.log('🚀 updateSubscriptionStatus called:', { businessId, newStatus });
     try {
       setLoading(true);
       const business = businesses.find((b) => b.businessId === businessId);
-      if (!business) return;
+      console.log('🔍 Found business:', business);
+      if (!business) {
+        console.error('❌ Business not found:', businessId);
+        return;
+      }
 
       // Ensure subscription is an object (handle case where it might be a string)
       let subscriptionObj = business.subscription;
@@ -188,10 +193,15 @@ export default function SuperAdminPage() {
   }
 
   async function updatePlanType(businessId: string, newPlanType: 'full' | 'menu_only') {
+    console.log('🚀 updatePlanType called:', { businessId, newPlanType });
     try {
       setLoading(true);
       const business = businesses.find((b) => b.businessId === businessId);
-      if (!business) return;
+      console.log('🔍 Found business:', business);
+      if (!business) {
+        console.error('❌ Business not found:', businessId);
+        return;
+      }
 
       // Ensure subscription is an object (handle case where it might be a string)
       let subscriptionObj = business.subscription;
@@ -436,7 +446,9 @@ export default function SuperAdminPage() {
                       <select
                         value={business.subscription?.status || 'trial'}
                         onChange={(e) => {
-                          console.log('📝 Changing status to:', e.target.value);
+                          console.log('📝 Select onChange triggered - status:', e.target.value);
+                          console.log('📝 Business ID:', business.businessId);
+                          console.log('📝 Current subscription:', business.subscription);
                           updateSubscriptionStatus(business.businessId, e.target.value);
                         }}
                         disabled={loading}
