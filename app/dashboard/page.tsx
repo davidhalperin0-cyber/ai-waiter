@@ -1727,7 +1727,9 @@ export default function DashboardPage() {
                 const aiInstructions = formData.get('aiInstructions') as string;
                 const menuOnlyMessage = formData.get('menuOnlyMessage') as string;
                 const isEnabled = formData.get('isEnabled') === 'on';
-                console.log('📝 Form submitted with menuOnlyMessage:', {
+                console.log('📝 Form submitted with isEnabled:', {
+                  isEnabled,
+                  isEnabledRaw: formData.get('isEnabled'),
                   menuOnlyMessage,
                   menuOnlyMessageLength: menuOnlyMessage?.length,
                   planType: businessInfo.subscription?.planType,
@@ -1765,7 +1767,7 @@ export default function DashboardPage() {
                       menuOnlyMessage: businessInfo.subscription?.planType === 'menu_only'
                         ? (menuOnlyMessage?.trim() || null)
                         : undefined,
-                      isEnabled,
+                      isEnabled: isEnabled, // Always send, even if false
                     }),
                   });
                   const data = await res.json();

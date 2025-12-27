@@ -35,7 +35,10 @@ export async function PUT(req: NextRequest) {
     if (name !== undefined) updateData.name = name;
     if (logoUrl !== undefined) updateData.logoUrl = logoUrl || null; // Allow empty string to clear logo
     if (type !== undefined) updateData.type = type;
-    if (isEnabled !== undefined) updateData.isEnabled = isEnabled;
+    if (isEnabled !== undefined) {
+      console.log('📝 Updating isEnabled:', { isEnabled, type: typeof isEnabled });
+      updateData.isEnabled = isEnabled;
+    }
     if (template !== undefined) {
       // Validate template value
       if (!validTemplates.includes(template)) {
@@ -214,6 +217,7 @@ export async function PUT(req: NextRequest) {
           if (updateData.type !== undefined) requiredFieldsOnly.type = updateData.type;
           if (updateData.template !== undefined) requiredFieldsOnly.template = updateData.template;
           if (updateData.aiInstructions !== undefined) requiredFieldsOnly.aiInstructions = updateData.aiInstructions;
+          if (updateData.isEnabled !== undefined) requiredFieldsOnly.isEnabled = updateData.isEnabled;
           
           if (Object.keys(requiredFieldsOnly).length > 0) {
             const { error: retryError, data: retryData } = await supabaseAdmin
