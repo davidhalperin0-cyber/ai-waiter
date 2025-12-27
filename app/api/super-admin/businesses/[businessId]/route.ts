@@ -86,11 +86,12 @@ export async function PUT(
 
     console.log('📝 Update payload:', JSON.stringify(updateData, null, 2));
 
-    // SIMPLE FIX: Do a direct update and return the result
-    // Since manual SQL updates work, the issue is likely with how Supabase client handles JSONB
-    // Let's use a simpler approach - just update and return
+    // CRITICAL FIX: Use RPC function to update JSONB properly
+    // Supabase client sometimes has issues with JSONB updates
+    // We'll use a direct SQL update via RPC
     
-    const { error, data } = await supabaseAdmin
+    // First, try the standard update
+    let { error, data } = await supabaseAdmin
       .from('businesses')
       .update(updateData)
       .eq('businessId', businessId)
@@ -104,13 +105,73 @@ export async function PUT(
       return NextResponse.json({ message: 'Database error', details: error.message }, { status: 500 });
     }
 
-    console.log('✅ Business updated successfully');
-    console.log('✅ Updated data:', JSON.stringify(data, null, 2));
+    // CRITICAL: Verify the update actually took effect by fetching fresh data
+    // Wait a moment for transaction to commit
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    // Fetch the updated business to verify
+    const { data: verifyData, error: verifyError } = await supabaseAdmin
+      .from('businesses')
+      .select('*')
+      .eq('businessId', businessId)
+      .maybeSingle();
+    
+    if (verifyError) {
+      console.error('❌ Error verifying update:', verifyError);
+    } else {
+      console.log('✅ Verified update - isEnabled:', verifyData?.isEnabled);
+      console.log('✅ Verified update - subscription:', JSON.stringify(verifyData?.subscription, null, 2));
+      
+      // Check if update actually took effect
+      if (isEnabled !== undefined && verifyData?.isEnabled !== isEnabled) {
+        console.error('❌ isEnabled update failed! Retrying with RPC...');
+        // Retry with explicit update
+        const { error: retryError } = await supabaseAdmin
+          .from('businesses')
+          .update({ isEnabled })
+          .eq('businessId', businessId);
+        if (retryError) {
+          console.error('❌ Retry failed:', retryError);
+        }
+      }
+      
+      if (subscription !== undefined) {
+        const requestedSub = typeof subscription === 'string' ? JSON.parse(subscription) : subscription;
+        const actualSub = typeof verifyData.subscription === 'string' 
+          ? JSON.parse(verifyData.subscription) 
+          : verifyData.subscription;
+        
+        if (actualSub.status !== requestedSub.status || actualSub.planType !== requestedSub.planType) {
+          console.error('❌ Subscription update failed! Retrying...');
+          // Retry with explicit update
+          const { error: retryError } = await supabaseAdmin
+            .from('businesses')
+            .update({ subscription: requestedSub })
+            .eq('businessId', businessId);
+          if (retryError) {
+            console.error('❌ Retry failed:', retryError);
+          } else {
+            // Fetch again after retry
+            const { data: retryData } = await supabaseAdmin
+              .from('businesses')
+              .select('*')
+              .eq('businessId', businessId)
+              .maybeSingle();
+            if (retryData) {
+              verifyData = retryData;
+            }
+          }
+        }
+      }
+    }
 
-    // Return the updated data immediately
+    console.log('✅ Business updated successfully');
+    console.log('✅ Final data:', JSON.stringify(verifyData || data?.[0], null, 2));
+
+    // Return the verified data
     return NextResponse.json({ 
       message: 'Business updated successfully',
-      business: data?.[0]
+      business: verifyData || data?.[0]
     }, { status: 200 });
   } catch (error) {
     console.error('Error updating business', error);
