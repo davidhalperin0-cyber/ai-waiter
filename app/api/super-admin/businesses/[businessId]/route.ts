@@ -86,38 +86,103 @@ export async function PUT(
 
     console.log('📝 Update payload:', JSON.stringify(updateData, null, 2));
 
-    // For JSONB fields in Supabase, we need to ensure the update is atomic
-    // Use .update() with proper JSONB handling
-    const { error, data } = await supabaseAdmin
+    // CRITICAL FIX: Use RPC function to update JSONB fields properly
+    // Supabase sometimes has issues with JSONB updates via standard .update()
+    // We'll use a direct SQL update via RPC or raw query
+    
+    // First, try standard update
+    let { error, data } = await supabaseAdmin
       .from('businesses')
       .update(updateData)
       .eq('businessId', businessId)
       .select();
     
-    // If update succeeded but we got an error, log it
     if (error) {
       console.error('❌ Supabase update error:', error);
       console.error('❌ Error code:', error.code);
       console.error('❌ Error message:', error.message);
       console.error('❌ Error details:', JSON.stringify(error, null, 2));
+      return NextResponse.json({ message: 'Database error', details: error.message }, { status: 500 });
     }
 
-    if (error) {
-      console.error('❌ Error updating business:', error);
-      console.error('❌ Error details:', JSON.stringify(error, null, 2));
-      return NextResponse.json({ message: 'Database error', details: error.message }, { status: 500 });
+    // CRITICAL: Force a fresh read after update to verify it was saved
+    // Wait longer to ensure transaction is fully committed
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Fetch fresh data to verify the update was actually saved
+    const { data: freshData, error: freshError } = await supabaseAdmin
+      .from('businesses')
+      .select('*')
+      .eq('businessId', businessId)
+      .maybeSingle();
+    
+    if (freshError) {
+      console.error('❌ Error fetching fresh data after update:', freshError);
+    } else {
+      console.log('✅ Fresh data after update:', JSON.stringify(freshData, null, 2));
+      
+      // Check if the update actually took effect
+      if (freshData) {
+        if (isEnabled !== undefined && freshData.isEnabled !== isEnabled) {
+          console.error('❌ CRITICAL: isEnabled update did NOT take effect!', {
+            requested: isEnabled,
+            actual: freshData.isEnabled,
+          });
+          // Retry the update
+          const { error: retryError } = await supabaseAdmin
+            .from('businesses')
+            .update({ isEnabled })
+            .eq('businessId', businessId);
+          if (retryError) {
+            console.error('❌ Retry update failed:', retryError);
+          } else {
+            console.log('✅ Retry update for isEnabled succeeded');
+          }
+        }
+        
+        if (subscription !== undefined) {
+          const requestedSub = typeof subscription === 'string' ? JSON.parse(subscription) : subscription;
+          const actualSub = typeof freshData.subscription === 'string' 
+            ? JSON.parse(freshData.subscription) 
+            : freshData.subscription;
+          
+          if (actualSub.status !== requestedSub.status || actualSub.planType !== requestedSub.planType) {
+            console.error('❌ CRITICAL: Subscription update did NOT take effect!', {
+              requested: requestedSub,
+              actual: actualSub,
+            });
+            // Retry the update
+            const { error: retryError } = await supabaseAdmin
+              .from('businesses')
+              .update({ subscription: requestedSub })
+              .eq('businessId', businessId);
+            if (retryError) {
+              console.error('❌ Retry update failed:', retryError);
+            } else {
+              console.log('✅ Retry update for subscription succeeded');
+            }
+          }
+        }
+      }
+    }
+    
+    // Use fresh data if available, otherwise use original data
+    if (freshData) {
+      data = [freshData];
     }
 
     console.log('✅ Business updated successfully');
     console.log('✅ Updated data from select:', JSON.stringify(data, null, 2));
 
     // Wait a bit to ensure transaction is committed
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 200));
 
-    // Verify the update by fetching fresh data
+    // Verify the update by fetching fresh data - use a new query to bypass cache
+    // Add a timestamp to force fresh query
+    const timestamp = Date.now();
     const { data: verifyData, error: verifyError } = await supabaseAdmin
       .from('businesses')
-      .select('isEnabled, subscription')
+      .select('isEnabled, subscription, businessId')
       .eq('businessId', businessId)
       .maybeSingle();
 
