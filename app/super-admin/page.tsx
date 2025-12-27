@@ -43,6 +43,16 @@ export default function SuperAdminPage() {
     loadBusinesses();
   }, []);
 
+  // Log businesses state changes
+  useEffect(() => {
+    console.log('📊 Businesses state changed:', businesses.length, 'businesses');
+    if (businesses.length > 0) {
+      businesses.forEach(b => {
+        console.log(`  - ${b.name}: subscription =`, b.subscription, 'type:', typeof b.subscription);
+      });
+    }
+  }, [businesses]);
+
   async function loadStats() {
     try {
       setLoading(true);
@@ -89,7 +99,12 @@ export default function SuperAdminPage() {
           };
         });
         console.log('📋 Loaded businesses:', businessesWithParsedSubscription.length);
-        console.log('📋 First business subscription:', businessesWithParsedSubscription[0]?.subscription);
+        console.log('📋 All businesses with subscriptions:', businessesWithParsedSubscription.map(b => ({
+          businessId: b.businessId,
+          name: b.name,
+          subscription: b.subscription,
+          subscriptionType: typeof b.subscription,
+        })));
         // Force state update by creating new array
         setBusinesses([...businessesWithParsedSubscription]);
         console.log('📋 State updated with', businessesWithParsedSubscription.length, 'businesses');
