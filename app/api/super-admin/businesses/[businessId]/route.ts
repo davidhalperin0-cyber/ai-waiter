@@ -51,18 +51,67 @@ export async function PUT(
     const body = await req.json();
     const { isEnabled, subscription } = body;
 
-    const updateData: any = {};
-    if (isEnabled !== undefined) updateData.isEnabled = isEnabled;
-    if (subscription !== undefined) updateData.subscription = subscription;
+    console.log('📝 Super admin updating business:', {
+      businessId,
+      isEnabled,
+      subscription: subscription ? JSON.stringify(subscription) : undefined,
+    });
 
-    const { error } = await supabaseAdmin
+    const updateData: any = {};
+    if (isEnabled !== undefined) {
+      updateData.isEnabled = isEnabled;
+      console.log('📝 Setting isEnabled to:', isEnabled);
+    }
+    if (subscription !== undefined) {
+      updateData.subscription = subscription;
+      console.log('📝 Setting subscription to:', JSON.stringify(subscription, null, 2));
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      console.warn('⚠️ No fields to update');
+      return NextResponse.json({ message: 'No fields to update' }, { status: 400 });
+    }
+
+    console.log('📝 Update payload:', JSON.stringify(updateData, null, 2));
+
+    const { error, data } = await supabaseAdmin
       .from('businesses')
       .update(updateData)
-      .eq('businessId', businessId);
+      .eq('businessId', businessId)
+      .select();
 
     if (error) {
-      console.error('Error updating business', error);
-      return NextResponse.json({ message: 'Database error' }, { status: 500 });
+      console.error('❌ Error updating business:', error);
+      console.error('❌ Error details:', JSON.stringify(error, null, 2));
+      return NextResponse.json({ message: 'Database error', details: error.message }, { status: 500 });
+    }
+
+    console.log('✅ Business updated successfully');
+    console.log('✅ Updated data:', JSON.stringify(data, null, 2));
+
+    // Verify the update
+    const { data: verifyData, error: verifyError } = await supabaseAdmin
+      .from('businesses')
+      .select('isEnabled, subscription')
+      .eq('businessId', businessId)
+      .maybeSingle();
+
+    if (verifyError) {
+      console.error('❌ Verification error:', verifyError);
+    } else {
+      console.log('✅ Verification - isEnabled:', verifyData?.isEnabled);
+      console.log('✅ Verification - subscription:', JSON.stringify(verifyData?.subscription, null, 2));
+      
+      if (subscription && verifyData?.subscription) {
+        const statusMatch = verifyData.subscription.status === subscription.status;
+        console.log('✅ Subscription status match:', statusMatch, {
+          requested: subscription.status,
+          actual: verifyData.subscription.status,
+        });
+        if (!statusMatch) {
+          console.error('❌ Subscription status mismatch!');
+        }
+      }
     }
 
     return NextResponse.json({ message: 'Business updated successfully' }, { status: 200 });
