@@ -253,33 +253,53 @@ export async function PUT(req: NextRequest) {
     }
     
     // Verify the update was successful by fetching the updated business
-    // Only verify if template was updated
-    if (template !== undefined) {
+    // Verify if template or isEnabled was updated
+    if (template !== undefined || isEnabled !== undefined) {
       const { data: verifyData, error: verifyError } = await supabaseAdmin
         .from('businesses')
-        .select('template')
+        .select('template, isEnabled')
         .eq('businessId', businessId)
         .maybeSingle();
       
       if (verifyError) {
         console.error('❌ Verification error:', verifyError);
         // Don't fail the request if verification fails - the update might have succeeded
-        console.warn('⚠️ Could not verify template update, but update may have succeeded');
+        console.warn('⚠️ Could not verify update, but update may have succeeded');
       } else {
         console.log('✅ Verification successful');
-        console.log('✅ Template in DB:', verifyData?.template);
-        console.log('✅ Template requested:', template);
         
-        // Verify that template was updated if it was in the request
-        if (verifyData?.template !== template) {
-          console.error('❌ Template mismatch!', {
-            requested: template,
-            actual: verifyData?.template
-          });
-          // Don't fail - just log the warning, the update might still be processing
-          console.warn('⚠️ Template value mismatch - may be a timing issue');
-        } else {
-          console.log('✅ Template matches requested value');
+        if (template !== undefined) {
+          console.log('✅ Template in DB:', verifyData?.template);
+          console.log('✅ Template requested:', template);
+          
+          // Verify that template was updated if it was in the request
+          if (verifyData?.template !== template) {
+            console.error('❌ Template mismatch!', {
+              requested: template,
+              actual: verifyData?.template
+            });
+            // Don't fail - just log the warning, the update might still be processing
+            console.warn('⚠️ Template value mismatch - may be a timing issue');
+          } else {
+            console.log('✅ Template matches requested value');
+          }
+        }
+        
+        if (isEnabled !== undefined) {
+          console.log('✅ isEnabled in DB:', verifyData?.isEnabled);
+          console.log('✅ isEnabled requested:', isEnabled);
+          
+          // Verify that isEnabled was updated if it was in the request
+          if (verifyData?.isEnabled !== isEnabled) {
+            console.error('❌ isEnabled mismatch!', {
+              requested: isEnabled,
+              actual: verifyData?.isEnabled
+            });
+            // Don't fail - just log the warning, the update might still be processing
+            console.warn('⚠️ isEnabled value mismatch - may be a timing issue');
+          } else {
+            console.log('✅ isEnabled matches requested value');
+          }
         }
       }
     }
