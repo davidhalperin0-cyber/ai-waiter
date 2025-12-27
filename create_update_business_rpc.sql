@@ -18,20 +18,33 @@ RETURNS TABLE (
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
+DECLARE
+  updated_subscription JSONB;
 BEGIN
+  -- If status is 'active' and nextBillingDate is in the past, remove it
+  -- This prevents auto-expire from immediately changing it back to 'expired'
+  updated_subscription := p_subscription;
+  IF updated_subscription->>'status' = 'active' AND updated_subscription->>'nextBillingDate' IS NOT NULL THEN
+    -- Check if nextBillingDate is in the past
+    IF (updated_subscription->>'nextBillingDate')::timestamp < NOW() THEN
+      -- Remove nextBillingDate to prevent auto-expire
+      updated_subscription := updated_subscription - 'nextBillingDate';
+    END IF;
+  END IF;
+  
   UPDATE businesses
-  SET subscription = p_subscription
+  SET subscription = updated_subscription
   WHERE businesses."businessId" = p_business_id;
   
   RETURN QUERY
   SELECT 
-    businesses.id,
-    businesses."businessId",
-    businesses.name,
-    businesses."isEnabled",
-    businesses.subscription
-  FROM businesses
-  WHERE businesses."businessId" = p_business_id;
+    b.id,
+    b."businessId",
+    b.name,
+    b."isEnabled",
+    b.subscription
+  FROM businesses b
+  WHERE b."businessId" = p_business_id;
 END;
 $$;
 
