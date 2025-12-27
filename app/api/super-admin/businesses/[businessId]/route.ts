@@ -88,24 +88,30 @@ export async function PUT(
 
     // CRITICAL FIX: Try using RPC function first if updating subscription
     // This bypasses any RLS or trigger issues
-    let { error, data } = null as any;
+    let error: any = null;
+    let data: any = null;
     
-    if (subscription !== undefined && !isEnabled) {
-      // Try RPC function for subscription updates
+    if (subscription !== undefined && isEnabled === undefined) {
+      // Try RPC function for subscription-only updates
       const subscriptionObj = typeof subscription === 'string' ? JSON.parse(subscription) : subscription;
       console.log('🔄 Trying RPC function for subscription update...');
-      const rpcResult = await supabaseAdmin.rpc('update_business_subscription', {
-        p_business_id: businessId,
-        p_subscription: subscriptionObj,
-      });
-      
-      if (!rpcResult.error && rpcResult.data && rpcResult.data.length > 0) {
-        console.log('✅ RPC function succeeded!');
-        data = rpcResult.data;
-        error = null;
-      } else {
-        console.log('⚠️ RPC function failed or not available, falling back to standard update');
-        console.log('RPC error:', rpcResult.error);
+      try {
+        const rpcResult = await supabaseAdmin.rpc('update_business_subscription', {
+          p_business_id: businessId,
+          p_subscription: subscriptionObj,
+        });
+        
+        if (!rpcResult.error && rpcResult.data && rpcResult.data.length > 0) {
+          console.log('✅ RPC function succeeded!');
+          data = rpcResult.data;
+          error = null;
+        } else {
+          console.log('⚠️ RPC function failed or not available, falling back to standard update');
+          console.log('RPC error:', rpcResult.error);
+        }
+      } catch (rpcError: any) {
+        console.log('⚠️ RPC function call failed:', rpcError.message);
+        console.log('⚠️ Falling back to standard update...');
       }
     }
     
