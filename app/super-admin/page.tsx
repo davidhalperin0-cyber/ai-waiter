@@ -212,40 +212,20 @@ export default function SuperAdminPage() {
       });
       const data = await res.json();
       console.log('📝 Update response:', { ok: res.ok, data });
+      console.log('📝 Response business data:', data.business);
+      console.log('📝 Response business subscription:', data.business?.subscription);
       
-      if (res.ok && data.business) {
-        // Update local state with the verified data from server
-        setBusinesses(prevBusinesses => {
-          const updated = prevBusinesses.map(b => {
-            if (b.businessId === businessId) {
-              // Use the verified data from server
-              const verifiedSub = typeof data.business.subscription === 'string'
-                ? JSON.parse(data.business.subscription)
-                : data.business.subscription;
-              const newBusiness = {
-                ...b,
-                isEnabled: data.business.isEnabled ?? b.isEnabled,
-                subscription: verifiedSub || { status: newStatus, planType: subscriptionObj.planType || 'full' },
-              };
-              console.log('✅ Updated business in state with verified data:', {
-                businessId: newBusiness.businessId,
-                oldSubscription: b.subscription,
-                newSubscription: newBusiness.subscription,
-              });
-              return newBusiness;
-            }
-            return { ...b };
-          });
-          return updated;
-        });
+      if (res.ok) {
+        // Wait a moment for the update to persist
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Always reload from server to get the actual database state
+        console.log('📝 Reloading businesses from server...');
+        await loadBusinesses();
+        await loadStats();
         
         // Force re-render
         setRefreshKey(prev => prev + 1);
-        
-        // Reload from server to ensure we have the latest data
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await loadBusinesses();
-        await loadStats();
       } else {
         alert(data.message || 'נכשל בעדכון סטטוס המנוי');
       }
@@ -306,39 +286,17 @@ export default function SuperAdminPage() {
       const data = await res.json();
       console.log('📝 Update response:', { ok: res.ok, data });
       
-      if (res.ok && data.business) {
-        // Update local state with the verified data from server
-        setBusinesses(prevBusinesses => {
-          const updated = prevBusinesses.map(b => {
-            if (b.businessId === businessId) {
-              // Use the verified data from server
-              const verifiedSub = typeof data.business.subscription === 'string'
-                ? JSON.parse(data.business.subscription)
-                : data.business.subscription;
-              const newBusiness = {
-                ...b,
-                isEnabled: data.business.isEnabled ?? b.isEnabled,
-                subscription: verifiedSub || { status: subscriptionObj.status || 'trial', planType: newPlanType },
-              };
-              console.log('✅ Updated business in state with verified data:', {
-                businessId: newBusiness.businessId,
-                oldSubscription: b.subscription,
-                newSubscription: newBusiness.subscription,
-              });
-              return newBusiness;
-            }
-            return { ...b };
-          });
-          return updated;
-        });
+      if (res.ok) {
+        // Wait a moment for the update to persist
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Always reload from server to get the actual database state
+        console.log('📝 Reloading businesses from server...');
+        await loadBusinesses();
+        await loadStats();
         
         // Force re-render
         setRefreshKey(prev => prev + 1);
-        
-        // Reload from server to ensure we have the latest data
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await loadBusinesses();
-        await loadStats();
       } else {
         alert(data.message || 'נכשל בעדכון סוג החבילה');
       }
