@@ -198,6 +198,37 @@ export async function PUT(
 
     console.log('✅ Business updated successfully');
     console.log('✅ Final data:', JSON.stringify(verifyData || data?.[0], null, 2));
+    
+    // CRITICAL: Double-check the final data matches what we requested
+    if (verifyData) {
+      if (isEnabled !== undefined && verifyData.isEnabled !== isEnabled) {
+        console.error('❌ FINAL CHECK FAILED: isEnabled mismatch!', {
+          requested: isEnabled,
+          actual: verifyData.isEnabled,
+        });
+      }
+      
+      if (subscription !== undefined) {
+        const requestedSub = typeof subscription === 'string' ? JSON.parse(subscription) : subscription;
+        const finalSub = typeof verifyData.subscription === 'string' 
+          ? JSON.parse(verifyData.subscription) 
+          : verifyData.subscription;
+        
+        if (finalSub.status !== requestedSub.status || finalSub.planType !== requestedSub.planType) {
+          console.error('❌ FINAL CHECK FAILED: Subscription mismatch!', {
+            requested: requestedSub,
+            actual: finalSub,
+          });
+          // Return error instead of wrong data
+          return NextResponse.json({ 
+            message: 'Update did not persist correctly',
+            error: 'Subscription update failed to persist',
+            requested: requestedSub,
+            actual: finalSub
+          }, { status: 500 });
+        }
+      }
+    }
 
     // Return the verified data
     return NextResponse.json({ 
