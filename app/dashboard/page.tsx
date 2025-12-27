@@ -47,6 +47,7 @@ export default function DashboardPage() {
     menuStyle?: string;
     logoUrl?: string;
     aiInstructions?: string;
+    isEnabled?: boolean;
     subscription?: {
       status: string;
       planType?: 'full' | 'menu_only';
@@ -207,6 +208,7 @@ export default function DashboardPage() {
           businessHours: data.business.businessHours || null,
           subscription: data.business.subscription,
           customContent: data.business.customContent || null,
+          isEnabled: data.business.isEnabled !== false,
           printerConfig: data.business.printerConfig || {
             enabled: false,
             type: 'http',
@@ -1724,6 +1726,7 @@ export default function DashboardPage() {
                 const menuStyle = formData.get('menuStyle') as string;
                 const aiInstructions = formData.get('aiInstructions') as string;
                 const menuOnlyMessage = formData.get('menuOnlyMessage') as string;
+                const isEnabled = formData.get('isEnabled') === 'on';
                 console.log('📝 Form submitted with menuOnlyMessage:', {
                   menuOnlyMessage,
                   menuOnlyMessageLength: menuOnlyMessage?.length,
@@ -1762,6 +1765,7 @@ export default function DashboardPage() {
                       menuOnlyMessage: businessInfo.subscription?.planType === 'menu_only'
                         ? (menuOnlyMessage?.trim() || null)
                         : undefined,
+                      isEnabled,
                     }),
                   });
                   const data = await res.json();
@@ -1786,6 +1790,7 @@ export default function DashboardPage() {
                     businessHours: businessHours,
                     subscription: updatedSubscription,
                     printerConfig: businessInfo.printerConfig,
+                    isEnabled,
                   });
                   toast.success('פרטי העסק עודכנו בהצלחה!');
                 } catch (err: any) {
@@ -1798,6 +1803,23 @@ export default function DashboardPage() {
               }}
               className="space-y-5 bg-neutral-900/60 backdrop-blur-sm border border-neutral-800/50 rounded-2xl p-5 lg:p-6 shadow-xl"
             >
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    name="isEnabled"
+                    defaultChecked={businessInfo.isEnabled !== false}
+                    className="w-5 h-5 rounded border-2 border-neutral-600 bg-neutral-800/80 text-green-500 focus:ring-2 focus:ring-green-500/50 transition-all cursor-pointer"
+                  />
+                  <span className="text-sm font-medium text-neutral-200 group-hover:text-white transition-colors">
+                    ✅ העסק פעיל (לקוחות יכולים לגשת לתפריט)
+                  </span>
+                </label>
+                <p className="text-xs text-neutral-400 ml-8">
+                  אם העסק לא פעיל, הלקוחות לא יוכלו לגשת לתפריט
+                </p>
+              </div>
+
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-neutral-200">שם העסק</label>
                 <input

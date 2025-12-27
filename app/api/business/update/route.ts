@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { businessId, name, logoUrl, type, template, menuStyle, aiInstructions, businessHours, menuOnlyMessage, customContent } = body;
+    const { businessId, name, logoUrl, type, template, menuStyle, aiInstructions, businessHours, menuOnlyMessage, customContent, isEnabled } = body;
 
     if (!businessId) {
       return NextResponse.json({ message: 'businessId is required' }, { status: 400 });
@@ -35,6 +35,7 @@ export async function PUT(req: NextRequest) {
     if (name !== undefined) updateData.name = name;
     if (logoUrl !== undefined) updateData.logoUrl = logoUrl || null; // Allow empty string to clear logo
     if (type !== undefined) updateData.type = type;
+    if (isEnabled !== undefined) updateData.isEnabled = isEnabled;
     if (template !== undefined) {
       // Validate template value
       if (!validTemplates.includes(template)) {
