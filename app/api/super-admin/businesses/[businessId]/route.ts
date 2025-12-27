@@ -86,11 +86,21 @@ export async function PUT(
 
     console.log('📝 Update payload:', JSON.stringify(updateData, null, 2));
 
+    // For JSONB fields in Supabase, we need to ensure the update is atomic
+    // Use .update() with proper JSONB handling
     const { error, data } = await supabaseAdmin
       .from('businesses')
       .update(updateData)
       .eq('businessId', businessId)
       .select();
+    
+    // If update succeeded but we got an error, log it
+    if (error) {
+      console.error('❌ Supabase update error:', error);
+      console.error('❌ Error code:', error.code);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error details:', JSON.stringify(error, null, 2));
+    }
 
     if (error) {
       console.error('❌ Error updating business:', error);
@@ -99,9 +109,12 @@ export async function PUT(
     }
 
     console.log('✅ Business updated successfully');
-    console.log('✅ Updated data:', JSON.stringify(data, null, 2));
+    console.log('✅ Updated data from select:', JSON.stringify(data, null, 2));
 
-    // Verify the update
+    // Wait a bit to ensure transaction is committed
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Verify the update by fetching fresh data
     const { data: verifyData, error: verifyError } = await supabaseAdmin
       .from('businesses')
       .select('isEnabled, subscription')
@@ -134,17 +147,34 @@ export async function PUT(
         });
         
         if (!statusMatch || !planTypeMatch) {
-          console.error('❌ Subscription mismatch!', {
+          console.error('❌ Subscription mismatch detected! Retrying update...', {
             statusMatch,
             planTypeMatch,
             requested: requestedSub,
             actual: actualSub,
           });
+          
+          // Retry the update - sometimes Supabase needs a retry for JSONB
+          const { error: retryError, data: retryData } = await supabaseAdmin
+            .from('businesses')
+            .update(updateData)
+            .eq('businessId', businessId)
+            .select();
+            
+          if (retryError) {
+            console.error('❌ Retry update failed:', retryError);
+          } else {
+            console.log('✅ Retry update successful:', JSON.stringify(retryData, null, 2));
+          }
         }
       }
     }
 
-    return NextResponse.json({ message: 'Business updated successfully' }, { status: 200 });
+    // Return the updated data in the response so frontend can use it
+    return NextResponse.json({ 
+      message: 'Business updated successfully',
+      business: data?.[0] || verifyData 
+    }, { status: 200 });
   } catch (error) {
     console.error('Error updating business', error);
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });

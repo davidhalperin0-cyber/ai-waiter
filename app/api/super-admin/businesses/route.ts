@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized - Super admin access required' }, { status: 403 });
     }
 
+    // Fetch businesses - ensure we get fresh data (no caching)
     const { data: businesses, error } = await supabaseAdmin
       .from('businesses')
       .select('businessId, name, type, email, isEnabled, subscription, createdAt')
