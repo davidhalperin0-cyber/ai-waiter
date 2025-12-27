@@ -90,7 +90,9 @@ export default function SuperAdminPage() {
         });
         console.log('📋 Loaded businesses:', businessesWithParsedSubscription.length);
         console.log('📋 First business subscription:', businessesWithParsedSubscription[0]?.subscription);
-        setBusinesses(businessesWithParsedSubscription);
+        // Force state update by creating new array
+        setBusinesses([...businessesWithParsedSubscription]);
+        console.log('📋 State updated with', businessesWithParsedSubscription.length, 'businesses');
       } else {
         setError(data.message || 'נכשל בטעינת עסקים');
       }
@@ -177,13 +179,34 @@ export default function SuperAdminPage() {
       console.log('📝 Update response:', { ok: res.ok, data });
       
       if (res.ok) {
-        // Add small delay to ensure database update is complete
-        await new Promise(resolve => setTimeout(resolve, 200));
-        console.log('📝 Reloading businesses...');
+        // Update local state immediately for better UX
+        setBusinesses(prevBusinesses => {
+          const updated = prevBusinesses.map(b => {
+            if (b.businessId === businessId) {
+              const currentSub = typeof b.subscription === 'string' 
+                ? JSON.parse(b.subscription) 
+                : (b.subscription || {});
+              return { 
+                ...b, 
+                subscription: { 
+                  ...currentSub, 
+                  status: newStatus 
+                } 
+              };
+            }
+            return b;
+          });
+          console.log('📝 Updated businesses state:', updated.find(b => b.businessId === businessId)?.subscription);
+          return updated;
+        });
+        
+        // Add small delay to ensure database update is complete, then reload
+        await new Promise(resolve => setTimeout(resolve, 300));
+        console.log('📝 Reloading businesses from server...');
         await loadBusinesses();
         await loadStats();
         console.log('📝 Reload complete');
-        alert(`סטטוס המנוי עודכן ל-${newStatus === 'active' ? 'פעיל' : newStatus === 'trial' ? 'ניסיון' : newStatus === 'expired' ? 'פג תוקף' : 'פיגור תשלום'}!`);
+        // Don't show alert - let the UI update speak for itself
       } else {
         alert(data.message || 'נכשל בעדכון סטטוס המנוי');
       }
@@ -245,13 +268,34 @@ export default function SuperAdminPage() {
       console.log('📝 Update response:', { ok: res.ok, data });
       
       if (res.ok) {
-        // Add small delay to ensure database update is complete
-        await new Promise(resolve => setTimeout(resolve, 200));
-        console.log('📝 Reloading businesses...');
+        // Update local state immediately for better UX
+        setBusinesses(prevBusinesses => {
+          const updated = prevBusinesses.map(b => {
+            if (b.businessId === businessId) {
+              const currentSub = typeof b.subscription === 'string' 
+                ? JSON.parse(b.subscription) 
+                : (b.subscription || {});
+              return { 
+                ...b, 
+                subscription: { 
+                  ...currentSub, 
+                  planType: newPlanType 
+                } 
+              };
+            }
+            return b;
+          });
+          console.log('📝 Updated businesses state:', updated.find(b => b.businessId === businessId)?.subscription);
+          return updated;
+        });
+        
+        // Add small delay to ensure database update is complete, then reload
+        await new Promise(resolve => setTimeout(resolve, 300));
+        console.log('📝 Reloading businesses from server...');
         await loadBusinesses();
         await loadStats();
         console.log('📝 Reload complete');
-        alert(`סוג החבילה עודכן ל-${newPlanType === 'full' ? 'חבילה מלאה' : 'תפריט בלבד'}!`);
+        // Don't show alert - let the UI update speak for itself
       } else {
         alert(data.message || 'נכשל בעדכון סוג החבילה');
       }
@@ -403,32 +447,32 @@ export default function SuperAdminPage() {
                     <div className="flex gap-2 items-center">
                       <span
                         className={`text-[10px] px-2 py-1 rounded ${
-                          (business.subscription.planType || 'full') === 'full'
+                          (business.subscription?.planType || 'full') === 'full'
                             ? 'bg-purple-900/40 text-purple-400'
                             : 'bg-orange-900/40 text-orange-400'
                         }`}
                         title="סוג חבילה"
                       >
-                        {(business.subscription.planType || 'full') === 'full' ? 'חבילה מלאה' : 'תפריט בלבד'}
+                        {(business.subscription?.planType || 'full') === 'full' ? 'חבילה מלאה' : 'תפריט בלבד'}
                       </span>
                       <span
                         className={`text-[10px] px-2 py-1 rounded ${
-                          business.subscription.status === 'active'
+                          business.subscription?.status === 'active'
                             ? 'bg-blue-900/40 text-blue-400'
-                            : business.subscription.status === 'trial'
+                            : business.subscription?.status === 'trial'
                             ? 'bg-yellow-900/40 text-yellow-400'
                             : 'bg-red-900/40 text-red-400'
                         }`}
                       >
-                        {business.subscription.status === 'active'
+                        {business.subscription?.status === 'active'
                           ? 'פעיל'
-                          : business.subscription.status === 'trial'
+                          : business.subscription?.status === 'trial'
                           ? 'ניסיון'
-                          : business.subscription.status === 'expired'
+                          : business.subscription?.status === 'expired'
                           ? 'פג תוקף'
-                          : business.subscription.status === 'past_due'
+                          : business.subscription?.status === 'past_due'
                           ? 'פיגור'
-                          : business.subscription.status}
+                          : business.subscription?.status || 'לא ידוע'}
                       </span>
                     </div>
                     <div className="text-right flex gap-2 justify-end items-center flex-wrap">
