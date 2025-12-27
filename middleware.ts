@@ -15,7 +15,19 @@ export async function middleware(req: NextRequest) {
     // But don't redirect if already on /home or /chat
     const menuPathMatch = pathname.match(/^\/menu\/([^/]+)\/([^/]+)$/);
     if (menuPathMatch) {
-      // This is exactly /menu/[businessId]/[tableId] - redirect to /home
+      // Check if user is coming from the home page (clicking the menu button)
+      const referer = req.headers.get('referer');
+      const isFromHomePage = referer && referer.includes('/home');
+      
+      // Also check for query parameter (fallback if referer is not available)
+      const fromHome = req.nextUrl.searchParams.get('from') === 'home';
+      
+      // If coming from home page, allow direct access to menu (don't redirect)
+      if (isFromHomePage || fromHome) {
+        return NextResponse.next();
+      }
+      
+      // Otherwise, redirect to /home (direct access from QR code or external link)
       const redirectUrl = new URL(`${pathname}/home`, req.url);
       return NextResponse.redirect(redirectUrl);
     }

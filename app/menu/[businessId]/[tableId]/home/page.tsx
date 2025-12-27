@@ -238,7 +238,7 @@ function HomePageContent({
 
             {/* 3. PRIMARY ACTION: Menu Entry Button - Glass / Blur Premium */}
             <div className="w-full">
-              <Link href={`/menu/${businessId}/${tableId}`} className="block">
+              <Link href={`/menu/${businessId}/${tableId}?from=home`} className="block">
                 <motion.button
                   className="relative w-full aspect-[2/1] md:aspect-[16/9] min-w-[280px] max-w-[340px] mx-auto rounded-3xl font-medium text-xl md:text-2xl transition-all overflow-hidden shadow-2xl flex items-center justify-center group"
                   whileHover={{ scale: 1.02 }}
