@@ -152,23 +152,44 @@ export async function PUT(
           : verifyData.subscription;
         
         if (actualSub.status !== requestedSub.status || actualSub.planType !== requestedSub.planType) {
-          console.error('❌ Subscription update failed! Retrying...');
-          // Retry with explicit update
-          const { error: retryError } = await supabaseAdmin
-            .from('businesses')
-            .update({ subscription: requestedSub })
-            .eq('businessId', businessId);
-          if (retryError) {
-            console.error('❌ Retry failed:', retryError);
-          } else {
-            // Fetch again after retry
-            const { data: retryData } = await supabaseAdmin
+          console.error('❌ Subscription update failed! Retrying with multiple attempts...');
+          console.error('❌ Requested:', requestedSub);
+          console.error('❌ Actual:', actualSub);
+          
+          // Try multiple retry attempts
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            console.log(`🔄 Retry attempt ${attempt}/3...`);
+            const { error: retryError } = await supabaseAdmin
               .from('businesses')
-              .select('*')
-              .eq('businessId', businessId)
-              .maybeSingle();
-            if (retryData) {
-              verifyData = retryData;
+              .update({ subscription: requestedSub })
+              .eq('businessId', businessId);
+            
+            if (retryError) {
+              console.error(`❌ Retry attempt ${attempt} failed:`, retryError);
+              if (attempt < 3) {
+                await new Promise(resolve => setTimeout(resolve, 300));
+              }
+            } else {
+              console.log(`✅ Retry attempt ${attempt} succeeded`);
+              // Wait and fetch again
+              await new Promise(resolve => setTimeout(resolve, 500));
+              const { data: retryData } = await supabaseAdmin
+                .from('businesses')
+                .select('*')
+                .eq('businessId', businessId)
+                .maybeSingle();
+              if (retryData) {
+                const retrySub = typeof retryData.subscription === 'string' 
+                  ? JSON.parse(retryData.subscription) 
+                  : retryData.subscription;
+                if (retrySub.status === requestedSub.status && retrySub.planType === requestedSub.planType) {
+                  verifyData = retryData;
+                  console.log('✅ Retry verified - update persisted!');
+                  break;
+                } else {
+                  console.error('❌ Retry data still wrong:', retrySub);
+                }
+              }
             }
           }
         }
