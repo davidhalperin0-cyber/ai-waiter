@@ -61,10 +61,18 @@ export default function SuperAdminPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch('/api/super-admin/businesses');
+      const res = await fetch('/api/super-admin/businesses', { cache: 'no-store' });
       const data = await res.json();
       if (res.ok) {
-        setBusinesses(data.businesses || []);
+        // Parse subscription if it's a string
+        const parsedBusinesses = (data.businesses || []).map((business: any) => ({
+          ...business,
+          subscription: typeof business.subscription === 'string' 
+            ? JSON.parse(business.subscription) 
+            : business.subscription || { status: 'trial', planType: 'full' },
+        }));
+        console.log('🔄 Loaded businesses:', parsedBusinesses.length);
+        setBusinesses(parsedBusinesses);
       } else {
         setError(data.message || 'נכשל בטעינת עסקים');
       }
@@ -78,20 +86,28 @@ export default function SuperAdminPage() {
   async function toggleBusinessStatus(businessId: string, currentStatus: boolean) {
     try {
       setLoading(true);
+      const newStatus = !currentStatus;
+      console.log('🔄 Toggling business status:', { businessId, currentStatus, newStatus });
+
       const res = await fetch(`/api/super-admin/businesses/${businessId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isEnabled: !currentStatus }),
+        body: JSON.stringify({ isEnabled: newStatus }),
       });
       const data = await res.json();
+      console.log('📥 Update response:', data);
+      
       if (res.ok) {
+        // Wait a bit for DB to commit
+        await new Promise(resolve => setTimeout(resolve, 300));
         await loadBusinesses();
         await loadStats();
-        alert('סטטוס העסק עודכן בהצלחה!');
+        console.log('✅ Reloaded businesses after update');
       } else {
         alert(data.message || 'נכשל בעדכון סטטוס העסק');
       }
     } catch (err: any) {
+      console.error('❌ Update error:', err);
       alert(err.message || 'נכשל בעדכון סטטוס העסק');
     } finally {
       setLoading(false);
@@ -106,25 +122,32 @@ export default function SuperAdminPage() {
       const business = businesses.find((b) => b.businessId === businessId);
       if (!business) return;
 
+      console.log('🔄 Updating subscription status:', { businessId, newStatus, current: business.subscription });
+
       const res = await fetch(`/api/super-admin/businesses/${businessId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subscription: {
-            ...business.subscription,
+            ...(business.subscription || {}),
             status: newStatus,
           },
         }),
       });
       const data = await res.json();
+      console.log('📥 Update response:', data);
+      
       if (res.ok) {
+        // Wait a bit for DB to commit
+        await new Promise(resolve => setTimeout(resolve, 300));
         await loadBusinesses();
         await loadStats();
-        alert(`סטטוס המנוי עודכן ל-${newStatus === 'active' ? 'פעיל' : newStatus === 'trial' ? 'ניסיון' : newStatus === 'expired' ? 'פג תוקף' : 'פיגור תשלום'}!`);
+        console.log('✅ Reloaded businesses after update');
       } else {
         alert(data.message || 'נכשל בעדכון סטטוס המנוי');
       }
     } catch (err: any) {
+      console.error('❌ Update error:', err);
       alert(err.message || 'נכשל בעדכון סטטוס המנוי');
     } finally {
       setLoading(false);
@@ -137,24 +160,32 @@ export default function SuperAdminPage() {
       const business = businesses.find((b) => b.businessId === businessId);
       if (!business) return;
 
+      console.log('🔄 Updating plan type:', { businessId, newPlanType, current: business.subscription });
+
       const res = await fetch(`/api/super-admin/businesses/${businessId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subscription: {
-            ...business.subscription,
+            ...(business.subscription || {}),
             planType: newPlanType,
           },
         }),
       });
       const data = await res.json();
+      console.log('📥 Update response:', data);
+      
       if (res.ok) {
+        // Wait a bit for DB to commit
+        await new Promise(resolve => setTimeout(resolve, 300));
         await loadBusinesses();
-        alert(`סוג החבילה עודכן ל-${newPlanType === 'full' ? 'חבילה מלאה' : 'תפריט בלבד'}!`);
+        await loadStats();
+        console.log('✅ Reloaded businesses after update');
       } else {
         alert(data.message || 'נכשל בעדכון סוג החבילה');
       }
     } catch (err: any) {
+      console.error('❌ Update error:', err);
       alert(err.message || 'נכשל בעדכון סוג החבילה');
     } finally {
       setLoading(false);
@@ -332,7 +363,8 @@ export default function SuperAdminPage() {
                     </div>
                     <div className="text-right flex gap-2 justify-end items-center flex-wrap">
                       <select
-                        value={business.subscription.planType || 'full'}
+                        key={`planType-${business.businessId}-${business.subscription?.planType || 'full'}`}
+                        value={business.subscription?.planType || 'full'}
                         onChange={(e) => updatePlanType(business.businessId, e.target.value as 'full' | 'menu_only')}
                         disabled={loading}
                         className="text-[10px] px-2 py-1 rounded bg-neutral-800 border border-neutral-700 disabled:opacity-60"
@@ -342,7 +374,8 @@ export default function SuperAdminPage() {
                         <option value="menu_only">תפריט בלבד</option>
                       </select>
                       <select
-                        value={business.subscription.status}
+                        key={`status-${business.businessId}-${business.subscription?.status || 'trial'}`}
+                        value={business.subscription?.status || 'trial'}
                         onChange={(e) => updateSubscriptionStatus(business.businessId, e.target.value)}
                         disabled={loading}
                         className="text-[10px] px-2 py-1 rounded bg-neutral-800 border border-neutral-700 disabled:opacity-60"
