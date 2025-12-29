@@ -51,11 +51,12 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Get stats for each business (orders count, tables count)
+    // Get stats for each business (orders count, tables count) - with timeout
     const businessesWithStats = await Promise.all(
       businessesWithParsedSubscription.map(async (business) => {
         try {
-          const [ordersRes, tablesRes] = await Promise.all([
+          // Add timeout to prevent hanging
+          const statsPromise = Promise.all([
             supabaseAdmin
               .from('orders')
               .select('orderId', { count: 'exact', head: true })
@@ -66,20 +67,34 @@ export async function GET(req: NextRequest) {
               .eq('businessId', business.businessId),
           ]);
 
-          if (ordersRes.error) {
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout')), 2000)
+          );
+
+          const [ordersRes, tablesRes] = await Promise.race([
+            statsPromise,
+            timeoutPromise,
+          ]) as any[];
+
+          if (ordersRes?.error) {
             console.error('Error counting orders for business', business.businessId, ordersRes.error);
           }
-          if (tablesRes.error) {
+          if (tablesRes?.error) {
             console.error('Error counting tables for business', business.businessId, tablesRes.error);
           }
 
           return {
             ...business,
-            ordersCount: ordersRes.count || 0,
-            tablesCount: tablesRes.count || 0,
+            ordersCount: ordersRes?.count || 0,
+            tablesCount: tablesRes?.count || 0,
           };
         } catch (err: any) {
-          console.error('Error fetching stats for business', business.businessId, err);
+          // If timeout or error, return with 0 counts
+          if (err.message === 'Timeout') {
+            console.warn('Timeout counting stats for business', business.businessId);
+          } else {
+            console.error('Error fetching stats for business', business.businessId, err);
+          }
           return {
             ...business,
             ordersCount: 0,
