@@ -87,110 +87,32 @@ export async function PUT(
       return NextResponse.json({ message: 'No fields to update' }, { status: 400 });
     }
 
-    // USE RAW SQL VIA RPC - Bypass Supabase client completely
-    let updateResult: any = null;
-    let error: any = null;
+    // SIMPLE DIRECT UPDATE - Return what the DB says, don't verify
+    const result = await supabaseAdmin
+      .from('businesses')
+      .update(updateData)
+      .eq('businessId', businessId)
+      .select('businessId, name, isEnabled, subscription, subscriptionlocked');
     
-    try {
-      // Build SQL update statement
-      let sqlParts: string[] = [];
-      let params: any[] = [];
-      let paramIndex = 1;
-      
-      if (updateData.isEnabled !== undefined) {
-        sqlParts.push(`"isEnabled" = $${paramIndex}`);
-        params.push(updateData.isEnabled);
-        paramIndex++;
-      }
-      
-      if (updateData.subscription) {
-        sqlParts.push(`subscription = $${paramIndex}::jsonb`);
-        params.push(JSON.stringify(updateData.subscription));
-        paramIndex++;
-      }
-      
-      if (sqlParts.length === 0) {
-        return NextResponse.json({ message: 'No fields to update' }, { status: 400 });
-      }
-      
-      params.push(businessId); // For WHERE clause
-      
-      const sql = `
-        UPDATE public.businesses
-        SET ${sqlParts.join(', ')}
-        WHERE "businessId" = $${paramIndex}
-        RETURNING "businessId", name, "isEnabled", subscription, "subscriptionlocked"
-      `;
-      
-      console.log('🔧 Executing raw SQL:', sql);
-      console.log('🔧 With params:', params);
-      
-      // Use RPC to execute raw SQL
-      const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('exec_sql', {
-        sql_query: sql,
-        sql_params: params,
-      });
-      
-      if (rpcError) {
-        console.error('❌ RPC SQL execution failed:', rpcError);
-        // Fallback to standard update
-        const result = await supabaseAdmin
-          .from('businesses')
-          .update(updateData)
-          .eq('businessId', businessId)
-          .select();
-        
-        if (result.error) {
-          error = result.error;
-        } else if (result.data) {
-          updateResult = { success: true, data: result.data[0] };
-        }
-      } else if (rpcData && rpcData.length > 0) {
-        updateResult = { success: true, data: rpcData[0] };
-      }
-    } catch (sqlError: any) {
-      console.error('❌ SQL execution error:', sqlError);
-      // Fallback to standard update
-      const result = await supabaseAdmin
-        .from('businesses')
-        .update(updateData)
-        .eq('businessId', businessId)
-        .select();
-      
-      if (result.error) {
-        error = result.error;
-      } else if (result.data) {
-        updateResult = { success: true, data: result.data[0] };
-      }
+    if (result.error) {
+      console.error('❌ Error updating business:', result.error);
+      return NextResponse.json({ 
+        message: 'Database error', 
+        details: result.error.message 
+      }, { status: 500 });
     }
     
-    // If SQL didn't work, use standard update with single retry
-    if (!updateResult && !error) {
-      console.log('🔄 Using standard update as fallback...');
-      const result = await supabaseAdmin
-        .from('businesses')
-        .update(updateData)
-        .eq('businessId', businessId)
-        .select();
-      
-      if (result.error) {
-        error = result.error;
-      } else if (result.data && result.data.length > 0) {
-        // Verify immediately
-        await new Promise(resolve => setTimeout(resolve, 100));
-        const verifyResult = await supabaseAdmin
-          .from('businesses')
-          .select('businessId, isEnabled, subscription, subscriptionlocked')
-          .eq('businessId', businessId)
-          .maybeSingle();
-        
-        if (verifyResult.data) {
-          updateResult = { success: true, data: verifyResult.data };
-        } else {
-          updateResult = { success: true, data: result.data[0] };
-        }
-      }
+    if (!result.data || result.data.length === 0) {
+      return NextResponse.json({ message: 'Business not found' }, { status: 404 });
     }
+    
+    const updatedBusiness = result.data[0];
+    console.log('✅ Update completed. DB returned:', {
+      isEnabled: updatedBusiness.isEnabled,
+      subscription: updatedBusiness.subscription,
+    });
+    
+    updateResult = { success: true, data: updatedBusiness };
 
     if (error && !updateResult) {
       console.error('❌ Error updating business after all retries:', error);
