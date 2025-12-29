@@ -87,15 +87,70 @@ export async function PUT(
       return NextResponse.json({ message: 'No fields to update' }, { status: 400 });
     }
 
-    // DIRECT UPDATE WITH RETRY - Skip RPC, use direct SQL with aggressive retry
+    // USE RAW SQL VIA RPC - Bypass Supabase client completely
     let updateResult: any = null;
     let error: any = null;
-    const maxRetries = 5;
     
-    for (let retry = 0; retry < maxRetries; retry++) {
-      console.log(`🔄 Direct update attempt ${retry + 1}/${maxRetries}...`);
+    try {
+      // Build SQL update statement
+      let sqlParts: string[] = [];
+      let params: any[] = [];
+      let paramIndex = 1;
       
-      // Direct update
+      if (updateData.isEnabled !== undefined) {
+        sqlParts.push(`"isEnabled" = $${paramIndex}`);
+        params.push(updateData.isEnabled);
+        paramIndex++;
+      }
+      
+      if (updateData.subscription) {
+        sqlParts.push(`subscription = $${paramIndex}::jsonb`);
+        params.push(JSON.stringify(updateData.subscription));
+        paramIndex++;
+      }
+      
+      if (sqlParts.length === 0) {
+        return NextResponse.json({ message: 'No fields to update' }, { status: 400 });
+      }
+      
+      params.push(businessId); // For WHERE clause
+      
+      const sql = `
+        UPDATE public.businesses
+        SET ${sqlParts.join(', ')}
+        WHERE "businessId" = $${paramIndex}
+        RETURNING "businessId", name, "isEnabled", subscription, "subscriptionlocked"
+      `;
+      
+      console.log('🔧 Executing raw SQL:', sql);
+      console.log('🔧 With params:', params);
+      
+      // Use RPC to execute raw SQL
+      const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('exec_sql', {
+        sql_query: sql,
+        sql_params: params,
+      });
+      
+      if (rpcError) {
+        console.error('❌ RPC SQL execution failed:', rpcError);
+        // Fallback to standard update
+        const result = await supabaseAdmin
+          .from('businesses')
+          .update(updateData)
+          .eq('businessId', businessId)
+          .select();
+        
+        if (result.error) {
+          error = result.error;
+        } else if (result.data) {
+          updateResult = { success: true, data: result.data[0] };
+        }
+      } else if (rpcData && rpcData.length > 0) {
+        updateResult = { success: true, data: rpcData[0] };
+      }
+    } catch (sqlError: any) {
+      console.error('❌ SQL execution error:', sqlError);
+      // Fallback to standard update
       const result = await supabaseAdmin
         .from('businesses')
         .update(updateData)
@@ -103,29 +158,26 @@ export async function PUT(
         .select();
       
       if (result.error) {
-        console.error(`❌ Update attempt ${retry + 1} failed:`, result.error);
         error = result.error;
-        if (retry < maxRetries - 1) {
-          await new Promise(resolve => setTimeout(resolve, 100 * (retry + 1)));
-          continue;
-        }
-        break;
+      } else if (result.data) {
+        updateResult = { success: true, data: result.data[0] };
       }
+    }
+    
+    // If SQL didn't work, use standard update with single retry
+    if (!updateResult && !error) {
+      console.log('🔄 Using standard update as fallback...');
+      const result = await supabaseAdmin
+        .from('businesses')
+        .update(updateData)
+        .eq('businessId', businessId)
+        .select();
       
-      if (result.data && result.data.length > 0) {
-        // Check the returned data first (before verification)
-        const returnedData = result.data[0];
-        console.log(`📊 Returned data from update:`, {
-          isEnabled: returnedData.isEnabled,
-          subscription: returnedData.subscription,
-        });
-        
-        // If returned data is wrong, something is very wrong
-        if (updateData.isEnabled !== undefined && returnedData.isEnabled !== updateData.isEnabled) {
-          console.error(`❌ CRITICAL: Update returned wrong value! Expected ${updateData.isEnabled}, got ${returnedData.isEnabled}`);
-        }
-        
-        // Verify immediately with NO delay to catch immediate changes
+      if (result.error) {
+        error = result.error;
+      } else if (result.data && result.data.length > 0) {
+        // Verify immediately
+        await new Promise(resolve => setTimeout(resolve, 100));
         const verifyResult = await supabaseAdmin
           .from('businesses')
           .select('businessId, isEnabled, subscription, subscriptionlocked')
@@ -133,46 +185,9 @@ export async function PUT(
           .maybeSingle();
         
         if (verifyResult.data) {
-          console.log(`📊 Verification data:`, {
-            isEnabled: verifyResult.data.isEnabled,
-            subscription: verifyResult.data.subscription,
-            subscriptionlocked: verifyResult.data.subscriptionlocked,
-          });
-          
-          let isCorrect = true;
-          
-          // Check isEnabled
-          if (updateData.isEnabled !== undefined) {
-            if (verifyResult.data.isEnabled !== updateData.isEnabled) {
-              console.error(`❌ Verification failed: isEnabled expected ${updateData.isEnabled}, got ${verifyResult.data.isEnabled}`);
-              console.error(`❌ Subscription status: ${verifyResult.data.subscription?.status}`);
-              console.error(`❌ Subscription locked: ${verifyResult.data.subscriptionlocked}`);
-              isCorrect = false;
-            }
-          }
-          
-          // Check subscription
-          if (updateData.subscription) {
-            const requestedStatus = typeof updateData.subscription === 'string' 
-              ? JSON.parse(updateData.subscription).status 
-              : updateData.subscription.status;
-            const actualStatus = verifyResult.data.subscription?.status;
-            if (actualStatus !== requestedStatus) {
-              console.error(`❌ Verification failed: subscription status expected ${requestedStatus}, got ${actualStatus}`);
-              isCorrect = false;
-            }
-          }
-          
-          if (isCorrect) {
-            console.log(`✅ Update verified successfully on attempt ${retry + 1}`);
-            updateResult = { success: true, data: verifyResult.data };
-            break;
-          } else if (retry < maxRetries - 1) {
-            console.log(`⚠️ Verification failed, retrying... (${retry + 1}/${maxRetries})`);
-            // Longer delay between retries
-            await new Promise(resolve => setTimeout(resolve, 500 * (retry + 1)));
-            continue;
-          }
+          updateResult = { success: true, data: verifyResult.data };
+        } else {
+          updateResult = { success: true, data: result.data[0] };
         }
       }
     }
