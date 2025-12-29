@@ -78,13 +78,16 @@ export default function SuperAdminPage() {
             : (business.subscription || { status: 'trial', planType: 'full' }),
         }));
         console.log('🔄 Loaded businesses:', parsedBusinesses.length);
-        console.log('🔄 Sample business:', parsedBusinesses[0] ? {
-          businessId: parsedBusinesses[0].businessId,
-          isEnabled: parsedBusinesses[0].isEnabled,
-          subscription: parsedBusinesses[0].subscription,
-        } : 'none');
-        // Force React to see this as a new array
-        setBusinesses([...parsedBusinesses]);
+        const targetBusiness = parsedBusinesses.find(b => b.businessId === 'b72bca1a-7fd3-470d-998e-971785f30ab4');
+        if (targetBusiness) {
+          console.log('🔄 Target business after load:', {
+            businessId: targetBusiness.businessId,
+            isEnabled: targetBusiness.isEnabled,
+            subscription: targetBusiness.subscription,
+          });
+        }
+        // Force React to see this as a new array with new objects
+        setBusinesses(parsedBusinesses.map(b => ({ ...b })));
       } else {
         setError(data.message || 'נכשל בטעינת עסקים');
       }
