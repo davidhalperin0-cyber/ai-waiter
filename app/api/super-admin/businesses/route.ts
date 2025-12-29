@@ -35,6 +35,16 @@ export async function GET(req: NextRequest) {
       .select('businessId, name, type, email, isEnabled, subscription, createdAt')
       .order('createdAt', { ascending: false });
 
+    // Log raw data from DB
+    const targetBusinessRaw = businesses?.find((b: any) => b.businessId === 'b72bca1a-7fd3-470d-998e-971785f30ab4');
+    if (targetBusinessRaw) {
+      console.log('🔍 GET /api/super-admin/businesses - Raw DB data for target business:', {
+        businessId: targetBusinessRaw.businessId,
+        isEnabled: targetBusinessRaw.isEnabled,
+        isEnabledType: typeof targetBusinessRaw.isEnabled,
+      });
+    }
+
     // Ensure subscription is always an object, not a string
     const businessesWithParsedSubscription = (businesses || []).map((business: any) => ({
       ...business,
@@ -42,6 +52,16 @@ export async function GET(req: NextRequest) {
         ? JSON.parse(business.subscription) 
         : business.subscription || { status: 'trial', planType: 'full' },
     }));
+
+    // Log after parsing
+    const targetBusinessParsed = businessesWithParsedSubscription.find((b: any) => b.businessId === 'b72bca1a-7fd3-470d-998e-971785f30ab4');
+    if (targetBusinessParsed) {
+      console.log('🔍 GET /api/super-admin/businesses - Parsed data for target business:', {
+        businessId: targetBusinessParsed.businessId,
+        isEnabled: targetBusinessParsed.isEnabled,
+        isEnabledType: typeof targetBusinessParsed.isEnabled,
+      });
+    }
 
     if (error) {
       console.error('Error fetching businesses', error);
