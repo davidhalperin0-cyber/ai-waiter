@@ -124,23 +124,35 @@ export async function PUT(
           }, { status: 500 });
         }
         
-        // Then update subscription via standard update
-        const subResult = await supabaseAdmin
-          .from('businesses')
-          .update({ subscription: updateData.subscription })
-          .eq('businessId', businessId)
-          .select('businessId, name, isEnabled, subscription, subscriptionlocked')
-          .maybeSingle();
-        
-        if (subResult.error) {
-          console.error('❌ Error updating subscription:', subResult.error);
+        // Then update subscription via RPC function to prevent side effects
+        try {
+          const subRpcResult = await supabaseAdmin.rpc('update_business_subscription', {
+            p_business_id: businessId,
+            p_subscription: updateData.subscription,
+          });
+          
+          if (subRpcResult.error) {
+            console.error('❌ RPC function error for subscription:', subRpcResult.error);
+            throw subRpcResult.error;
+          }
+          
+          console.log('✅ RPC function succeeded for subscription');
+          
+          // Fetch full business data
+          const { data: fullData } = await supabaseAdmin
+            .from('businesses')
+            .select('businessId, name, isEnabled, subscription, subscriptionlocked')
+            .eq('businessId', businessId)
+            .maybeSingle();
+          
+          finalData = fullData;
+        } catch (subRpcError: any) {
+          console.error('❌ RPC function call failed for subscription:', subRpcError);
           return NextResponse.json({ 
-            message: 'Database error', 
-            details: subResult.error.message 
+            message: 'Failed to update subscription', 
+            details: subRpcError.message 
           }, { status: 500 });
         }
-        
-        finalData = subResult.data;
       } else {
         // Only isEnabled update - use RPC function
         try {
