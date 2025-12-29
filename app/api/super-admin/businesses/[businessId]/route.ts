@@ -186,28 +186,78 @@ export async function PUT(
       finalData = updateResult.data[0];
     }
     
-    // Double-check by fetching fresh data (with a small delay to ensure transaction committed)
+    // Double-check by fetching fresh data (with multiple attempts to catch any async changes)
     if (finalData) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      const { data: verifyData } = await supabaseAdmin
-        .from('businesses')
-        .select('businessId, isEnabled, subscription')
-        .eq('businessId', businessId)
-        .maybeSingle();
-      
-      if (verifyData) {
-        console.log('✅ Final verification - isEnabled:', verifyData.isEnabled);
-        console.log('✅ Final verification - subscription:', JSON.stringify(verifyData.subscription, null, 2));
+      // Wait a bit longer and check multiple times
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        const { data: verifyData } = await supabaseAdmin
+          .from('businesses')
+          .select('businessId, isEnabled, subscription')
+          .eq('businessId', businessId)
+          .maybeSingle();
         
-        // If verification shows different value, log warning but return what RPC said
-        if (updateData.isEnabled !== undefined && verifyData.isEnabled !== updateData.isEnabled) {
-          console.error('⚠️ WARNING: Verification shows different isEnabled value!');
-          console.error('⚠️ Expected:', updateData.isEnabled, 'Got:', verifyData.isEnabled);
-          console.error('⚠️ This might indicate a trigger or default value is overriding the update');
+        if (verifyData) {
+          console.log(`✅ Verification attempt ${attempt} - isEnabled:`, verifyData.isEnabled);
+          console.log(`✅ Verification attempt ${attempt} - subscription:`, JSON.stringify(verifyData.subscription, null, 2));
+          
+          // If verification shows different value, log warning
+          if (updateData.isEnabled !== undefined && verifyData.isEnabled !== updateData.isEnabled) {
+            console.error(`⚠️ WARNING (attempt ${attempt}): Verification shows different isEnabled value!`);
+            console.error('⚠️ Expected:', updateData.isEnabled, 'Got:', verifyData.isEnabled);
+            console.error('⚠️ This might indicate a trigger or async process is overriding the update');
+            
+            // If this is the last attempt and still wrong, try to update again
+            if (attempt === 3) {
+              console.error('⚠️ Final attempt failed - trying direct update again...');
+              const { error: retryError } = await supabaseAdmin
+                .from('businesses')
+                .update({ isEnabled: updateData.isEnabled })
+                .eq('businessId', businessId);
+              
+              if (retryError) {
+                console.error('❌ Retry update failed:', retryError);
+              } else {
+                console.log('✅ Retry update succeeded');
+              }
+            }
+          }
+          
+          // Check subscription status
+          if (updateData.subscription) {
+            const requestedStatus = typeof updateData.subscription === 'string' 
+              ? JSON.parse(updateData.subscription).status 
+              : updateData.subscription.status;
+            const actualStatus = verifyData.subscription?.status;
+            
+            if (actualStatus !== requestedStatus) {
+              console.error(`⚠️ WARNING (attempt ${attempt}): Subscription status mismatch!`);
+              console.error('⚠️ Expected:', requestedStatus, 'Got:', actualStatus);
+              
+              // If this is the last attempt and still wrong, try to update again
+              if (attempt === 3) {
+                console.error('⚠️ Final attempt failed - trying direct subscription update again...');
+                const subscriptionObj = typeof updateData.subscription === 'string' 
+                  ? JSON.parse(updateData.subscription) 
+                  : updateData.subscription;
+                
+                const { error: retryError } = await supabaseAdmin
+                  .from('businesses')
+                  .update({ subscription: subscriptionObj })
+                  .eq('businessId', businessId);
+                
+                if (retryError) {
+                  console.error('❌ Retry subscription update failed:', retryError);
+                } else {
+                  console.log('✅ Retry subscription update succeeded');
+                }
+              }
+            }
+          }
+          
+          // Use verified data
+          finalData = verifyData;
         }
-        
-        // Use verified data if available
-        finalData = verifyData;
       }
     }
 
