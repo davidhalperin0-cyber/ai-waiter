@@ -244,7 +244,14 @@ GRANT EXECUTE ON FUNCTION update_business_subscription(TEXT, JSONB) TO service_r
 GRANT EXECUTE ON FUNCTION update_business_subscription(TEXT, JSONB) TO authenticated;
 
 -- ============================================
--- 6. RPC FUNCTION - Update Business isEnabled
+-- 6. FIX: Remove DEFAULT value from isEnabled column
+-- ============================================
+-- The DEFAULT true was causing updates to revert
+-- Remove it so updates persist correctly
+ALTER TABLE businesses ALTER COLUMN "isEnabled" DROP DEFAULT;
+
+-- ============================================
+-- 7. RPC FUNCTION - Update Business isEnabled
 -- ============================================
 -- This function is used by Super Admin to update isEnabled
 -- It bypasses any RLS or trigger issues
@@ -267,8 +274,9 @@ DECLARE
   updated_row RECORD;
 BEGIN
   -- Update directly using table alias to avoid ambiguity
+  -- Use explicit cast to ensure the value is set correctly
   UPDATE public.businesses AS b
-  SET "isEnabled" = p_is_enabled
+  SET "isEnabled" = p_is_enabled::BOOLEAN
   WHERE b."businessId" = p_business_id;
   
   -- Verify the update actually happened
@@ -291,8 +299,7 @@ END;
 $$;
 
 -- Grant execute permission
-GRANT EXECUTE ON FUNCTION update_business_is_enabled(TEXT, BOOLEAN) TO service_role;
-GRANT EXECUTE ON FUNCTION update_business_is_enabled(TEXT, BOOLEAN) TO authenticated;
+
 
 -- ============================================
 -- 7. DISABLE ROW LEVEL SECURITY (if needed)
