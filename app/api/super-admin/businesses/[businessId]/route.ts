@@ -112,10 +112,7 @@ export async function PUT(
       subscription: updatedBusiness.subscription,
     });
     
-    updateResult = { success: true, data: updatedBusiness };
-
-    // Return the updated business data
-    const finalData = updateResult.data;
+    const finalData = updatedBusiness;
 
     console.log('✅ Business updated successfully');
     return NextResponse.json({ 
