@@ -229,29 +229,54 @@ export async function PUT(
       finalData = result.data;
     }
     
-    // Wait a moment and verify the update persisted
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    const { data: verifyData } = await supabaseAdmin
-      .from('businesses')
-      .select('businessId, name, isEnabled, subscription')
-      .eq('businessId', businessId)
-      .maybeSingle();
-    
-    if (verifyData) {
-      console.log('🔍 Verification after update:', {
-        requestedIsEnabled: updateData.isEnabled,
-        actualIsEnabled: verifyData.isEnabled,
-        matches: updateData.isEnabled === undefined || verifyData.isEnabled === updateData.isEnabled,
-      });
+    // Wait a moment and verify the update persisted multiple times
+    for (let i = 0; i < 3; i++) {
+      await new Promise(resolve => setTimeout(resolve, 300));
       
-      // If isEnabled doesn't match, something is changing it back
-      if (updateData.isEnabled !== undefined && verifyData.isEnabled !== updateData.isEnabled) {
-        console.error('❌ CRITICAL: isEnabled was changed back!', {
-          requested: updateData.isEnabled,
-          actual: verifyData.isEnabled,
+      const { data: verifyData } = await supabaseAdmin
+        .from('businesses')
+        .select('businessId, name, isEnabled, subscription')
+        .eq('businessId', businessId)
+        .maybeSingle();
+      
+      if (verifyData) {
+        console.log(`🔍 Verification attempt ${i + 1}/3:`, {
+          requestedIsEnabled: updateData.isEnabled,
+          actualIsEnabled: verifyData.isEnabled,
+          matches: updateData.isEnabled === undefined || verifyData.isEnabled === updateData.isEnabled,
         });
-        // Still return the data we got, but log the issue
+        
+        // If isEnabled doesn't match, something is changing it back - try to fix it
+        if (updateData.isEnabled !== undefined && verifyData.isEnabled !== updateData.isEnabled) {
+          console.error(`❌ CRITICAL: isEnabled was changed back on attempt ${i + 1}!`, {
+            requested: updateData.isEnabled,
+            actual: verifyData.isEnabled,
+          });
+          
+          // Try to update again using RPC function
+          if (i < 2) {
+            console.log(`🔄 Attempting to fix by updating again...`);
+            try {
+              const fixResult = await supabaseAdmin.rpc('update_business_is_enabled', {
+                p_business_id: businessId,
+                p_is_enabled: updateData.isEnabled,
+              });
+              
+              if (fixResult.error) {
+                console.error('❌ Fix attempt failed:', fixResult.error);
+              } else {
+                console.log('✅ Fix attempt succeeded');
+              }
+            } catch (fixError: any) {
+              console.error('❌ Fix attempt error:', fixError);
+            }
+          }
+        } else if (updateData.isEnabled !== undefined && verifyData.isEnabled === updateData.isEnabled) {
+          console.log(`✅ Verification passed on attempt ${i + 1}!`);
+          // Update finalData with verified data
+          finalData = verifyData;
+          break;
+        }
       }
     }
     
