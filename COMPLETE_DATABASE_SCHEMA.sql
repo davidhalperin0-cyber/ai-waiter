@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS businesses (
   )),
   email TEXT UNIQUE NOT NULL,
   "passwordHash" TEXT NOT NULL,
-  "isEnabled" BOOLEAN DEFAULT true,
+  "isEnabled" BOOLEAN,
   subscription JSONB NOT NULL DEFAULT '{"status": "trial", "planType": "full"}'::jsonb,
   "subscriptionlocked" BOOLEAN DEFAULT false,
   "printerConfig" JSONB DEFAULT '{"enabled": false, "type": "http", "endpoint": "", "payloadType": "json"}'::jsonb,
