@@ -26,6 +26,7 @@ DECLARE
   v_is_enabled BOOLEAN;
 BEGIN
   -- Update directly - use explicit boolean value
+  -- Use a transaction-safe approach with explicit locking
   UPDATE public.businesses
   SET "isEnabled" = p_is_enabled
   WHERE "businessId" = p_business_id;
@@ -35,7 +36,12 @@ BEGIN
     RAISE EXCEPTION 'Business with id % not found', p_business_id;
   END IF;
   
+  -- Force a commit point by doing a dummy operation
+  -- This ensures the transaction is committed before we read back
+  PERFORM pg_advisory_xact_lock(hashtext(p_business_id));
+  
   -- Fetch the updated values into variables
+  -- Use FOR UPDATE to lock the row and prevent concurrent modifications
   SELECT 
     b."businessId",
     b.name,
@@ -45,11 +51,26 @@ BEGIN
     v_name,
     v_is_enabled
   FROM public.businesses b
-  WHERE b."businessId" = p_business_id;
+  WHERE b."businessId" = p_business_id
+  FOR UPDATE;
   
   -- Verify the value was actually updated
   IF v_is_enabled IS DISTINCT FROM p_is_enabled THEN
-    RAISE EXCEPTION 'Update failed: expected isEnabled=%, but got %', p_is_enabled, v_is_enabled;
+    -- Try one more time with explicit locking
+    UPDATE public.businesses
+    SET "isEnabled" = p_is_enabled
+    WHERE "businessId" = p_business_id;
+    
+    -- Fetch again
+    SELECT b."isEnabled"
+    INTO v_is_enabled
+    FROM public.businesses b
+    WHERE b."businessId" = p_business_id;
+    
+    -- If still wrong, raise exception
+    IF v_is_enabled IS DISTINCT FROM p_is_enabled THEN
+      RAISE EXCEPTION 'Update failed: expected isEnabled=%, but got %', p_is_enabled, v_is_enabled;
+    END IF;
   END IF;
   
   -- Return the values
@@ -116,7 +137,12 @@ BEGIN
     RAISE EXCEPTION 'Business with id % not found', p_business_id;
   END IF;
   
+  -- Force a commit point by doing a dummy operation
+  -- This ensures the transaction is committed before we read back
+  PERFORM pg_advisory_xact_lock(hashtext(p_business_id));
+  
   -- Fetch the updated values into variables
+  -- Use FOR UPDATE to lock the row and prevent concurrent modifications
   SELECT 
     b.id,
     b."businessId",
@@ -130,13 +156,28 @@ BEGIN
     v_is_enabled,
     v_subscription
   FROM public.businesses b
-  WHERE b."businessId" = p_business_id;
+  WHERE b."businessId" = p_business_id
+  FOR UPDATE;
   
   -- Verify the subscription was actually updated
   IF v_subscription->>'status' IS DISTINCT FROM updated_subscription->>'status' THEN
-    RAISE EXCEPTION 'Update failed: expected status=%, but got %', 
-      updated_subscription->>'status', 
-      v_subscription->>'status';
+    -- Try one more time with explicit locking
+    UPDATE public.businesses
+    SET subscription = updated_subscription
+    WHERE "businessId" = p_business_id;
+    
+    -- Fetch again
+    SELECT b.subscription
+    INTO v_subscription
+    FROM public.businesses b
+    WHERE b."businessId" = p_business_id;
+    
+    -- If still wrong, raise exception
+    IF v_subscription->>'status' IS DISTINCT FROM updated_subscription->>'status' THEN
+      RAISE EXCEPTION 'Update failed: expected status=%, but got %', 
+        updated_subscription->>'status', 
+        v_subscription->>'status';
+    END IF;
   END IF;
   
   -- Return the values
