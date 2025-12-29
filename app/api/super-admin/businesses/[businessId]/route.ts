@@ -94,14 +94,36 @@ export async function PUT(
     // Try RPC function for isEnabled updates
     if (updateData.isEnabled !== undefined && !updateData.subscription) {
       try {
+        console.log('🔄 Calling RPC function update_business_is_enabled with:', {
+          p_business_id: businessId,
+          p_is_enabled: updateData.isEnabled,
+        });
         const rpcResult = await supabaseAdmin.rpc('update_business_is_enabled', {
           p_business_id: businessId,
           p_is_enabled: updateData.isEnabled,
         });
         
+        console.log('🔄 RPC result:', {
+          hasError: !!rpcResult.error,
+          error: rpcResult.error,
+          hasData: !!rpcResult.data,
+          dataLength: rpcResult.data?.length,
+          data: rpcResult.data,
+        });
+        
         if (!rpcResult.error && rpcResult.data && rpcResult.data.length > 0) {
+          const rpcData = rpcResult.data[0];
           console.log('✅ RPC function succeeded for isEnabled');
-          updateResult = { success: true };
+          console.log('✅ RPC returned isEnabled:', rpcData.isEnabled);
+          console.log('✅ Expected isEnabled:', updateData.isEnabled);
+          console.log('✅ Match?', rpcData.isEnabled === updateData.isEnabled);
+          
+          if (rpcData.isEnabled === updateData.isEnabled) {
+            updateResult = { success: true, data: rpcResult.data };
+          } else {
+            console.error('❌ RPC function returned wrong value! Using standard update');
+            error = { message: 'RPC returned wrong value' };
+          }
         } else {
           console.log('⚠️ RPC function failed, using standard update');
           error = rpcResult.error;
