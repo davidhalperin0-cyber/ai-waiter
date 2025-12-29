@@ -199,6 +199,11 @@ SET search_path = public
 AS $$
 DECLARE
   updated_subscription JSONB;
+  v_id BIGINT;
+  v_business_id TEXT;
+  v_name TEXT;
+  v_is_enabled BOOLEAN;
+  v_subscription JSONB;
 BEGIN
   -- If status is 'active' and nextBillingDate is in the past, remove it
   -- This prevents auto-expire from immediately changing it back to 'expired'
@@ -217,25 +222,46 @@ BEGIN
   END IF;
   
   -- Update the subscription directly
-  UPDATE public.businesses b
-  SET subscription = updated_subscription::jsonb
-  WHERE b."businessId" = p_business_id;
+  UPDATE public.businesses
+  SET subscription = updated_subscription
+  WHERE "businessId" = p_business_id;
   
   -- Verify the update actually happened
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Business with id % not found', p_business_id;
   END IF;
   
-  -- Return the updated row
-  RETURN QUERY
+  -- Fetch the updated values into variables
   SELECT 
     b.id,
     b."businessId",
     b.name,
     b."isEnabled",
     b.subscription
+  INTO 
+    v_id,
+    v_business_id,
+    v_name,
+    v_is_enabled,
+    v_subscription
   FROM public.businesses b
   WHERE b."businessId" = p_business_id;
+  
+  -- Verify the subscription was actually updated
+  IF v_subscription->>'status' IS DISTINCT FROM updated_subscription->>'status' THEN
+    RAISE EXCEPTION 'Update failed: expected status=%, but got %', 
+      updated_subscription->>'status', 
+      v_subscription->>'status';
+  END IF;
+  
+  -- Return the values
+  RETURN QUERY
+  SELECT 
+    v_id,
+    v_business_id,
+    v_name,
+    v_is_enabled,
+    v_subscription;
 END;
 $$;
 
@@ -271,30 +297,43 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  updated_row RECORD;
+  v_business_id TEXT;
+  v_name TEXT;
+  v_is_enabled BOOLEAN;
 BEGIN
-  -- Update directly using table alias to avoid ambiguity
-  -- Use explicit cast to ensure the value is set correctly
-  UPDATE public.businesses AS b
-  SET "isEnabled" = p_is_enabled::BOOLEAN
-  WHERE b."businessId" = p_business_id;
+  -- Update directly - use explicit boolean value
+  UPDATE public.businesses
+  SET "isEnabled" = p_is_enabled
+  WHERE "businessId" = p_business_id;
   
   -- Verify the update actually happened
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Business with id % not found', p_business_id;
   END IF;
   
-  -- Force commit by doing a dummy SELECT (ensures transaction is committed)
-  PERFORM 1 FROM public.businesses b WHERE b."businessId" = p_business_id;
-  
-  -- Return the updated row - fetch AFTER the update to ensure we get the new value
-  RETURN QUERY
+  -- Fetch the updated values into variables
   SELECT 
     b."businessId",
     b.name,
     b."isEnabled"
+  INTO 
+    v_business_id,
+    v_name,
+    v_is_enabled
   FROM public.businesses b
   WHERE b."businessId" = p_business_id;
+  
+  -- Verify the value was actually updated
+  IF v_is_enabled IS DISTINCT FROM p_is_enabled THEN
+    RAISE EXCEPTION 'Update failed: expected isEnabled=%, but got %', p_is_enabled, v_is_enabled;
+  END IF;
+  
+  -- Return the values
+  RETURN QUERY
+  SELECT 
+    v_business_id,
+    v_name,
+    v_is_enabled;
 END;
 $$;
 
