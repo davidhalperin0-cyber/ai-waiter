@@ -113,21 +113,40 @@ export async function PUT(
       }
       
       if (result.data && result.data.length > 0) {
-        // Verify immediately
-        await new Promise(resolve => setTimeout(resolve, 50));
+        // Check the returned data first (before verification)
+        const returnedData = result.data[0];
+        console.log(`📊 Returned data from update:`, {
+          isEnabled: returnedData.isEnabled,
+          subscription: returnedData.subscription,
+        });
+        
+        // If returned data is wrong, something is very wrong
+        if (updateData.isEnabled !== undefined && returnedData.isEnabled !== updateData.isEnabled) {
+          console.error(`❌ CRITICAL: Update returned wrong value! Expected ${updateData.isEnabled}, got ${returnedData.isEnabled}`);
+        }
+        
+        // Verify immediately with NO delay to catch immediate changes
         const verifyResult = await supabaseAdmin
           .from('businesses')
-          .select('businessId, isEnabled, subscription')
+          .select('businessId, isEnabled, subscription, subscriptionlocked')
           .eq('businessId', businessId)
           .maybeSingle();
         
         if (verifyResult.data) {
+          console.log(`📊 Verification data:`, {
+            isEnabled: verifyResult.data.isEnabled,
+            subscription: verifyResult.data.subscription,
+            subscriptionlocked: verifyResult.data.subscriptionlocked,
+          });
+          
           let isCorrect = true;
           
           // Check isEnabled
           if (updateData.isEnabled !== undefined) {
             if (verifyResult.data.isEnabled !== updateData.isEnabled) {
               console.error(`❌ Verification failed: isEnabled expected ${updateData.isEnabled}, got ${verifyResult.data.isEnabled}`);
+              console.error(`❌ Subscription status: ${verifyResult.data.subscription?.status}`);
+              console.error(`❌ Subscription locked: ${verifyResult.data.subscriptionlocked}`);
               isCorrect = false;
             }
           }
@@ -150,7 +169,8 @@ export async function PUT(
             break;
           } else if (retry < maxRetries - 1) {
             console.log(`⚠️ Verification failed, retrying... (${retry + 1}/${maxRetries})`);
-            await new Promise(resolve => setTimeout(resolve, 200 * (retry + 1)));
+            // Longer delay between retries
+            await new Promise(resolve => setTimeout(resolve, 500 * (retry + 1)));
             continue;
           }
         }
