@@ -87,179 +87,92 @@ export async function PUT(
       return NextResponse.json({ message: 'No fields to update' }, { status: 400 });
     }
 
-    // Try RPC function first for better reliability
+    // DIRECT UPDATE WITH RETRY - Skip RPC, use direct SQL with aggressive retry
     let updateResult: any = null;
     let error: any = null;
-
-    // Try RPC function for isEnabled updates
-    if (updateData.isEnabled !== undefined && !updateData.subscription) {
-      try {
-        console.log('🔄 Calling RPC function update_business_is_enabled with:', {
-          p_business_id: businessId,
-          p_is_enabled: updateData.isEnabled,
-        });
-        const rpcResult = await supabaseAdmin.rpc('update_business_is_enabled', {
-          p_business_id: businessId,
-          p_is_enabled: updateData.isEnabled,
-        });
-        
-        console.log('🔄 RPC result:', {
-          hasError: !!rpcResult.error,
-          error: rpcResult.error,
-          hasData: !!rpcResult.data,
-          dataLength: rpcResult.data?.length,
-          data: rpcResult.data,
-        });
-        
-        if (!rpcResult.error && rpcResult.data && rpcResult.data.length > 0) {
-          const rpcData = rpcResult.data[0];
-          console.log('✅ RPC function succeeded for isEnabled');
-          console.log('✅ RPC returned isEnabled:', rpcData.isEnabled);
-          console.log('✅ Expected isEnabled:', updateData.isEnabled);
-          console.log('✅ Match?', rpcData.isEnabled === updateData.isEnabled);
-          
-          if (rpcData.isEnabled === updateData.isEnabled) {
-            updateResult = { success: true, data: rpcResult.data };
-          } else {
-            console.error('❌ RPC function returned wrong value! Using standard update');
-            error = { message: 'RPC returned wrong value' };
-          }
-        } else {
-          console.log('⚠️ RPC function failed, using standard update');
-          error = rpcResult.error;
-        }
-      } catch (rpcError: any) {
-        console.log('⚠️ RPC function call failed:', rpcError.message);
-        error = rpcError;
-      }
-    }
-
-    // Try RPC function for subscription updates
-    if (updateData.subscription && !updateResult) {
-      try {
-        const rpcResult = await supabaseAdmin.rpc('update_business_subscription', {
-          p_business_id: businessId,
-          p_subscription: updateData.subscription,
-        });
-        
-        if (!rpcResult.error && rpcResult.data && rpcResult.data.length > 0) {
-          console.log('✅ RPC function succeeded for subscription');
-          updateResult = { success: true, data: rpcResult.data };
-        } else {
-          console.log('⚠️ RPC function failed, using standard update');
-          error = rpcResult.error;
-        }
-      } catch (rpcError: any) {
-        console.log('⚠️ RPC function call failed:', rpcError.message);
-        error = rpcError;
-      }
-    }
-
-    // If RPC didn't work, use standard update
-    if (!updateResult) {
-      console.log('🔄 Using standard update...');
-      const standardResult = await supabaseAdmin
+    const maxRetries = 5;
+    
+    for (let retry = 0; retry < maxRetries; retry++) {
+      console.log(`🔄 Direct update attempt ${retry + 1}/${maxRetries}...`);
+      
+      // Direct update
+      const result = await supabaseAdmin
         .from('businesses')
         .update(updateData)
         .eq('businessId', businessId)
         .select();
       
-      error = standardResult.error;
-      if (!error && standardResult.data) {
-        updateResult = { success: true, data: standardResult.data };
+      if (result.error) {
+        console.error(`❌ Update attempt ${retry + 1} failed:`, result.error);
+        error = result.error;
+        if (retry < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100 * (retry + 1)));
+          continue;
+        }
+        break;
       }
-    }
-
-    if (error) {
-      console.error('❌ Error updating business:', error);
-      return NextResponse.json({ 
-        message: 'Database error', 
-        details: error.message 
-      }, { status: 500 });
-    }
-
-    // Use the data from RPC function if available (it's already verified)
-    let finalData = updateResult?.data?.[0];
-    
-    // If we used standard update, verify it persisted
-    if (!finalData && updateResult?.data) {
-      finalData = updateResult.data[0];
-    }
-    
-    // Double-check by fetching fresh data (with multiple attempts to catch any async changes)
-    if (finalData) {
-      // Wait a bit longer and check multiple times
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        const { data: verifyData } = await supabaseAdmin
+      
+      if (result.data && result.data.length > 0) {
+        // Verify immediately
+        await new Promise(resolve => setTimeout(resolve, 50));
+        const verifyResult = await supabaseAdmin
           .from('businesses')
           .select('businessId, isEnabled, subscription')
           .eq('businessId', businessId)
           .maybeSingle();
         
-        if (verifyData) {
-          console.log(`✅ Verification attempt ${attempt} - isEnabled:`, verifyData.isEnabled);
-          console.log(`✅ Verification attempt ${attempt} - subscription:`, JSON.stringify(verifyData.subscription, null, 2));
+        if (verifyResult.data) {
+          let isCorrect = true;
           
-          // If verification shows different value, log warning
-          if (updateData.isEnabled !== undefined && verifyData.isEnabled !== updateData.isEnabled) {
-            console.error(`⚠️ WARNING (attempt ${attempt}): Verification shows different isEnabled value!`);
-            console.error('⚠️ Expected:', updateData.isEnabled, 'Got:', verifyData.isEnabled);
-            console.error('⚠️ This might indicate a trigger or async process is overriding the update');
-            
-            // If this is the last attempt and still wrong, try to update again
-            if (attempt === 3) {
-              console.error('⚠️ Final attempt failed - trying direct update again...');
-              const { error: retryError } = await supabaseAdmin
-                .from('businesses')
-                .update({ isEnabled: updateData.isEnabled })
-                .eq('businessId', businessId);
-              
-              if (retryError) {
-                console.error('❌ Retry update failed:', retryError);
-              } else {
-                console.log('✅ Retry update succeeded');
-              }
+          // Check isEnabled
+          if (updateData.isEnabled !== undefined) {
+            if (verifyResult.data.isEnabled !== updateData.isEnabled) {
+              console.error(`❌ Verification failed: isEnabled expected ${updateData.isEnabled}, got ${verifyResult.data.isEnabled}`);
+              isCorrect = false;
             }
           }
           
-          // Check subscription status
+          // Check subscription
           if (updateData.subscription) {
             const requestedStatus = typeof updateData.subscription === 'string' 
               ? JSON.parse(updateData.subscription).status 
               : updateData.subscription.status;
-            const actualStatus = verifyData.subscription?.status;
-            
+            const actualStatus = verifyResult.data.subscription?.status;
             if (actualStatus !== requestedStatus) {
-              console.error(`⚠️ WARNING (attempt ${attempt}): Subscription status mismatch!`);
-              console.error('⚠️ Expected:', requestedStatus, 'Got:', actualStatus);
-              
-              // If this is the last attempt and still wrong, try to update again
-              if (attempt === 3) {
-                console.error('⚠️ Final attempt failed - trying direct subscription update again...');
-                const subscriptionObj = typeof updateData.subscription === 'string' 
-                  ? JSON.parse(updateData.subscription) 
-                  : updateData.subscription;
-                
-                const { error: retryError } = await supabaseAdmin
-                  .from('businesses')
-                  .update({ subscription: subscriptionObj })
-                  .eq('businessId', businessId);
-                
-                if (retryError) {
-                  console.error('❌ Retry subscription update failed:', retryError);
-                } else {
-                  console.log('✅ Retry subscription update succeeded');
-                }
-              }
+              console.error(`❌ Verification failed: subscription status expected ${requestedStatus}, got ${actualStatus}`);
+              isCorrect = false;
             }
           }
           
-          // Use verified data
-          finalData = verifyData;
+          if (isCorrect) {
+            console.log(`✅ Update verified successfully on attempt ${retry + 1}`);
+            updateResult = { success: true, data: verifyResult.data };
+            break;
+          } else if (retry < maxRetries - 1) {
+            console.log(`⚠️ Verification failed, retrying... (${retry + 1}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, 200 * (retry + 1)));
+            continue;
+          }
         }
       }
     }
+
+    if (error && !updateResult) {
+      console.error('❌ Error updating business after all retries:', error);
+      return NextResponse.json({ 
+        message: 'Database error', 
+        details: error.message 
+      }, { status: 500 });
+    }
+    
+    if (!updateResult) {
+      return NextResponse.json({ 
+        message: 'Update failed after multiple attempts' 
+      }, { status: 500 });
+    }
+
+    // Use the verified data
+    const finalData = updateResult.data;
 
     console.log('✅ Business updated successfully');
     return NextResponse.json({ 
