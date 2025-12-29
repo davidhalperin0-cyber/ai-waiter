@@ -352,6 +352,7 @@ export default function SuperAdminPage() {
                     <div>{business.ordersCount}</div>
                     <div>
                       <span
+                        key={`status-${business.businessId}-${business.isEnabled}`}
                         className={`text-[10px] px-2 py-1 rounded ${
                           business.isEnabled
                             ? 'bg-green-900/40 text-green-400'
