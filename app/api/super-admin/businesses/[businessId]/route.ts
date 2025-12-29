@@ -173,33 +173,26 @@ export async function PUT(
             matches: rpcResult.data[0]?.isEnabled === updateData.isEnabled,
           });
           
-          // Fetch full business data
-          const { data: fullData, error: fetchError } = await supabaseAdmin
+          // Use RPC result directly - don't fetch from DB as it might be stale
+          console.log('✅ Using RPC result directly');
+          finalData = {
+            businessId: rpcResult.data[0].businessId,
+            name: rpcResult.data[0].name,
+            isEnabled: rpcResult.data[0].isEnabled,
+            subscription: null, // Will be fetched separately if needed
+            subscriptionlocked: null,
+          };
+          
+          // Fetch subscription separately if needed
+          const { data: subData } = await supabaseAdmin
             .from('businesses')
-            .select('businessId, name, isEnabled, subscription, subscriptionlocked')
+            .select('subscription, subscriptionlocked')
             .eq('businessId', businessId)
             .maybeSingle();
           
-          if (fetchError) {
-            console.error('❌ Error fetching after RPC:', fetchError);
-            throw fetchError;
-          }
-          
-          console.log('🔍 Fetched data after RPC:', {
-            isEnabled: fullData?.isEnabled,
-            requestedIsEnabled: updateData.isEnabled,
-            matches: fullData?.isEnabled === updateData.isEnabled,
-          });
-          
-          // If fetched data doesn't match, use the RPC result instead
-          if (fullData?.isEnabled !== updateData.isEnabled && rpcResult.data?.[0]?.isEnabled === updateData.isEnabled) {
-            console.log('⚠️ Fetched data mismatch, using RPC result instead');
-            finalData = {
-              ...fullData,
-              isEnabled: rpcResult.data[0].isEnabled,
-            };
-          } else {
-            finalData = fullData;
+          if (subData) {
+            finalData.subscription = subData.subscription;
+            finalData.subscriptionlocked = subData.subscriptionlocked;
           }
         } catch (rpcError: any) {
           console.error('❌ RPC function call failed:', rpcError);
