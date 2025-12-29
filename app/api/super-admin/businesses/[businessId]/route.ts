@@ -114,21 +114,7 @@ export async function PUT(
     
     updateResult = { success: true, data: updatedBusiness };
 
-    if (error && !updateResult) {
-      console.error('❌ Error updating business after all retries:', error);
-      return NextResponse.json({ 
-        message: 'Database error', 
-        details: error.message 
-      }, { status: 500 });
-    }
-    
-    if (!updateResult) {
-      return NextResponse.json({ 
-        message: 'Update failed after multiple attempts' 
-      }, { status: 500 });
-    }
-
-    // Use the verified data
+    // Return the updated business data
     const finalData = updateResult.data;
 
     console.log('✅ Business updated successfully');
