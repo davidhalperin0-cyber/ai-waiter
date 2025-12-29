@@ -35,6 +35,14 @@ export async function GET(req: NextRequest) {
       .select('businessId, name, type, email, isEnabled, subscription, createdAt')
       .order('createdAt', { ascending: false });
 
+    // Ensure subscription is always an object, not a string
+    const businessesWithParsedSubscription = (businesses || []).map((business: any) => ({
+      ...business,
+      subscription: typeof business.subscription === 'string' 
+        ? JSON.parse(business.subscription) 
+        : business.subscription || { status: 'trial', planType: 'full' },
+    }));
+
     if (error) {
       console.error('Error fetching businesses', error);
       return NextResponse.json(
@@ -45,7 +53,7 @@ export async function GET(req: NextRequest) {
 
     // Get stats for each business (orders count, tables count)
     const businessesWithStats = await Promise.all(
-      (businesses || []).map(async (business) => {
+      businessesWithParsedSubscription.map(async (business) => {
         try {
           const [ordersRes, tablesRes] = await Promise.all([
             supabaseAdmin

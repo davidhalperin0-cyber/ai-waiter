@@ -61,18 +61,30 @@ export default function SuperAdminPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch('/api/super-admin/businesses', { cache: 'no-store' });
+      const res = await fetch('/api/super-admin/businesses', { 
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+        },
+      });
       const data = await res.json();
       if (res.ok) {
-        // Parse subscription if it's a string
+        // API already parses subscription, but ensure it's an object
         const parsedBusinesses = (data.businesses || []).map((business: any) => ({
           ...business,
           subscription: typeof business.subscription === 'string' 
             ? JSON.parse(business.subscription) 
-            : business.subscription || { status: 'trial', planType: 'full' },
+            : (business.subscription || { status: 'trial', planType: 'full' }),
         }));
         console.log('🔄 Loaded businesses:', parsedBusinesses.length);
-        setBusinesses(parsedBusinesses);
+        console.log('🔄 Sample business:', parsedBusinesses[0] ? {
+          businessId: parsedBusinesses[0].businessId,
+          isEnabled: parsedBusinesses[0].isEnabled,
+          subscription: parsedBusinesses[0].subscription,
+        } : 'none');
+        // Force React to see this as a new array
+        setBusinesses([...parsedBusinesses]);
       } else {
         setError(data.message || 'נכשל בטעינת עסקים');
       }
