@@ -87,7 +87,7 @@ export default function SuperAdminPage() {
           });
         }
         // Force React to see this as a new array with new objects
-        setBusinesses(parsedBusinesses.map(b => ({ ...b })));
+        setBusinesses(parsedBusinesses.map((b: Business) => ({ ...b })));
       } else {
         setError(data.message || 'נכשל בטעינת עסקים');
       }
