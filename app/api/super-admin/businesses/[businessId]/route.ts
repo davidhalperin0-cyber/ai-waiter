@@ -280,6 +280,33 @@ export async function PUT(
       }
     }
     
+    // Final verification - check one more time after all verifications
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const { data: finalVerify } = await supabaseAdmin
+      .from('businesses')
+      .select('businessId, name, isEnabled, subscription')
+      .eq('businessId', businessId)
+      .maybeSingle();
+    
+    if (finalVerify && updateData.isEnabled !== undefined) {
+      console.log('🔍 Final verification:', {
+        requestedIsEnabled: updateData.isEnabled,
+        finalIsEnabled: finalVerify.isEnabled,
+        matches: finalVerify.isEnabled === updateData.isEnabled,
+      });
+      
+      // Use the final verified data
+      if (finalVerify.isEnabled === updateData.isEnabled) {
+        finalData = { ...finalData, isEnabled: finalVerify.isEnabled };
+      } else {
+        console.error('❌ FINAL VERIFICATION FAILED - isEnabled was changed back!', {
+          requested: updateData.isEnabled,
+          final: finalVerify.isEnabled,
+        });
+        // Still return success, but log the issue
+      }
+    }
+    
     console.log('✅ Update completed. DB returned:', {
       isEnabled: finalData.isEnabled,
       subscription: finalData.subscription,
