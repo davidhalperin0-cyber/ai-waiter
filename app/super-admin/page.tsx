@@ -101,6 +101,13 @@ export default function SuperAdminPage() {
       const newStatus = !currentStatus;
       console.log('🔄 Toggling business status:', { businessId, currentStatus, newStatus });
 
+      // Optimistic update - update UI immediately
+      setBusinesses(prev => prev.map(b => 
+        b.businessId === businessId 
+          ? { ...b, isEnabled: newStatus }
+          : b
+      ));
+
       const res = await fetch(`/api/super-admin/businesses/${businessId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -110,16 +117,28 @@ export default function SuperAdminPage() {
       console.log('📥 Update response:', data);
       
       if (res.ok) {
-        // Wait a bit for DB to commit
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Wait a bit for DB to commit, then reload to get fresh data
+        await new Promise(resolve => setTimeout(resolve, 500));
         await loadBusinesses();
         await loadStats();
         console.log('✅ Reloaded businesses after update');
       } else {
+        // Revert optimistic update on error
+        setBusinesses(prev => prev.map(b => 
+          b.businessId === businessId 
+            ? { ...b, isEnabled: currentStatus }
+            : b
+        ));
         alert(data.message || 'נכשל בעדכון סטטוס העסק');
       }
     } catch (err: any) {
       console.error('❌ Update error:', err);
+      // Revert optimistic update on error
+      setBusinesses(prev => prev.map(b => 
+        b.businessId === businessId 
+          ? { ...b, isEnabled: currentStatus }
+          : b
+      ));
       alert(err.message || 'נכשל בעדכון סטטוס העסק');
     } finally {
       setLoading(false);
