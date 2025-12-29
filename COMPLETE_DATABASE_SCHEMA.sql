@@ -221,10 +221,10 @@ BEGIN
     updated_subscription := updated_subscription - 'nextBillingDate';
   END IF;
   
-  -- Update the subscription directly
-  UPDATE public.businesses
+  -- Update the subscription directly - use table alias to avoid ambiguity
+  UPDATE public.businesses b
   SET subscription = updated_subscription
-  WHERE "businessId" = p_business_id;
+  WHERE b."businessId" = p_business_id;
   
   -- Verify the update actually happened
   IF NOT FOUND THEN
