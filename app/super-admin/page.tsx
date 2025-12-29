@@ -78,7 +78,7 @@ export default function SuperAdminPage() {
             : (business.subscription || { status: 'trial', planType: 'full' }),
         }));
         console.log('🔄 Loaded businesses:', parsedBusinesses.length);
-        const targetBusiness = parsedBusinesses.find(b => b.businessId === 'b72bca1a-7fd3-470d-998e-971785f30ab4');
+        const targetBusiness = parsedBusinesses.find((b: Business) => b.businessId === 'b72bca1a-7fd3-470d-998e-971785f30ab4');
         if (targetBusiness) {
           console.log('🔄 Target business after load:', {
             businessId: targetBusiness.businessId,
