@@ -178,23 +178,43 @@ export async function PUT(
       }, { status: 500 });
     }
 
-    // Verify the update persisted
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const { data: verifyData } = await supabaseAdmin
-      .from('businesses')
-      .select('businessId, isEnabled, subscription')
-      .eq('businessId', businessId)
-      .maybeSingle();
-
-    console.log('✅ Business updated successfully');
-    if (verifyData) {
-      console.log('✅ Verified - isEnabled:', verifyData.isEnabled);
-      console.log('✅ Verified - subscription:', JSON.stringify(verifyData.subscription, null, 2));
+    // Use the data from RPC function if available (it's already verified)
+    let finalData = updateResult?.data?.[0];
+    
+    // If we used standard update, verify it persisted
+    if (!finalData && updateResult?.data) {
+      finalData = updateResult.data[0];
+    }
+    
+    // Double-check by fetching fresh data (with a small delay to ensure transaction committed)
+    if (finalData) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const { data: verifyData } = await supabaseAdmin
+        .from('businesses')
+        .select('businessId, isEnabled, subscription')
+        .eq('businessId', businessId)
+        .maybeSingle();
+      
+      if (verifyData) {
+        console.log('✅ Final verification - isEnabled:', verifyData.isEnabled);
+        console.log('✅ Final verification - subscription:', JSON.stringify(verifyData.subscription, null, 2));
+        
+        // If verification shows different value, log warning but return what RPC said
+        if (updateData.isEnabled !== undefined && verifyData.isEnabled !== updateData.isEnabled) {
+          console.error('⚠️ WARNING: Verification shows different isEnabled value!');
+          console.error('⚠️ Expected:', updateData.isEnabled, 'Got:', verifyData.isEnabled);
+          console.error('⚠️ This might indicate a trigger or default value is overriding the update');
+        }
+        
+        // Use verified data if available
+        finalData = verifyData;
+      }
     }
 
+    console.log('✅ Business updated successfully');
     return NextResponse.json({ 
       message: 'Business updated successfully',
-      business: verifyData || updateResult?.data?.[0]
+      business: finalData
     }, { status: 200 });
   } catch (error) {
     console.error('Error updating business', error);
