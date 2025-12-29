@@ -188,6 +188,7 @@ export async function PUT(
     }
     
     // Fetch fresh data to ensure we have the latest
+    await new Promise(resolve => setTimeout(resolve, 100));
     const { data: freshData } = await supabaseAdmin
       .from('businesses')
       .select('businessId, name, isEnabled, subscription, subscriptionlocked')
@@ -200,6 +201,29 @@ export async function PUT(
       isEnabled: finalData.isEnabled,
       subscription: finalData.subscription,
     });
+    
+    // Verify the update actually persisted
+    if (updateData.isEnabled !== undefined && finalData.isEnabled !== updateData.isEnabled) {
+      console.error('❌ CRITICAL: Update did not persist!', {
+        expected: updateData.isEnabled,
+        actual: finalData.isEnabled,
+      });
+      // Try one more direct update
+      const retryResult = await supabaseAdmin
+        .from('businesses')
+        .update({ isEnabled: updateData.isEnabled })
+        .eq('businessId', businessId)
+        .select('businessId, name, isEnabled, subscription')
+        .maybeSingle();
+      
+      if (retryResult.data) {
+        console.log('✅ Retry update succeeded');
+        return NextResponse.json({ 
+          message: 'Business updated successfully (retry)',
+          business: retryResult.data
+        }, { status: 200 });
+      }
+    }
 
     console.log('✅ Business updated successfully');
     return NextResponse.json({ 
