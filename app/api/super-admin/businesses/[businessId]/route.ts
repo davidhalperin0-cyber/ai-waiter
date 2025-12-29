@@ -87,32 +87,119 @@ export async function PUT(
       return NextResponse.json({ message: 'No fields to update' }, { status: 400 });
     }
 
-    // SIMPLE DIRECT UPDATE - Return what the DB says, don't verify
-    const result = await supabaseAdmin
+    // USE RPC FUNCTIONS FOR RELIABLE UPDATES
+    let updatedBusiness: any = null;
+    
+    // Update isEnabled using RPC function if needed
+    if (updateData.isEnabled !== undefined) {
+      console.log('🔄 Using RPC function for isEnabled update...');
+      const rpcResult = await supabaseAdmin.rpc('update_business_is_enabled', {
+        p_business_id: businessId,
+        p_is_enabled: updateData.isEnabled,
+      });
+      
+      if (rpcResult.error) {
+        console.error('❌ RPC function error:', rpcResult.error);
+        // Fallback to standard update
+        const result = await supabaseAdmin
+          .from('businesses')
+          .update({ isEnabled: updateData.isEnabled })
+          .eq('businessId', businessId)
+          .select('businessId, name, isEnabled, subscription, subscriptionlocked')
+          .maybeSingle();
+        
+        if (result.error) {
+          return NextResponse.json({ 
+            message: 'Database error', 
+            details: result.error.message 
+          }, { status: 500 });
+        }
+        
+        if (!result.data) {
+          return NextResponse.json({ message: 'Business not found' }, { status: 404 });
+        }
+        
+        updatedBusiness = result.data;
+      } else if (rpcResult.data && rpcResult.data.length > 0) {
+        updatedBusiness = rpcResult.data[0];
+        console.log('✅ RPC function succeeded for isEnabled');
+      }
+    }
+    
+    // Update subscription using RPC function if needed
+    if (updateData.subscription) {
+      console.log('🔄 Using RPC function for subscription update...');
+      const rpcResult = await supabaseAdmin.rpc('update_business_subscription', {
+        p_business_id: businessId,
+        p_subscription: updateData.subscription,
+      });
+      
+      if (rpcResult.error) {
+        console.error('❌ RPC function error:', rpcResult.error);
+        // Fallback to standard update
+        const result = await supabaseAdmin
+          .from('businesses')
+          .update({ subscription: updateData.subscription })
+          .eq('businessId', businessId)
+          .select('businessId, name, isEnabled, subscription, subscriptionlocked')
+          .maybeSingle();
+        
+        if (result.error) {
+          return NextResponse.json({ 
+            message: 'Database error', 
+            details: result.error.message 
+          }, { status: 500 });
+        }
+        
+        if (!result.data) {
+          return NextResponse.json({ message: 'Business not found' }, { status: 404 });
+        }
+        
+        updatedBusiness = result.data;
+      } else if (rpcResult.data && rpcResult.data.length > 0) {
+        updatedBusiness = rpcResult.data[0];
+        console.log('✅ RPC function succeeded for subscription');
+      }
+    }
+    
+    // If we didn't use RPC, use standard update
+    if (!updatedBusiness) {
+      console.log('🔄 Using standard update...');
+      const result = await supabaseAdmin
+        .from('businesses')
+        .update(updateData)
+        .eq('businessId', businessId)
+        .select('businessId, name, isEnabled, subscription, subscriptionlocked')
+        .maybeSingle();
+      
+      if (result.error) {
+        console.error('❌ Error updating business:', result.error);
+        return NextResponse.json({ 
+          message: 'Database error', 
+          details: result.error.message 
+        }, { status: 500 });
+      }
+      
+      if (!result.data) {
+        return NextResponse.json({ message: 'Business not found' }, { status: 404 });
+      }
+      
+      updatedBusiness = result.data;
+    }
+    
+    // Fetch fresh data to ensure we have the latest
+    const { data: freshData } = await supabaseAdmin
       .from('businesses')
-      .update(updateData)
+      .select('businessId, name, isEnabled, subscription, subscriptionlocked')
       .eq('businessId', businessId)
-      .select('businessId, name, isEnabled, subscription, subscriptionlocked');
+      .maybeSingle();
     
-    if (result.error) {
-      console.error('❌ Error updating business:', result.error);
-      return NextResponse.json({ 
-        message: 'Database error', 
-        details: result.error.message 
-      }, { status: 500 });
-    }
+    const finalData = freshData || updatedBusiness;
     
-    if (!result.data || result.data.length === 0) {
-      return NextResponse.json({ message: 'Business not found' }, { status: 404 });
-    }
-    
-    const updatedBusiness = result.data[0];
-    console.log('✅ Update completed. DB returned:', {
-      isEnabled: updatedBusiness.isEnabled,
-      subscription: updatedBusiness.subscription,
+    console.log('✅ Update completed. Final data:', {
+      isEnabled: finalData.isEnabled,
+      subscription: finalData.subscription,
     });
-    
-    const finalData = updatedBusiness;
 
     console.log('✅ Business updated successfully');
     return NextResponse.json({ 
