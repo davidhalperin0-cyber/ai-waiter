@@ -116,12 +116,24 @@ export default function SuperAdminPage() {
       const data = await res.json();
       console.log('📥 Update response:', data);
       
-      if (res.ok) {
+      if (res.ok && data.business) {
+        // Update immediately with response data
+        setBusinesses(prev => prev.map(b => 
+          b.businessId === businessId 
+            ? { ...b, isEnabled: data.business.isEnabled, subscription: data.business.subscription || b.subscription }
+            : b
+        ));
+        
         // Wait a bit for DB to commit, then reload to get fresh data
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 300));
         await loadBusinesses();
         await loadStats();
         console.log('✅ Reloaded businesses after update');
+      } else if (res.ok) {
+        // If no business in response, just reload
+        await new Promise(resolve => setTimeout(resolve, 300));
+        await loadBusinesses();
+        await loadStats();
       } else {
         // Revert optimistic update on error
         setBusinesses(prev => prev.map(b => 
