@@ -191,7 +191,16 @@ export async function PUT(
             matches: fullData?.isEnabled === updateData.isEnabled,
           });
           
-          finalData = fullData;
+          // If fetched data doesn't match, use the RPC result instead
+          if (fullData?.isEnabled !== updateData.isEnabled && rpcResult.data?.[0]?.isEnabled === updateData.isEnabled) {
+            console.log('⚠️ Fetched data mismatch, using RPC result instead');
+            finalData = {
+              ...fullData,
+              isEnabled: rpcResult.data[0].isEnabled,
+            };
+          } else {
+            finalData = fullData;
+          }
         } catch (rpcError: any) {
           console.error('❌ RPC function call failed:', rpcError);
           console.error('❌ RPC error message:', rpcError.message);
