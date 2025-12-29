@@ -91,28 +91,57 @@ export async function PUT(
     let finalData: any = null;
     
     if (updateData.isEnabled !== undefined && !updateData.subscription) {
-      console.log('🔄 Trying RPC function for isEnabled update...');
+      console.log('🔄 Trying RPC function for isEnabled update...', {
+        businessId,
+        isEnabled: updateData.isEnabled,
+        isEnabledType: typeof updateData.isEnabled,
+      });
       try {
         const rpcResult = await supabaseAdmin.rpc('update_business_is_enabled', {
           p_business_id: businessId,
           p_is_enabled: updateData.isEnabled,
         });
         
+        console.log('🔍 RPC result:', {
+          hasError: !!rpcResult.error,
+          error: rpcResult.error,
+          hasData: !!rpcResult.data,
+          dataLength: rpcResult.data?.length,
+          data: rpcResult.data,
+        });
+        
         if (!rpcResult.error && rpcResult.data && rpcResult.data.length > 0) {
-          console.log('✅ RPC function succeeded!');
+          console.log('✅ RPC function succeeded!', {
+            returnedIsEnabled: rpcResult.data[0]?.isEnabled,
+            requestedIsEnabled: updateData.isEnabled,
+            matches: rpcResult.data[0]?.isEnabled === updateData.isEnabled,
+          });
           // Fetch full business data
-          const { data: fullData } = await supabaseAdmin
+          const { data: fullData, error: fetchError } = await supabaseAdmin
             .from('businesses')
             .select('businessId, name, isEnabled, subscription, subscriptionlocked')
             .eq('businessId', businessId)
             .maybeSingle();
+          
+          if (fetchError) {
+            console.error('❌ Error fetching after RPC:', fetchError);
+          } else {
+            console.log('🔍 Fetched data after RPC:', {
+              isEnabled: fullData?.isEnabled,
+              requestedIsEnabled: updateData.isEnabled,
+              matches: fullData?.isEnabled === updateData.isEnabled,
+            });
+          }
           finalData = fullData;
         } else {
           console.log('⚠️ RPC function failed, falling back to standard update');
           console.log('RPC error:', rpcResult.error);
+          console.log('RPC data:', rpcResult.data);
         }
       } catch (rpcError: any) {
-        console.log('⚠️ RPC function call failed:', rpcError.message);
+        console.error('❌ RPC function call failed:', rpcError);
+        console.error('❌ RPC error message:', rpcError.message);
+        console.error('❌ RPC error stack:', rpcError.stack);
         console.log('⚠️ Falling back to standard update...');
       }
     }
