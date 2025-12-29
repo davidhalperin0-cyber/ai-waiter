@@ -87,35 +87,92 @@ export async function PUT(
       return NextResponse.json({ message: 'No fields to update' }, { status: 400 });
     }
 
-    // Try RPC function first for isEnabled updates (bypasses triggers/defaults)
+    // ALWAYS use RPC function for isEnabled updates (bypasses triggers/defaults)
     let finalData: any = null;
     
-    if (updateData.isEnabled !== undefined && !updateData.subscription) {
-      console.log('🔄 Trying RPC function for isEnabled update...', {
+    if (updateData.isEnabled !== undefined) {
+      console.log('🔄 Using RPC function for isEnabled update...', {
         businessId,
         isEnabled: updateData.isEnabled,
         isEnabledType: typeof updateData.isEnabled,
+        isBoolean: typeof updateData.isEnabled === 'boolean',
       });
-      try {
-        const rpcResult = await supabaseAdmin.rpc('update_business_is_enabled', {
-          p_business_id: businessId,
-          p_is_enabled: updateData.isEnabled,
-        });
+      
+      // If we also have subscription update, do them separately
+      if (updateData.subscription) {
+        // First update isEnabled via RPC
+        try {
+          const rpcResult = await supabaseAdmin.rpc('update_business_is_enabled', {
+            p_business_id: businessId,
+            p_is_enabled: updateData.isEnabled,
+          });
+          
+          if (rpcResult.error) {
+            console.error('❌ RPC function error for isEnabled:', rpcResult.error);
+            throw rpcResult.error;
+          }
+          
+          console.log('✅ RPC function succeeded for isEnabled:', {
+            returnedIsEnabled: rpcResult.data?.[0]?.isEnabled,
+            requestedIsEnabled: updateData.isEnabled,
+          });
+        } catch (rpcError: any) {
+          console.error('❌ RPC function call failed:', rpcError);
+          return NextResponse.json({ 
+            message: 'Failed to update isEnabled', 
+            details: rpcError.message 
+          }, { status: 500 });
+        }
         
-        console.log('🔍 RPC result:', {
-          hasError: !!rpcResult.error,
-          error: rpcResult.error,
-          hasData: !!rpcResult.data,
-          dataLength: rpcResult.data?.length,
-          data: rpcResult.data,
-        });
+        // Then update subscription via standard update
+        const subResult = await supabaseAdmin
+          .from('businesses')
+          .update({ subscription: updateData.subscription })
+          .eq('businessId', businessId)
+          .select('businessId, name, isEnabled, subscription, subscriptionlocked')
+          .maybeSingle();
         
-        if (!rpcResult.error && rpcResult.data && rpcResult.data.length > 0) {
+        if (subResult.error) {
+          console.error('❌ Error updating subscription:', subResult.error);
+          return NextResponse.json({ 
+            message: 'Database error', 
+            details: subResult.error.message 
+          }, { status: 500 });
+        }
+        
+        finalData = subResult.data;
+      } else {
+        // Only isEnabled update - use RPC function
+        try {
+          const rpcResult = await supabaseAdmin.rpc('update_business_is_enabled', {
+            p_business_id: businessId,
+            p_is_enabled: updateData.isEnabled,
+          });
+          
+          console.log('🔍 RPC result:', {
+            hasError: !!rpcResult.error,
+            error: rpcResult.error,
+            hasData: !!rpcResult.data,
+            dataLength: rpcResult.data?.length,
+            data: rpcResult.data,
+          });
+          
+          if (rpcResult.error) {
+            console.error('❌ RPC function error:', rpcResult.error);
+            throw rpcResult.error;
+          }
+          
+          if (!rpcResult.data || rpcResult.data.length === 0) {
+            console.error('❌ RPC function returned no data');
+            throw new Error('RPC function returned no data');
+          }
+          
           console.log('✅ RPC function succeeded!', {
             returnedIsEnabled: rpcResult.data[0]?.isEnabled,
             requestedIsEnabled: updateData.isEnabled,
             matches: rpcResult.data[0]?.isEnabled === updateData.isEnabled,
           });
+          
           // Fetch full business data
           const { data: fullData, error: fetchError } = await supabaseAdmin
             .from('businesses')
@@ -125,24 +182,25 @@ export async function PUT(
           
           if (fetchError) {
             console.error('❌ Error fetching after RPC:', fetchError);
-          } else {
-            console.log('🔍 Fetched data after RPC:', {
-              isEnabled: fullData?.isEnabled,
-              requestedIsEnabled: updateData.isEnabled,
-              matches: fullData?.isEnabled === updateData.isEnabled,
-            });
+            throw fetchError;
           }
+          
+          console.log('🔍 Fetched data after RPC:', {
+            isEnabled: fullData?.isEnabled,
+            requestedIsEnabled: updateData.isEnabled,
+            matches: fullData?.isEnabled === updateData.isEnabled,
+          });
+          
           finalData = fullData;
-        } else {
-          console.log('⚠️ RPC function failed, falling back to standard update');
-          console.log('RPC error:', rpcResult.error);
-          console.log('RPC data:', rpcResult.data);
+        } catch (rpcError: any) {
+          console.error('❌ RPC function call failed:', rpcError);
+          console.error('❌ RPC error message:', rpcError.message);
+          console.error('❌ RPC error stack:', rpcError.stack);
+          return NextResponse.json({ 
+            message: 'Failed to update isEnabled', 
+            details: rpcError.message 
+          }, { status: 500 });
         }
-      } catch (rpcError: any) {
-        console.error('❌ RPC function call failed:', rpcError);
-        console.error('❌ RPC error message:', rpcError.message);
-        console.error('❌ RPC error stack:', rpcError.stack);
-        console.log('⚠️ Falling back to standard update...');
       }
     }
     
