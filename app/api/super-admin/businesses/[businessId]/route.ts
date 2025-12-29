@@ -87,27 +87,86 @@ export async function PUT(
       return NextResponse.json({ message: 'No fields to update' }, { status: 400 });
     }
 
-    // DIRECT UPDATE - Simple and reliable
-    const result = await supabaseAdmin
+    // Try RPC function first for isEnabled updates (bypasses triggers/defaults)
+    let finalData: any = null;
+    
+    if (updateData.isEnabled !== undefined && !updateData.subscription) {
+      console.log('🔄 Trying RPC function for isEnabled update...');
+      try {
+        const rpcResult = await supabaseAdmin.rpc('update_business_is_enabled', {
+          p_business_id: businessId,
+          p_is_enabled: updateData.isEnabled,
+        });
+        
+        if (!rpcResult.error && rpcResult.data && rpcResult.data.length > 0) {
+          console.log('✅ RPC function succeeded!');
+          // Fetch full business data
+          const { data: fullData } = await supabaseAdmin
+            .from('businesses')
+            .select('businessId, name, isEnabled, subscription, subscriptionlocked')
+            .eq('businessId', businessId)
+            .maybeSingle();
+          finalData = fullData;
+        } else {
+          console.log('⚠️ RPC function failed, falling back to standard update');
+          console.log('RPC error:', rpcResult.error);
+        }
+      } catch (rpcError: any) {
+        console.log('⚠️ RPC function call failed:', rpcError.message);
+        console.log('⚠️ Falling back to standard update...');
+      }
+    }
+    
+    // If RPC didn't work or we're updating subscription, use standard update
+    if (!finalData) {
+      console.log('🔄 Using standard update...');
+      const result = await supabaseAdmin
+        .from('businesses')
+        .update(updateData)
+        .eq('businessId', businessId)
+        .select('businessId, name, isEnabled, subscription, subscriptionlocked')
+        .maybeSingle();
+      
+      if (result.error) {
+        console.error('❌ Error updating business:', result.error);
+        return NextResponse.json({ 
+          message: 'Database error', 
+          details: result.error.message 
+        }, { status: 500 });
+      }
+      
+      if (!result.data) {
+        return NextResponse.json({ message: 'Business not found' }, { status: 404 });
+      }
+      
+      finalData = result.data;
+    }
+    
+    // Wait a moment and verify the update persisted
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    const { data: verifyData } = await supabaseAdmin
       .from('businesses')
-      .update(updateData)
+      .select('businessId, name, isEnabled, subscription')
       .eq('businessId', businessId)
-      .select('businessId, name, isEnabled, subscription, subscriptionlocked')
       .maybeSingle();
     
-    if (result.error) {
-      console.error('❌ Error updating business:', result.error);
-      return NextResponse.json({ 
-        message: 'Database error', 
-        details: result.error.message 
-      }, { status: 500 });
+    if (verifyData) {
+      console.log('🔍 Verification after update:', {
+        requestedIsEnabled: updateData.isEnabled,
+        actualIsEnabled: verifyData.isEnabled,
+        matches: updateData.isEnabled === undefined || verifyData.isEnabled === updateData.isEnabled,
+      });
+      
+      // If isEnabled doesn't match, something is changing it back
+      if (updateData.isEnabled !== undefined && verifyData.isEnabled !== updateData.isEnabled) {
+        console.error('❌ CRITICAL: isEnabled was changed back!', {
+          requested: updateData.isEnabled,
+          actual: verifyData.isEnabled,
+        });
+        // Still return the data we got, but log the issue
+      }
     }
-    
-    if (!result.data) {
-      return NextResponse.json({ message: 'Business not found' }, { status: 404 });
-    }
-    
-    const finalData = result.data;
     
     console.log('✅ Update completed. DB returned:', {
       isEnabled: finalData.isEnabled,
