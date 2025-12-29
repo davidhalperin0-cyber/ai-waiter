@@ -302,9 +302,10 @@ DECLARE
   v_is_enabled BOOLEAN;
 BEGIN
   -- Update directly - use explicit boolean value
-  UPDATE public.businesses
+  -- Use table alias to avoid ambiguity
+  UPDATE public.businesses b
   SET "isEnabled" = p_is_enabled
-  WHERE "businessId" = p_business_id;
+  WHERE b."businessId" = p_business_id;
   
   -- Verify the update actually happened
   IF NOT FOUND THEN
