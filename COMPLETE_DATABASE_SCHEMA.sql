@@ -263,20 +263,30 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  updated_row RECORD;
 BEGIN
   -- Update directly using table alias to avoid ambiguity
   UPDATE public.businesses AS b
   SET "isEnabled" = p_is_enabled
   WHERE b."businessId" = p_business_id;
   
-  -- Return the updated row
+  -- Verify the update actually happened
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Business with id % not found', p_business_id;
+  END IF;
+  
+  -- Force commit by doing a dummy SELECT (ensures transaction is committed)
+  PERFORM 1 FROM public.businesses b WHERE b."businessId" = p_business_id;
+  
+  -- Return the updated row - fetch AFTER the update to ensure we get the new value
   RETURN QUERY
   SELECT 
-    businesses."businessId",
-    businesses.name,
-    businesses."isEnabled"
-  FROM public.businesses
-  WHERE businesses."businessId" = p_business_id;
+    b."businessId",
+    b.name,
+    b."isEnabled"
+  FROM public.businesses b
+  WHERE b."businessId" = p_business_id;
 END;
 $$;
 
