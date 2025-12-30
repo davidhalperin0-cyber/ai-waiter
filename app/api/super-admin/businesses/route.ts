@@ -30,7 +30,47 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized - Super admin access required' }, { status: 403 });
     }
 
-    const { data: businesses, error } = await supabaseAdmin
+    // Use a fresh query with explicit cache control
+    // Add a longer delay to ensure any pending transactions are fully committed
+    // This is especially important after RPC updates
+    // Increased delay to 4 seconds to ensure RPC transaction is fully committed and visible
+    // This gives extra time for the connection pool to clear stale data
+    await new Promise(resolve => setTimeout(resolve, 4000));
+    
+    // Create a fresh client instance to avoid connection pooling issues
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (!supabaseUrl || !serviceRoleKey) {
+      return NextResponse.json(
+        { message: 'Database configuration error' },
+        { status: 500 },
+      );
+    }
+    
+    const freshClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        persistSession: false,
+      },
+      db: {
+        schema: 'public',
+      },
+      global: {
+        headers: {
+          'x-client-info': 'super-admin-fresh-client',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        },
+      },
+    });
+    
+    // Don't use RPC for reading - it has the same connection pooling issues
+    // Instead, we'll rely on the delay and fresh client to get the latest data
+    // The RPC read was returning stale data even with the updated function
+    
+    // Use a direct query with explicit ordering to ensure we get fresh data
+    // The 3-second delay should be enough for the RPC transaction to be fully committed
+    const { data: businesses, error } = await freshClient
       .from('businesses')
       .select('businessId, name, type, email, isEnabled, subscription, createdAt')
       .order('createdAt', { ascending: false });

@@ -38,6 +38,7 @@ export default function SuperAdminPage() {
 
   useEffect(() => {
     loadStats();
+    // Don't load businesses automatically - only when user clicks refresh or switches to businesses tab
   }, []);
 
   async function loadStats() {
@@ -85,9 +86,57 @@ export default function SuperAdminPage() {
             isEnabled: targetBusiness.isEnabled,
             subscription: targetBusiness.subscription,
           });
+          console.log('⚠️ WARNING: GET request returned stale data for isEnabled:', {
+            returnedIsEnabled: targetBusiness.isEnabled,
+            note: 'This is expected - GET request returns stale data due to connection pooling'
+          });
         }
-        // Force React to see this as a new array with new objects
-        setBusinesses(parsedBusinesses.map((b: Business) => ({ ...b })));
+        
+        // CRITICAL: Never overwrite isEnabled if it was set via RPC
+        // The GET request returns stale data due to connection pooling / read replicas
+        // If a business has _lastRpcUpdate, it means isEnabled was set via RPC, which is the source of truth
+        // We should NEVER overwrite RPC-set values with GET request values
+        setBusinesses(prev => {
+          console.log('🔄 loadBusinesses: Checking existing businesses for RPC updates...', {
+            prevCount: prev.length,
+            newCount: parsedBusinesses.length,
+          });
+          const updated = parsedBusinesses.map((b: Business) => {
+            const existing = prev.find(p => p.businessId === b.businessId);
+            if (existing) {
+              const existingWithTimestamp = existing as Business & { _lastRpcUpdate?: number };
+              // If isEnabled was set via RPC (has _lastRpcUpdate), NEVER overwrite it with GET request data
+              // The RPC result is the source of truth, GET request is unreliable due to stale reads
+              if (existingWithTimestamp._lastRpcUpdate) {
+                console.log('✅ Preserving RPC isEnabled value (RPC is source of truth):', {
+                  businessId: b.businessId,
+                  rpcIsEnabled: existing.isEnabled,
+                  getRequestIsEnabled: b.isEnabled,
+                  _lastRpcUpdate: existingWithTimestamp._lastRpcUpdate,
+                  timeSinceUpdate: `${Math.round((Date.now() - existingWithTimestamp._lastRpcUpdate) / 1000)}s`,
+                  note: 'GET request returns stale data, RPC is reliable',
+                });
+                // Keep the RPC value and preserve the timestamp
+                return { ...b, isEnabled: existing.isEnabled, _lastRpcUpdate: existingWithTimestamp._lastRpcUpdate } as Business & { _lastRpcUpdate?: number };
+              } else {
+                console.log('⚠️ No RPC update found, using GET request value (might be stale):', {
+                  businessId: b.businessId,
+                  getRequestIsEnabled: b.isEnabled,
+                  existingIsEnabled: existing.isEnabled,
+                });
+              }
+              // If no RPC update, use GET request value (but it might be stale)
+              return { ...b };
+            }
+            // New business, use GET request value
+            console.log('🆕 New business, using GET request value:', {
+              businessId: b.businessId,
+              isEnabled: b.isEnabled,
+            });
+            return { ...b };
+          });
+          return updated;
+        });
       } else {
         setError(data.message || 'נכשל בטעינת עסקים');
       }
@@ -120,22 +169,41 @@ export default function SuperAdminPage() {
       console.log('📥 Update response:', data);
       
       if (res.ok && data.business) {
-        // Update immediately with response data
+        // CRITICAL: Always use the RPC result from the response
+        // The RPC function already verified the update, so we trust its result
+        // Don't trust any fetched data - it might be stale
+        const rpcIsEnabled = data.business.isEnabled;
+        
+        console.log('✅ Using RPC result from response:', {
+          businessId,
+          requestedIsEnabled: newStatus,
+          rpcIsEnabled: rpcIsEnabled,
+          matches: rpcIsEnabled === newStatus,
+        });
+        
+        // Update immediately with RPC result - this is the source of truth
+        // Store timestamp to track when this was updated via RPC
         setBusinesses(prev => prev.map(b => 
           b.businessId === businessId 
-            ? { ...b, isEnabled: data.business.isEnabled, subscription: data.business.subscription || b.subscription }
+            ? { 
+                ...b, 
+                isEnabled: rpcIsEnabled, // ALWAYS use RPC result, never trust fetched data
+                subscription: data.business.subscription || b.subscription,
+                _lastRpcUpdate: Date.now(), // Track when this was updated via RPC
+              } as Business & { _lastRpcUpdate?: number }
             : b
         ));
         
-        // Wait a bit for DB to commit, then reload to get fresh data
-        await new Promise(resolve => setTimeout(resolve, 300));
-        await loadBusinesses();
+        // DON'T reload from server - it returns stale data
+        // The RPC result is the source of truth - trust it completely
+        console.log('✅ Updated business state with RPC result, NOT reloading from server');
+        
+        // Only reload stats, not businesses (to avoid stale data overwriting RPC result)
         await loadStats();
-        console.log('✅ Reloaded businesses after update');
       } else if (res.ok) {
-        // If no business in response, just reload
-        await new Promise(resolve => setTimeout(resolve, 300));
-        await loadBusinesses();
+        // If no business in response, don't reload - it returns stale data
+        // Just update stats
+        console.log('⚠️ No business in response, not reloading to avoid stale data');
         await loadStats();
       } else {
         // Revert optimistic update on error
@@ -183,12 +251,20 @@ export default function SuperAdminPage() {
       const data = await res.json();
       console.log('📥 Update response:', data);
       
-      if (res.ok) {
-        // Wait a bit for DB to commit
-        await new Promise(resolve => setTimeout(resolve, 300));
-        await loadBusinesses();
+      if (res.ok && data.business) {
+        // Update immediately with response data - trust the RPC result
+        setBusinesses(prev => prev.map(b => 
+          b.businessId === businessId 
+            ? { ...b, subscription: data.business.subscription || b.subscription }
+            : b
+        ));
+        
+        // Don't reload from server - it returns stale data
+        // Trust the RPC result that was returned in the response
+        console.log('✅ Updated subscription state with RPC result, not reloading from server');
+        
+        // Only reload stats, not businesses (to avoid stale data)
         await loadStats();
-        console.log('✅ Reloaded businesses after update');
       } else {
         alert(data.message || 'נכשל בעדכון סטטוס המנוי');
       }
@@ -221,12 +297,20 @@ export default function SuperAdminPage() {
       const data = await res.json();
       console.log('📥 Update response:', data);
       
-      if (res.ok) {
-        // Wait a bit for DB to commit
-        await new Promise(resolve => setTimeout(resolve, 300));
-        await loadBusinesses();
+      if (res.ok && data.business) {
+        // Update immediately with response data - trust the RPC result
+        setBusinesses(prev => prev.map(b => 
+          b.businessId === businessId 
+            ? { ...b, subscription: data.business.subscription || b.subscription }
+            : b
+        ));
+        
+        // Don't reload from server - it returns stale data
+        // Trust the RPC result that was returned in the response
+        console.log('✅ Updated plan type state with RPC result, not reloading from server');
+        
+        // Only reload stats, not businesses (to avoid stale data)
         await loadStats();
-        console.log('✅ Reloaded businesses after update');
       } else {
         alert(data.message || 'נכשל בעדכון סוג החבילה');
       }

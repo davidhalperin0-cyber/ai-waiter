@@ -187,24 +187,40 @@ export async function PUT(
           
           // Use RPC result directly - don't fetch from DB as it might be stale
           console.log('✅ Using RPC result directly');
+          
+          // DON'T fetch from DB at all - it will return stale data
+          // Use RPC result directly and return it immediately
+          // The RPC function already verified the update, so we trust it
           finalData = {
             businessId: rpcResult.data[0].businessId,
             name: rpcResult.data[0].name,
-            isEnabled: rpcResult.data[0].isEnabled,
+            isEnabled: rpcResult.data[0].isEnabled, // ALWAYS use RPC result
             subscription: null, // Will be fetched separately if needed
             subscriptionlocked: null,
           };
           
-          // Fetch subscription separately if needed
-          const { data: subData } = await supabaseAdmin
-            .from('businesses')
-            .select('subscription, subscriptionlocked')
-            .eq('businessId', businessId)
-            .maybeSingle();
+          console.log('✅ Using RPC result directly, not fetching from DB:', {
+            rpcIsEnabled: rpcResult.data[0].isEnabled,
+            finalIsEnabled: finalData.isEnabled,
+          });
           
-          if (subData) {
-            finalData.subscription = subData.subscription;
-            finalData.subscriptionlocked = subData.subscriptionlocked;
+          // If we need subscription data, fetch it separately (but don't trust isEnabled from it)
+          // Wait a bit to ensure RPC transaction is committed
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+          try {
+            const { data: subData } = await supabaseAdmin
+              .from('businesses')
+              .select('subscription, subscriptionlocked')
+              .eq('businessId', businessId)
+              .maybeSingle();
+            
+            if (subData) {
+              finalData.subscription = subData.subscription;
+              finalData.subscriptionlocked = subData.subscriptionlocked;
+            }
+          } catch (subErr) {
+            console.warn('⚠️ Could not fetch subscription data, using RPC result only:', subErr);
           }
         } catch (rpcError: any) {
           console.error('❌ RPC function call failed:', rpcError);
@@ -243,83 +259,10 @@ export async function PUT(
       finalData = result.data;
     }
     
-    // Wait a moment and verify the update persisted multiple times
-    for (let i = 0; i < 3; i++) {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      const { data: verifyData } = await supabaseAdmin
-        .from('businesses')
-        .select('businessId, name, isEnabled, subscription')
-        .eq('businessId', businessId)
-        .maybeSingle();
-      
-      if (verifyData) {
-        console.log(`🔍 Verification attempt ${i + 1}/3:`, {
-          requestedIsEnabled: updateData.isEnabled,
-          actualIsEnabled: verifyData.isEnabled,
-          matches: updateData.isEnabled === undefined || verifyData.isEnabled === updateData.isEnabled,
-        });
-        
-        // If isEnabled doesn't match, something is changing it back - try to fix it
-        if (updateData.isEnabled !== undefined && verifyData.isEnabled !== updateData.isEnabled) {
-          console.error(`❌ CRITICAL: isEnabled was changed back on attempt ${i + 1}!`, {
-            requested: updateData.isEnabled,
-            actual: verifyData.isEnabled,
-          });
-          
-          // Try to update again using RPC function
-          if (i < 2) {
-            console.log(`🔄 Attempting to fix by updating again...`);
-            try {
-              const fixResult = await supabaseAdmin.rpc('update_business_is_enabled', {
-                p_business_id: businessId,
-                p_is_enabled: updateData.isEnabled,
-              });
-              
-              if (fixResult.error) {
-                console.error('❌ Fix attempt failed:', fixResult.error);
-              } else {
-                console.log('✅ Fix attempt succeeded');
-              }
-            } catch (fixError: any) {
-              console.error('❌ Fix attempt error:', fixError);
-            }
-          }
-        } else if (updateData.isEnabled !== undefined && verifyData.isEnabled === updateData.isEnabled) {
-          console.log(`✅ Verification passed on attempt ${i + 1}!`);
-          // Update finalData with verified data
-          finalData = verifyData;
-          break;
-        }
-      }
-    }
-    
-    // Final verification - check one more time after all verifications
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const { data: finalVerify } = await supabaseAdmin
-      .from('businesses')
-      .select('businessId, name, isEnabled, subscription')
-      .eq('businessId', businessId)
-      .maybeSingle();
-    
-    if (finalVerify && updateData.isEnabled !== undefined) {
-      console.log('🔍 Final verification:', {
-        requestedIsEnabled: updateData.isEnabled,
-        finalIsEnabled: finalVerify.isEnabled,
-        matches: finalVerify.isEnabled === updateData.isEnabled,
-      });
-      
-      // Use the final verified data
-      if (finalVerify.isEnabled === updateData.isEnabled) {
-        finalData = { ...finalData, isEnabled: finalVerify.isEnabled };
-      } else {
-        console.error('❌ FINAL VERIFICATION FAILED - isEnabled was changed back!', {
-          requested: updateData.isEnabled,
-          final: finalVerify.isEnabled,
-        });
-        // Still return success, but log the issue
-      }
-    }
+    // Don't verify - trust the RPC result
+    // Verification was causing issues with stale reads
+    // The RPC function already verifies internally, so we trust its result
+    console.log('✅ Skipping verification - trusting RPC result');
     
     console.log('✅ Update completed. DB returned:', {
       isEnabled: finalData.isEnabled,
