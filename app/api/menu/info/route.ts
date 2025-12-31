@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { isSubscriptionActive, shouldAutoExpire, Subscription } from '@/lib/subscription';
@@ -128,6 +129,7 @@ export async function GET(req: NextRequest) {
       hasCustomContent: !!response.customContent,
       customContentType: typeof response.customContent,
       customContentKeys: response.customContent ? Object.keys(response.customContent) : [],
+      customContentString: JSON.stringify(response.customContent),
     });
     
     return NextResponse.json(response, { status: 200 });

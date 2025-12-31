@@ -54,3 +54,4 @@ ADD COLUMN IF NOT EXISTS "customContent" JSONB DEFAULT '{
 COMMENT ON COLUMN businesses."customContent" IS 'Custom content sections for menu: promotions, events, contact info, loyalty club, reviews, delivery options';
 
 
+

@@ -38,6 +38,7 @@ export default function SuperAdminPage() {
 
   useEffect(() => {
     loadStats();
+    // Don't load businesses automatically - only when user clicks refresh or switches to businesses tab
   }, []);
 
   async function loadStats() {
@@ -61,10 +62,81 @@ export default function SuperAdminPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch('/api/super-admin/businesses');
+      const res = await fetch('/api/super-admin/businesses', { 
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+        },
+      });
       const data = await res.json();
       if (res.ok) {
-        setBusinesses(data.businesses || []);
+        // API already parses subscription, but ensure it's an object
+        const parsedBusinesses = (data.businesses || []).map((business: any) => ({
+          ...business,
+          subscription: typeof business.subscription === 'string' 
+            ? JSON.parse(business.subscription) 
+            : (business.subscription || { status: 'trial', planType: 'full' }),
+        }));
+        console.log('🔄 Loaded businesses:', parsedBusinesses.length);
+        const targetBusiness = parsedBusinesses.find((b: Business) => b.businessId === 'b72bca1a-7fd3-470d-998e-971785f30ab4');
+        if (targetBusiness) {
+          console.log('🔄 Target business after load:', {
+            businessId: targetBusiness.businessId,
+            isEnabled: targetBusiness.isEnabled,
+            subscription: targetBusiness.subscription,
+          });
+          console.log('⚠️ WARNING: GET request returned stale data for isEnabled:', {
+            returnedIsEnabled: targetBusiness.isEnabled,
+            note: 'This is expected - GET request returns stale data due to connection pooling'
+          });
+        }
+        
+        // CRITICAL: Never overwrite isEnabled if it was set via RPC
+        // The GET request returns stale data due to connection pooling / read replicas
+        // If a business has _lastRpcUpdate, it means isEnabled was set via RPC, which is the source of truth
+        // We should NEVER overwrite RPC-set values with GET request values
+        setBusinesses(prev => {
+          console.log('🔄 loadBusinesses: Checking existing businesses for RPC updates...', {
+            prevCount: prev.length,
+            newCount: parsedBusinesses.length,
+          });
+          const updated = parsedBusinesses.map((b: Business) => {
+            const existing = prev.find(p => p.businessId === b.businessId);
+            if (existing) {
+              const existingWithTimestamp = existing as Business & { _lastRpcUpdate?: number };
+              // If isEnabled was set via RPC (has _lastRpcUpdate), NEVER overwrite it with GET request data
+              // The RPC result is the source of truth, GET request is unreliable due to stale reads
+              if (existingWithTimestamp._lastRpcUpdate) {
+                console.log('✅ Preserving RPC isEnabled value (RPC is source of truth):', {
+                  businessId: b.businessId,
+                  rpcIsEnabled: existing.isEnabled,
+                  getRequestIsEnabled: b.isEnabled,
+                  _lastRpcUpdate: existingWithTimestamp._lastRpcUpdate,
+                  timeSinceUpdate: `${Math.round((Date.now() - existingWithTimestamp._lastRpcUpdate) / 1000)}s`,
+                  note: 'GET request returns stale data, RPC is reliable',
+                });
+                // Keep the RPC value and preserve the timestamp
+                return { ...b, isEnabled: existing.isEnabled, _lastRpcUpdate: existingWithTimestamp._lastRpcUpdate } as Business & { _lastRpcUpdate?: number };
+              } else {
+                console.log('⚠️ No RPC update found, using GET request value (might be stale):', {
+                  businessId: b.businessId,
+                  getRequestIsEnabled: b.isEnabled,
+                  existingIsEnabled: existing.isEnabled,
+                });
+              }
+              // If no RPC update, use GET request value (but it might be stale)
+              return { ...b };
+            }
+            // New business, use GET request value
+            console.log('🆕 New business, using GET request value:', {
+              businessId: b.businessId,
+              isEnabled: b.isEnabled,
+            });
+            return { ...b };
+          });
+          return updated;
+        });
       } else {
         setError(data.message || 'נכשל בטעינת עסקים');
       }
@@ -78,20 +150,78 @@ export default function SuperAdminPage() {
   async function toggleBusinessStatus(businessId: string, currentStatus: boolean) {
     try {
       setLoading(true);
+      const newStatus = !currentStatus;
+      console.log('🔄 Toggling business status:', { businessId, currentStatus, newStatus });
+
+      // Optimistic update - update UI immediately
+      setBusinesses(prev => prev.map(b => 
+        b.businessId === businessId 
+          ? { ...b, isEnabled: newStatus }
+          : b
+      ));
+
       const res = await fetch(`/api/super-admin/businesses/${businessId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isEnabled: !currentStatus }),
+        body: JSON.stringify({ isEnabled: newStatus }),
       });
       const data = await res.json();
-      if (res.ok) {
-        await loadBusinesses();
+      console.log('📥 Update response:', data);
+      
+      if (res.ok && data.business) {
+        // CRITICAL: Always use the RPC result from the response
+        // The RPC function already verified the update, so we trust its result
+        // Don't trust any fetched data - it might be stale
+        const rpcIsEnabled = data.business.isEnabled;
+        
+        console.log('✅ Using RPC result from response:', {
+          businessId,
+          requestedIsEnabled: newStatus,
+          rpcIsEnabled: rpcIsEnabled,
+          matches: rpcIsEnabled === newStatus,
+        });
+        
+        // Update immediately with RPC result - this is the source of truth
+        // Store timestamp to track when this was updated via RPC
+        setBusinesses(prev => prev.map(b => 
+          b.businessId === businessId 
+            ? { 
+                ...b, 
+                isEnabled: rpcIsEnabled, // ALWAYS use RPC result, never trust fetched data
+                subscription: data.business.subscription || b.subscription,
+                _lastRpcUpdate: Date.now(), // Track when this was updated via RPC
+              } as Business & { _lastRpcUpdate?: number }
+            : b
+        ));
+        
+        // DON'T reload from server - it returns stale data
+        // The RPC result is the source of truth - trust it completely
+        console.log('✅ Updated business state with RPC result, NOT reloading from server');
+        
+        // Only reload stats, not businesses (to avoid stale data overwriting RPC result)
         await loadStats();
-        alert('סטטוס העסק עודכן בהצלחה!');
+      } else if (res.ok) {
+        // If no business in response, don't reload - it returns stale data
+        // Just update stats
+        console.log('⚠️ No business in response, not reloading to avoid stale data');
+        await loadStats();
       } else {
+        // Revert optimistic update on error
+        setBusinesses(prev => prev.map(b => 
+          b.businessId === businessId 
+            ? { ...b, isEnabled: currentStatus }
+            : b
+        ));
         alert(data.message || 'נכשל בעדכון סטטוס העסק');
       }
     } catch (err: any) {
+      console.error('❌ Update error:', err);
+      // Revert optimistic update on error
+      setBusinesses(prev => prev.map(b => 
+        b.businessId === businessId 
+          ? { ...b, isEnabled: currentStatus }
+          : b
+      ));
       alert(err.message || 'נכשל בעדכון סטטוס העסק');
     } finally {
       setLoading(false);
@@ -106,25 +236,40 @@ export default function SuperAdminPage() {
       const business = businesses.find((b) => b.businessId === businessId);
       if (!business) return;
 
+      console.log('🔄 Updating subscription status:', { businessId, newStatus, current: business.subscription });
+
       const res = await fetch(`/api/super-admin/businesses/${businessId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subscription: {
-            ...business.subscription,
+            ...(business.subscription || {}),
             status: newStatus,
           },
         }),
       });
       const data = await res.json();
-      if (res.ok) {
-        await loadBusinesses();
+      console.log('📥 Update response:', data);
+      
+      if (res.ok && data.business) {
+        // Update immediately with response data - trust the RPC result
+        setBusinesses(prev => prev.map(b => 
+          b.businessId === businessId 
+            ? { ...b, subscription: data.business.subscription || b.subscription }
+            : b
+        ));
+        
+        // Don't reload from server - it returns stale data
+        // Trust the RPC result that was returned in the response
+        console.log('✅ Updated subscription state with RPC result, not reloading from server');
+        
+        // Only reload stats, not businesses (to avoid stale data)
         await loadStats();
-        alert(`סטטוס המנוי עודכן ל-${newStatus === 'active' ? 'פעיל' : newStatus === 'trial' ? 'ניסיון' : newStatus === 'expired' ? 'פג תוקף' : 'פיגור תשלום'}!`);
       } else {
         alert(data.message || 'נכשל בעדכון סטטוס המנוי');
       }
     } catch (err: any) {
+      console.error('❌ Update error:', err);
       alert(err.message || 'נכשל בעדכון סטטוס המנוי');
     } finally {
       setLoading(false);
@@ -137,24 +282,40 @@ export default function SuperAdminPage() {
       const business = businesses.find((b) => b.businessId === businessId);
       if (!business) return;
 
+      console.log('🔄 Updating plan type:', { businessId, newPlanType, current: business.subscription });
+
       const res = await fetch(`/api/super-admin/businesses/${businessId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subscription: {
-            ...business.subscription,
+            ...(business.subscription || {}),
             planType: newPlanType,
           },
         }),
       });
       const data = await res.json();
-      if (res.ok) {
-        await loadBusinesses();
-        alert(`סוג החבילה עודכן ל-${newPlanType === 'full' ? 'חבילה מלאה' : 'תפריט בלבד'}!`);
+      console.log('📥 Update response:', data);
+      
+      if (res.ok && data.business) {
+        // Update immediately with response data - trust the RPC result
+        setBusinesses(prev => prev.map(b => 
+          b.businessId === businessId 
+            ? { ...b, subscription: data.business.subscription || b.subscription }
+            : b
+        ));
+        
+        // Don't reload from server - it returns stale data
+        // Trust the RPC result that was returned in the response
+        console.log('✅ Updated plan type state with RPC result, not reloading from server');
+        
+        // Only reload stats, not businesses (to avoid stale data)
+        await loadStats();
       } else {
         alert(data.message || 'נכשל בעדכון סוג החבילה');
       }
     } catch (err: any) {
+      console.error('❌ Update error:', err);
       alert(err.message || 'נכשל בעדכון סוג החבילה');
     } finally {
       setLoading(false);
@@ -290,6 +451,7 @@ export default function SuperAdminPage() {
                     <div>{business.ordersCount}</div>
                     <div>
                       <span
+                        key={`status-${business.businessId}-${business.isEnabled}`}
                         className={`text-[10px] px-2 py-1 rounded ${
                           business.isEnabled
                             ? 'bg-green-900/40 text-green-400'
@@ -332,7 +494,8 @@ export default function SuperAdminPage() {
                     </div>
                     <div className="text-right flex gap-2 justify-end items-center flex-wrap">
                       <select
-                        value={business.subscription.planType || 'full'}
+                        key={`planType-${business.businessId}-${business.subscription?.planType || 'full'}`}
+                        value={business.subscription?.planType || 'full'}
                         onChange={(e) => updatePlanType(business.businessId, e.target.value as 'full' | 'menu_only')}
                         disabled={loading}
                         className="text-[10px] px-2 py-1 rounded bg-neutral-800 border border-neutral-700 disabled:opacity-60"
@@ -342,7 +505,8 @@ export default function SuperAdminPage() {
                         <option value="menu_only">תפריט בלבד</option>
                       </select>
                       <select
-                        value={business.subscription.status}
+                        key={`status-${business.businessId}-${business.subscription?.status || 'trial'}`}
+                        value={business.subscription?.status || 'trial'}
                         onChange={(e) => updateSubscriptionStatus(business.businessId, e.target.value)}
                         disabled={loading}
                         className="text-[10px] px-2 py-1 rounded bg-neutral-800 border border-neutral-700 disabled:opacity-60"

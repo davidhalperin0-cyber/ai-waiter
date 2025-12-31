@@ -257,15 +257,31 @@ function HomePageContent({
             
             {/* 1. Top Padding (15vh) & Business Name - Brand Identity */}
             <div className="pt-[15vh] text-center w-full">
-              {businessInfo.logoUrl ? (
-                <motion.img
+              {businessInfo.logoUrl && businessInfo.logoUrl.trim() ? (
+                <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                  src={businessInfo.logoUrl}
-                  alt={displayBusinessName}
-                  className="h-20 max-h-[80px] w-auto mx-auto object-contain"
-                />
+                  className="relative"
+                >
+                  <img
+                    src={businessInfo.logoUrl}
+                    alt={displayBusinessName}
+                    className="h-20 max-h-[80px] w-auto mx-auto object-contain"
+                    onError={(e) => {
+                      // Hide image on error and show fallback
+                      (e.target as HTMLImageElement).style.display = 'none';
+                      const parent = (e.target as HTMLImageElement).parentElement;
+                      if (parent) {
+                        const fallback = document.createElement('h1');
+                        fallback.className = 'text-4xl md:text-5xl font-semibold tracking-tight text-white uppercase';
+                        fallback.style.fontFamily = 'var(--font-sans), system-ui, -apple-system, sans-serif';
+                        fallback.textContent = displayBusinessName;
+                        parent.appendChild(fallback);
+                      }
+                    }}
+                  />
+                </motion.div>
               ) : (
                 <motion.h1 
                   initial={{ opacity: 0, y: 10 }}
@@ -284,7 +300,7 @@ function HomePageContent({
 
             {/* 3. PRIMARY ACTION: Menu Entry Button - Glass / Blur Premium */}
             <div className="w-full">
-              <Link href={`/menu/${businessId}/${tableId}`} className="block">
+              <Link href={`/menu/${businessId}/${tableId}?from=home`} className="block">
                 <motion.button
                   className="relative w-full aspect-[2/1] md:aspect-[16/9] min-w-[280px] max-w-[340px] mx-auto rounded-3xl font-medium text-xl md:text-2xl transition-all overflow-hidden shadow-2xl flex items-center justify-center group"
                   whileHover={{ scale: 1.02 }}
@@ -344,8 +360,8 @@ function HomePageContent({
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                     >
-                      <PhoneIcon className="w-6 h-6 text-white/40 group-hover:text-white/80 transition-all duration-300" strokeWidth={1.5} />
-                    </motion.a>
+<PhoneIcon className="w-6 h-6 text-white/40 group-hover:text-white/80 transition-all duration-300" />
+</motion.a>
                   )}
                   {contact.whatsapp && (
                     <motion.a
@@ -408,8 +424,8 @@ function HomePageContent({
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.7 }}
                 >
-                  <LoyaltyIcon className="w-4 h-4" strokeWidth={1.5} />
-                  <span>
+<LoyaltyIcon className="w-4 h-4" />
+<span>
                     {language === 'en' 
                       ? businessInfo.customContent.loyaltyClub.titleEn || 'Loyalty'
                       : businessInfo.customContent.loyaltyClub.title || 'מועדון לקוחות'}

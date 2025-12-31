@@ -88,7 +88,7 @@ export function AccessibilityWidget() {
   }, [underlineLinks]);
 
   return (
-    <div className="fixed bottom-20 left-4 z-50 text-xs">
+    <div className="fixed top-1/2 -translate-y-1/2 left-4 z-50 text-xs">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

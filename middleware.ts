@@ -7,6 +7,33 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const isDashboard = pathname.startsWith("/dashboard");
   const isSuperAdmin = pathname.startsWith("/super-admin");
+  const isMenu = pathname.startsWith("/menu/");
+
+  // Redirect menu pages to home page if accessing directly (not /home or /chat)
+  if (isMenu) {
+    // Pattern: /menu/[businessId]/[tableId] - redirect to /home
+    // But don't redirect if already on /home or /chat
+    const menuPathMatch = pathname.match(/^\/menu\/([^/]+)\/([^/]+)$/);
+    if (menuPathMatch) {
+      // Check if user is coming from the home page (clicking the menu button)
+      const referer = req.headers.get('referer');
+      const isFromHomePage = referer && referer.includes('/home');
+      
+      // Also check for query parameter (fallback if referer is not available)
+      const fromHome = req.nextUrl.searchParams.get('from') === 'home';
+      
+      // If coming from home page, allow direct access to menu (don't redirect)
+      if (isFromHomePage || fromHome) {
+        return NextResponse.next();
+      }
+      
+      // Otherwise, redirect to /home (direct access from QR code or external link)
+      const redirectUrl = new URL(`${pathname}/home`, req.url);
+      return NextResponse.redirect(redirectUrl);
+    }
+    // Otherwise, continue (could be /home, /chat, or other sub-routes)
+    return NextResponse.next();
+  }
 
   // Protect dashboard routes
   if (isDashboard) {
@@ -91,7 +118,7 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/super-admin/:path*"],
+  matcher: ["/dashboard/:path*", "/super-admin/:path*", "/menu/:path*"],
 };
 
 

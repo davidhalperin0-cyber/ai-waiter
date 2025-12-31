@@ -135,7 +135,42 @@ function CustomerMenuPageContent({
   } | null>(null);
   const [hasNewChatMessage, setHasNewChatMessage] = useState(false);
   const [language, setLanguage] = useState<'he' | 'en'>('he');
+  const [categoryTranslations, setCategoryTranslations] = useState<Record<string, string>>({});
+  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
 
+  async function translateCategory(category: string): Promise<string> {
+    if (language === 'he') return category;
+  
+    if (categoryTranslations[category]) {
+      return categoryTranslations[category];
+    }
+  
+    try {
+      const res = await fetch('/api/ai/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: category,
+          target: 'category',
+        }),
+      });
+  
+      if (!res.ok) throw new Error('translate failed');
+  
+      const data = await res.json();
+      const translated = data.translated || category;
+  
+      setCategoryTranslations((prev) => ({
+        ...prev,
+        [category]: translated,
+      }));
+  
+      return translated;
+    } catch {
+      return category;
+    }
+  }
+  
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const totalPrice = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
@@ -396,16 +431,24 @@ function CustomerMenuPageContent({
   }, [menuItems, businessInfo?.businessHours]);
 
   // Get all categories in order (business first if exists, then others)
-  const orderedCategories = useMemo(() => {
-    const cats = categories.filter(cat => cat !== 'business');
-    const businessHoursActive = isBusinessHoursActive();
-    const hasBusinessItems = itemsByCategory['business'] && itemsByCategory['business'].length > 0;
-    
-    if (hasBusinessItems && businessHoursActive) {
-      return ['business', ...cats];
-    }
-    return cats;
-  }, [categories, itemsByCategory]);
+ // Get all categories in order (business first if exists, then others)
+const orderedCategories = useMemo(() => {
+  const businessHoursActive = isBusinessHoursActive();
+
+  // Separate business and regular categories
+  const regularCategories = categories.filter(cat => cat !== 'business');
+
+  const hasBusinessItems =
+    Array.isArray(itemsByCategory['business']) &&
+    itemsByCategory['business'].length > 0;
+
+  // Show business category first only if allowed
+  if (hasBusinessItems && businessHoursActive) {
+    return ['business', ...regularCategories];
+  }
+
+  return regularCategories;
+}, [categories, itemsByCategory, businessInfo?.businessHours, currentServerTime]);
 
   // Scroll-based active category detection
   useEffect(() => {
@@ -665,7 +708,7 @@ function CustomerMenuPageContent({
 
           <div className="flex flex-col items-center text-center">
             {/* SINGLE SOURCE OF TRUTH: Business name rendered exactly once */}
-            {businessInfo?.logoUrl ? (
+            {businessInfo?.logoUrl && businessInfo.logoUrl.trim() ? (
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -678,13 +721,19 @@ function CustomerMenuPageContent({
                   alt={displayBusinessName}
                   className="relative max-h-20 lg:max-h-24 w-auto object-contain drop-shadow-2xl"
                   onError={(e) => {
+                    // Hide image on error and show fallback
                     (e.target as HTMLImageElement).style.display = 'none';
-                    const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
-                    if (fallback) fallback.style.display = 'flex';
+                    const parent = (e.target as HTMLImageElement).parentElement;
+                    if (parent) {
+                      const fallback = parent.querySelector('.logo-fallback') as HTMLElement;
+                      if (fallback) {
+                        fallback.style.display = 'flex';
+                      }
+                    }
                   }}
                 />
                 {/* Fallback: show full business name if logo fails */}
-                <div className="hidden absolute inset-0 items-center justify-center text-2xl font-light tracking-wide">
+                <div className="hidden logo-fallback absolute inset-0 items-center justify-center text-2xl font-light tracking-wide">
                   {displayBusinessName}
                 </div>
               </motion.div>
@@ -831,17 +880,15 @@ function CustomerMenuPageContent({
           {/* Don't show menu if subscription is expired or business is disabled */}
           {!subscriptionExpired && !businessDisabled ? (
             <>
-          {/* Mobile Categories Navigation - Redesigned Dynamic Ribbon */}
-          <nav className="lg:hidden sticky top-0 z-30 mb-8 -mx-4">
-            <div className="relative overflow-hidden pt-4 pb-6">
-              {/* Glass Background that appears on scroll would be cool, but keeping it simple for now */}
-              <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent pointer-events-none" />
-              
-              <div className="flex gap-3 overflow-x-auto px-4 pb-2 scrollbar-hide no-scrollbar items-center">
+          {/* Mobile Categories Navigation - Grid Layout */}
+          <nav className="lg:hidden sticky top-0 z-30 mb-8 -mx-4 bg-black/40 backdrop-blur-sm pt-4 pb-4">
+            <div className="px-4">
+              {/* Home button */}
+              <div className="mb-3">
                 <motion.button
                   onClick={() => scrollToCategory('all')}
-                  className="relative flex-shrink-0 group"
-                  whileTap={{ scale: 0.95 }}
+                  className="relative w-full group"
+                  whileTap={{ scale: 0.98 }}
                 >
                   <div
                     className={`px-5 py-2.5 rounded-full text-xs font-medium tracking-wider transition-all duration-500 ${
@@ -860,30 +907,34 @@ function CustomerMenuPageContent({
                     />
                   )}
                 </motion.button>
+              </div>
 
-                {orderedCategories.map((cat) => {
+              {/* Categories Grid */}
+              {orderedCategories.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {(categoriesExpanded ? orderedCategories : orderedCategories.slice(0, 3)).map((cat) => {
                   // Get categoryEn from first item in category
                   const categoryItems = itemsByCategory[cat] || [];
                   const firstItem = categoryItems[0];
                   const displayCategory = cat === 'business'
-                    ? (language === 'en' ? '💼 Business meals' : '💼 מנות עסקיות')
-                    : (language === 'en' && firstItem?.categoryEn ? firstItem.categoryEn : cat);
+                    ? (language === 'en' ? '💼 Business' : '💼 עסקי')
+                    : (language === 'en' && firstItem?.category ? categoryTranslations[firstItem.category] || firstItem.category : cat);
                   
                   return (
                     <motion.button
                       key={cat}
                       onClick={() => scrollToCategory(cat)}
-                      className="relative flex-shrink-0 group"
+                      className="relative group"
                       whileTap={{ scale: 0.95 }}
                     >
                       <div
-                        className={`px-5 py-2.5 rounded-full text-xs font-medium tracking-wider transition-all duration-500 ${
+                        className={`px-3 py-2 rounded-full text-xs font-medium tracking-wider transition-all duration-500 text-center ${
                           activeCategory === cat
                             ? 'text-black z-10'
                             : 'text-white/60 bg-white/5 border border-white/10'
                         }`}
                       >
-                        {displayCategory}
+                        <span className="line-clamp-1">{displayCategory}</span>
                       </div>
                       {activeCategory === cat && (
                         <motion.div
@@ -894,12 +945,27 @@ function CustomerMenuPageContent({
                       )}
                     </motion.button>
                   );
-                })}
-              </div>
-              
-              {/* Fade masks */}
-              <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-black/20 to-transparent pointer-events-none" />
-              <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-black/20 to-transparent pointer-events-none" />
+                  })}
+                </div>
+              )}
+
+              {/* Expand/Collapse Button */}
+              {orderedCategories.length > 3 && (
+                <motion.button
+                  onClick={() => setCategoriesExpanded(!categoriesExpanded)}
+                  className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-full text-xs font-medium text-white/60 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <span>{categoriesExpanded ? (language === 'en' ? 'Show Less' : 'הצג פחות') : (language === 'en' ? 'Show More' : 'הצג עוד')}</span>
+                  <motion.span
+                    animate={{ rotate: categoriesExpanded ? 180 : 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="text-lg"
+                  >
+                    ↓
+                  </motion.span>
+                </motion.button>
+              )}
             </div>
           </nav>
 
@@ -1026,18 +1092,16 @@ function CustomerMenuPageContent({
                   {/* Category Header */}
                   <div className="mb-6 pt-8">
                     <h2 className={menuStyle.typography.sectionTitle}>
-                      {category === 'business'
-                        ? language === 'en'
-                          ? '💼 Business Meals'
-                          : '💼 מנות עסקיות'
-                        : (() => {
-                            // Find the first item in this category to get categoryEn
-                            const firstItem = categoryItems[0];
-                            if (language === 'en' && firstItem?.categoryEn) {
-                              return firstItem.categoryEn;
-                            }
-                            return category;
-                          })()}
+                    <h2 className={menuStyle.typography.sectionTitle}>
+  {category === 'business'
+    ? language === 'en'
+      ? '💼 Business Meals'
+      : '💼 מנות עסקיות'
+    : language === 'en'
+      ? categoryTranslations[category] || category
+      : category}
+</h2>
+
                     </h2>
                   </div>
 
@@ -1326,10 +1390,15 @@ function CustomerMenuPageContent({
                 {orderedCategories.map((cat, index) => {
                   // Get categoryEn from first item in category
                   const categoryItems = itemsByCategory[cat] || [];
-                  const firstItem = categoryItems[0];
-                  const displayCategory = cat === 'business'
-                    ? (language === 'en' ? '💼 Business Meals' : '💼 מנות עסקיות')
-                    : (language === 'en' && firstItem?.categoryEn ? firstItem.categoryEn : cat);
+                  const displayCategory =
+                  cat === 'business'
+                    ? language === 'en'
+                      ? '💼 Business Meals'
+                      : '💼 מנות עסקיות'
+                    : language === 'en'
+                      ? categoryTranslations[cat] || cat
+                      : cat;
+                
                   
                   return (
                   <motion.button
