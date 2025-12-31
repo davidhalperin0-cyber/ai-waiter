@@ -918,7 +918,7 @@ const orderedCategories = useMemo(() => {
                   const firstItem = categoryItems[0];
                   const displayCategory = cat === 'business'
                     ? (language === 'en' ? '💼 Business' : '💼 עסקי')
-                    : (language === 'en' && firstItem?.category ? categoryTranslations[firstItem.category] || firstItem.category : cat);
+                    : (language === 'en' && firstItem?.categoryEn ? firstItem.categoryEn : (language === 'en' ? categoryTranslations[cat] || cat : cat));
                   
                   return (
                     <motion.button
@@ -1087,21 +1087,18 @@ const orderedCategories = useMemo(() => {
               const categoryItems = itemsByCategory[category] || [];
               if (categoryItems.length === 0) return null;
 
+              // Get categoryEn from first item in category
+              const firstItem = categoryItems[0];
+              const displayCategory = category === 'business'
+                ? (language === 'en' ? '💼 Business Meals' : '💼 מנות עסקיות')
+                : (language === 'en' && firstItem?.categoryEn ? firstItem.categoryEn : (language === 'en' ? categoryTranslations[category] || category : category));
+
               return (
                 <section key={category} id={`category-${category}`} className="space-y-4">
                   {/* Category Header */}
                   <div className="mb-6 pt-8">
                     <h2 className={menuStyle.typography.sectionTitle}>
-                    <h2 className={menuStyle.typography.sectionTitle}>
-  {category === 'business'
-    ? language === 'en'
-      ? '💼 Business Meals'
-      : '💼 מנות עסקיות'
-    : language === 'en'
-      ? categoryTranslations[category] || category
-      : category}
-</h2>
-
+                      {displayCategory}
                     </h2>
                   </div>
 
@@ -1390,14 +1387,10 @@ const orderedCategories = useMemo(() => {
                 {orderedCategories.map((cat, index) => {
                   // Get categoryEn from first item in category
                   const categoryItems = itemsByCategory[cat] || [];
-                  const displayCategory =
-                  cat === 'business'
-                    ? language === 'en'
-                      ? '💼 Business Meals'
-                      : '💼 מנות עסקיות'
-                    : language === 'en'
-                      ? categoryTranslations[cat] || cat
-                      : cat;
+                  const firstItem = categoryItems[0];
+                  const displayCategory = cat === 'business'
+                    ? (language === 'en' ? '💼 Business Meals' : '💼 מנות עסקיות')
+                    : (language === 'en' && firstItem?.categoryEn ? firstItem.categoryEn : (language === 'en' ? categoryTranslations[cat] || cat : cat));
                 
                   
                   return (
