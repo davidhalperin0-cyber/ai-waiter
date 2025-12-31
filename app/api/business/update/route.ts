@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { businessId, name, logoUrl, type, template, menuStyle, aiInstructions, businessHours, menuOnlyMessage, customContent } = body;
+    const { businessId, name, nameEn, logoUrl, type, template, menuStyle, aiInstructions, businessHours, menuOnlyMessage, customContent } = body;
 
     if (!businessId) {
       return NextResponse.json({ message: 'businessId is required' }, { status: 400 });
@@ -31,8 +31,21 @@ export async function PUT(req: NextRequest) {
     ];
 
     // Build update object - only include fields that are provided
+    // Separate name_en from other fields since it should always be saved
     const updateData: any = {};
+    const nameEnUpdate: any = {};
+    
     if (name !== undefined) updateData.name = name;
+    if (nameEn !== undefined) {
+      // Handle nameEn like menu items - allow null/empty to clear, otherwise trim
+      if (nameEn === null || nameEn === '') {
+        nameEnUpdate.name_en = null;
+      } else if (typeof nameEn === 'string') {
+        nameEnUpdate.name_en = nameEn.trim() || null;
+      } else {
+        nameEnUpdate.name_en = nameEn;
+      }
+    }
     if (logoUrl !== undefined) updateData.logoUrl = logoUrl || null; // Allow empty string to clear logo
     if (type !== undefined) updateData.type = type;
     if (template !== undefined) {
@@ -51,9 +64,10 @@ export async function PUT(req: NextRequest) {
     if (aiInstructions !== undefined) updateData.aiInstructions = aiInstructions;
     
     // Handle menuStyle, businessHours, and customContent separately - if columns don't exist, skip them
+    // Use actual DB column name: menustyle (lowercase)
     let optionalFieldsUpdate: any = {};
     if (menuStyle !== undefined) {
-      optionalFieldsUpdate.menuStyle = menuStyle || null;
+      optionalFieldsUpdate.menustyle = menuStyle || null; // Use lowercase column name
     }
     if (businessHours !== undefined) {
       optionalFieldsUpdate.businessHours = businessHours || null;
@@ -128,6 +142,25 @@ export async function PUT(req: NextRequest) {
       
       // Remove subscription from optionalFieldsUpdate since we already updated it
       delete optionalFieldsUpdate.subscription;
+    }
+    
+    // Update name_en separately if needed (like customContent)
+    if (nameEnUpdate && Object.keys(nameEnUpdate).length > 0) {
+      console.log('📝 Updating name_en separately:', JSON.stringify(nameEnUpdate, null, 2));
+      const { error: nameEnError, data: nameEnData } = await supabaseAdmin
+        .from('businesses')
+        .update(nameEnUpdate)
+        .eq('businessId', businessId)
+        .select('name_en');
+      
+      if (nameEnError) {
+        console.error('❌ name_en update error:', nameEnError);
+        // Don't fail the entire request if name_en fails - it might not exist yet
+        console.warn('⚠️ name_en update failed, but continuing with other fields');
+      } else {
+        console.log('✅ name_en update successful');
+        console.log('📝 Updated name_en:', JSON.stringify(nameEnData?.[0]?.name_en, null, 2));
+      }
     }
     
     // Update customContent separately if needed (like subscription)
@@ -206,7 +239,7 @@ export async function PUT(req: NextRequest) {
         
         if (isColumnError) {
           console.warn('⚠️ Column may not exist, trying update without optional fields');
-          // Try updating only required fields (template, name, type, etc.)
+          // Try updating only required fields (name_en was already updated separately above)
           const requiredFieldsOnly: any = {};
           if (updateData.name !== undefined) requiredFieldsOnly.name = updateData.name;
           if (updateData.logoUrl !== undefined) requiredFieldsOnly.logoUrl = updateData.logoUrl;

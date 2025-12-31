@@ -22,29 +22,62 @@ export default function CustomContentEditor({ businessId, initialContent, onSave
 
   const [saving, setSaving] = useState(false);
 
-  // Update content when initialContent changes (after save)
+  // Update content when initialContent changes (after save) - only if values actually changed
   useEffect(() => {
-    console.log('🔄 CustomContentEditor: initialContent changed', initialContent);
-    if (initialContent) {
-      setContent({
+    setContent((prevContent) => {
+      if (!initialContent) {
+        // Only reset if current content is not already empty
+        const isEmpty = !prevContent.menuButtonImageUrl && 
+                       (!prevContent.promotions || prevContent.promotions.length === 0) &&
+                       (!prevContent.contact || !prevContent.contact.enabled) &&
+                       (!prevContent.loyaltyClub || !prevContent.loyaltyClub.enabled) &&
+                       (!prevContent.reviews || !prevContent.reviews.enabled);
+        if (isEmpty) {
+          return prevContent; // No change needed
+        }
+        return {
+          promotions: [],
+          events: { enabled: false, title: '', description: '', formFields: [] },
+          contact: { enabled: false, title: '', description: '', phone: '', email: '', whatsapp: '', instagram: '', facebook: '' },
+          loyaltyClub: { enabled: false, title: '', description: '', benefits: [] },
+          menuButtonImageUrl: '',
+          reviews: { enabled: false, googleReviewsUrl: '' },
+        };
+      }
+
+      // Deep comparison - only update if values actually changed
+      const currentStr = JSON.stringify({
+        menuButtonImageUrl: prevContent.menuButtonImageUrl || '',
+        promotions: prevContent.promotions || [],
+        events: prevContent.events || { enabled: false, title: '', description: '', formFields: [] },
+        contact: prevContent.contact || { enabled: false, title: '', description: '', phone: '', email: '', whatsapp: '', instagram: '', facebook: '' },
+        loyaltyClub: prevContent.loyaltyClub || { enabled: false, title: '', description: '', benefits: [] },
+        reviews: prevContent.reviews || { enabled: false, googleReviewsUrl: '' },
+      });
+
+      const newStr = JSON.stringify({
+        menuButtonImageUrl: initialContent.menuButtonImageUrl || '',
         promotions: initialContent.promotions || [],
         events: initialContent.events || { enabled: false, title: '', description: '', formFields: [] },
         contact: initialContent.contact || { enabled: false, title: '', description: '', phone: '', email: '', whatsapp: '', instagram: '', facebook: '' },
         loyaltyClub: initialContent.loyaltyClub || { enabled: false, title: '', description: '', benefits: [] },
-        menuButtonImageUrl: initialContent.menuButtonImageUrl || '',
         reviews: initialContent.reviews || { enabled: false, googleReviewsUrl: '' },
       });
-    } else {
-      // Reset to defaults if initialContent is null
-      setContent({
-        promotions: [],
-        events: { enabled: false, title: '', description: '', formFields: [] },
-        contact: { enabled: false, title: '', description: '', phone: '', email: '', whatsapp: '', instagram: '', facebook: '' },
-        loyaltyClub: { enabled: false, title: '', description: '', benefits: [] },
-        menuButtonImageUrl: '',
-        reviews: { enabled: false, googleReviewsUrl: '' },
-      });
-    }
+
+      // Only update if values actually changed
+      if (currentStr !== newStr) {
+        return {
+          promotions: initialContent.promotions || [],
+          events: initialContent.events || { enabled: false, title: '', description: '', formFields: [] },
+          contact: initialContent.contact || { enabled: false, title: '', description: '', phone: '', email: '', whatsapp: '', instagram: '', facebook: '' },
+          loyaltyClub: initialContent.loyaltyClub || { enabled: false, title: '', description: '', benefits: [] },
+          menuButtonImageUrl: initialContent.menuButtonImageUrl || '',
+          reviews: initialContent.reviews || { enabled: false, googleReviewsUrl: '' },
+        };
+      }
+
+      return prevContent; // No change needed
+    });
   }, [initialContent]);
 
   const handleSave = async () => {

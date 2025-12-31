@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import ThemeWrapper from '../../../../../components/themes/ThemeWrapper';
 
@@ -66,6 +66,7 @@ function HomePageContent({
   const [error, setError] = useState<string | null>(null);
   const [businessInfo, setBusinessInfo] = useState<{
     name: string;
+    nameEn?: string; // Optional English translation
     logoUrl?: string;
     template: 'bar-modern' | 'bar-classic' | 'bar-mid' | 'pizza-modern' | 'pizza-classic' | 'pizza-mid' | 'sushi' | 'generic' | 'gold';
     customContent?: {
@@ -110,17 +111,36 @@ function HomePageContent({
         const infoData = await infoRes.json();
 
         if (!infoRes.ok) {
-          throw new Error(infoData.message || 'שגיאה בטעינת המידע');
+          throw new Error(infoData.message || 'Error loading information');
         }
 
-        setBusinessInfo({
-          name: infoData.name || 'העסק',
-          logoUrl: infoData.logoUrl,
-          template: (infoData.template || 'generic') as any,
-          customContent: infoData.customContent || null,
+        // Only update if values actually changed to prevent infinite re-renders
+        setBusinessInfo((prev) => {
+          const newBusinessInfo = {
+            name: infoData.name || 'העסק',
+            nameEn: infoData.nameEn || undefined, // Optional English translation
+            logoUrl: infoData.logoUrl,
+            template: (infoData.template || 'generic') as any,
+            customContent: infoData.customContent || null,
+          };
+
+          if (!prev) return newBusinessInfo;
+
+          // Deep comparison to check if anything actually changed
+          const nameChanged = prev.name !== newBusinessInfo.name;
+          const logoChanged = prev.logoUrl !== newBusinessInfo.logoUrl;
+          const templateChanged = prev.template !== newBusinessInfo.template;
+          const contentChanged = JSON.stringify(prev.customContent) !== JSON.stringify(newBusinessInfo.customContent);
+
+          // If nothing changed, return previous to prevent re-render
+          if (!nameChanged && !logoChanged && !templateChanged && !contentChanged) {
+            return prev;
+          }
+
+          return newBusinessInfo;
         });
       } catch (err: any) {
-        setError(err.message || 'שגיאה בטעינת המידע');
+        setError(err.message || 'Error loading information');
       } finally {
         setLoading(false);
       }
@@ -160,7 +180,7 @@ function HomePageContent({
     return (
       <ThemeWrapper template="generic">
         <div className="min-h-screen flex items-center justify-center text-white">
-          <p>{error || 'שגיאה בטעינת המידע'}</p>
+          <p>{error || (language === 'en' ? 'Error loading information' : 'שגיאה בטעינת המידע')}</p>
         </div>
       </ThemeWrapper>
     );
@@ -173,9 +193,35 @@ function HomePageContent({
     contact.phone || contact.email || contact.whatsapp || contact.instagram || contact.facebook
   );
 
+  // SINGLE SOURCE OF TRUTH: Business name - name is always the fallback
+  // Rules:
+  // - English: Use nameEn if exists and non-empty, otherwise ALWAYS use name
+  // - Hebrew: Always use name
+  // - NEVER return empty/undefined - name is the guaranteed fallback
+  const displayBusinessName = useMemo(() => {
+    // If businessInfo not loaded, return placeholder
+    if (!businessInfo || !businessInfo.name) {
+      return 'Business';
+    }
+    
+    // For English: try nameEn, but ALWAYS fallback to name
+    if (language === 'en' && businessInfo.nameEn) {
+      const nameEn = String(businessInfo.nameEn).trim();
+      if (nameEn.length > 0) {
+        return nameEn;
+      }
+    }
+    
+    // ALWAYS return name as fallback (guaranteed to exist at this point)
+    return String(businessInfo.name);
+  }, [businessInfo, language]);
+  
   return (
     <ThemeWrapper template={template}>
-      <main className="min-h-screen text-white flex flex-col">
+      <main 
+        className="min-h-screen text-white flex flex-col"
+        dir={language === 'he' ? 'rtl' : 'ltr'}
+      >
         {/* Minimal Header */}
         <header className="pt-6 pb-4 px-6">
           <div className="flex items-center justify-end max-w-4xl mx-auto">
@@ -217,7 +263,7 @@ function HomePageContent({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                   src={businessInfo.logoUrl}
-                  alt={businessInfo.name}
+                  alt={displayBusinessName}
                   className="h-20 max-h-[80px] w-auto mx-auto object-contain"
                 />
               ) : (
@@ -228,7 +274,7 @@ function HomePageContent({
                   className="text-4xl md:text-5xl font-semibold tracking-tight text-white uppercase"
                   style={{ fontFamily: 'var(--font-sans), system-ui, -apple-system, sans-serif' }}
                 >
-                  {businessInfo.name}
+                  {displayBusinessName}
                 </motion.h1>
               )}
             </div>

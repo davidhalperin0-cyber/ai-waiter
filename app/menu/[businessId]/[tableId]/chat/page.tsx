@@ -108,11 +108,29 @@ function ChatPageContent({
         const infoRes = await fetch(`/api/menu/info?businessId=${encodeURIComponent(businessId)}`);
         if (infoRes.ok) {
           const infoData = await infoRes.json();
-          setBusinessInfo({
-            name: infoData.name,
-            logoUrl: infoData.logoUrl,
-            template: infoData.template || 'generic',
-            menuStyle: infoData.menuStyle || 'elegant',
+          // Only update if values actually changed to prevent infinite re-renders
+          setBusinessInfo((prev) => {
+            const newBusinessInfo = {
+              name: infoData.name,
+              logoUrl: infoData.logoUrl,
+              template: infoData.template || 'generic',
+              menuStyle: infoData.menuStyle || 'elegant',
+            };
+
+            if (!prev) return newBusinessInfo;
+
+            // Deep comparison to check if anything actually changed
+            const nameChanged = prev.name !== newBusinessInfo.name;
+            const logoChanged = prev.logoUrl !== newBusinessInfo.logoUrl;
+            const templateChanged = prev.template !== newBusinessInfo.template;
+            const menuStyleChanged = prev.menuStyle !== newBusinessInfo.menuStyle;
+
+            // If nothing changed, return previous to prevent re-render
+            if (!nameChanged && !logoChanged && !templateChanged && !menuStyleChanged) {
+              return prev;
+            }
+
+            return newBusinessInfo;
           });
         }
 

@@ -13,6 +13,7 @@ import { getMenuStyle, MenuStyleVariant } from '@/lib/menuStyle';
 interface MenuItem {
   businessId: string;
   category: string;
+  categoryEn?: string;
   name: string;
   nameEn?: string;
   price: number;
@@ -43,6 +44,7 @@ function CustomerMenuPageContent({
   const [activeCategory, setActiveCategory] = useState<string | 'all'>('all'); // For scroll-based highlighting only
   const [businessInfo, setBusinessInfo] = useState<{
     name: string;
+    nameEn?: string; // Optional English translation
     logoUrl?: string;
     template: 'bar-modern' | 'bar-classic' | 'bar-mid' | 'pizza-modern' | 'pizza-classic' | 'pizza-mid' | 'sushi' | 'generic' | 'gold';
     menuStyle?: MenuStyleVariant;
@@ -163,6 +165,7 @@ function CustomerMenuPageContent({
 
         const newBusinessInfo = {
           name: infoData.name || 'העסק',
+          nameEn: infoData.nameEn || undefined, // Optional English translation
           logoUrl: infoData.logoUrl,
           template: (infoData.template || 'generic') as 'bar-modern' | 'bar-classic' | 'bar-mid' | 'pizza-modern' | 'pizza-classic' | 'pizza-mid' | 'sushi' | 'generic' | 'gold',
           menuStyle: (infoData.menuStyle || 'elegant') as MenuStyleVariant,
@@ -190,16 +193,29 @@ function CustomerMenuPageContent({
             setBusinessInfo(newBusinessInfo);
           }
         } else if (infoRes.ok) {
-          // Always update business info - React will handle re-renders efficiently
-          console.log('🔄 Updating business info:', {
-            template: newBusinessInfo.template,
-            menuStyle: newBusinessInfo.menuStyle,
-            prev: businessInfo ? {
-              template: businessInfo.template,
-              menuStyle: businessInfo.menuStyle,
-            } : null
+          // Only update if values actually changed to prevent infinite re-renders
+          setBusinessInfo((prev) => {
+            if (!prev) return newBusinessInfo;
+            
+            // Deep comparison to check if anything actually changed
+            const nameChanged = prev.name !== newBusinessInfo.name;
+            const logoChanged = prev.logoUrl !== newBusinessInfo.logoUrl;
+            const templateChanged = prev.template !== newBusinessInfo.template;
+            const menuStyleChanged = prev.menuStyle !== newBusinessInfo.menuStyle;
+            const statusChanged = prev.subscriptionStatus !== newBusinessInfo.subscriptionStatus;
+            const planTypeChanged = prev.planType !== newBusinessInfo.planType;
+            const messageChanged = prev.menuOnlyMessage !== newBusinessInfo.menuOnlyMessage;
+            const hoursChanged = JSON.stringify(prev.businessHours) !== JSON.stringify(newBusinessInfo.businessHours);
+            const contentChanged = JSON.stringify(prev.customContent) !== JSON.stringify(newBusinessInfo.customContent);
+            
+            // If nothing changed, return previous to prevent re-render
+            if (!nameChanged && !logoChanged && !templateChanged && !menuStyleChanged && 
+                !statusChanged && !planTypeChanged && !messageChanged && !hoursChanged && !contentChanged) {
+              return prev;
+            }
+            
+            return newBusinessInfo;
           });
-          setBusinessInfo(newBusinessInfo);
         }
 
         // Load menu items - with cache busting (only on initial load)
@@ -225,13 +241,7 @@ function CustomerMenuPageContent({
 
     loadData(true);
     
-    // Poll for business info changes every 5 seconds (to catch template/menuStyle changes)
-    // This runs silently in the background without showing loading state
-    const interval = setInterval(() => {
-      loadData(false);
-    }, 5000);
-    
-    return () => clearInterval(interval);
+    // No polling - only load once per businessId to prevent infinite re-renders
   }, [businessId]);
 
   // Load saved language preference from localStorage
@@ -609,13 +619,43 @@ function CustomerMenuPageContent({
     console.log('📝 menuStyleVariant changed to:', menuStyleVariant);
   }, [menuStyleVariant]);
 
-  if (!businessInfo) {
-    return <div className="min-h-screen flex items-center justify-center text-white">טוען...</div>;
-  }
+  // SINGLE SOURCE OF TRUTH: Business name - name is always the fallback
+  // Rules:
+  // - English: Use nameEn if exists and non-empty, otherwise ALWAYS use name
+  // - Hebrew: Always use name
+  // - NEVER return empty/undefined - name is the guaranteed fallback
+  const displayBusinessName = useMemo(() => {
+    // If businessInfo not loaded, return placeholder
+    if (!businessInfo || !businessInfo.name) {
+      return 'Menu';
+    }
+    
+    // For English: try nameEn, but ALWAYS fallback to name
+    if (language === 'en' && businessInfo.nameEn) {
+      const nameEn = String(businessInfo.nameEn).trim();
+      if (nameEn.length > 0) {
+        return nameEn;
+      }
+    }
+    
+    // ALWAYS return name as fallback (guaranteed to exist at this point)
+    return String(businessInfo.name);
+  }, [businessInfo, language]);
 
+  if (!businessInfo) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white" dir={language === 'he' ? 'rtl' : 'ltr'}>
+        {language === 'en' ? 'Loading...' : 'טוען...'}
+      </div>
+    );
+  }
+  
   return (
     <ThemeWrapper template={template}>
-      <main className="min-h-screen text-white pb-32">
+      <main 
+        className="min-h-screen text-white pb-32"
+        dir={language === 'he' ? 'rtl' : 'ltr'}
+      >
         {/* Header - Premium Redesign */}
         <header className="relative pt-8 pb-12 px-6 overflow-hidden">
           {/* Subtle background decoration */}
@@ -624,6 +664,7 @@ function CustomerMenuPageContent({
           </div>
 
           <div className="flex flex-col items-center text-center">
+            {/* SINGLE SOURCE OF TRUTH: Business name rendered exactly once */}
             {businessInfo?.logoUrl ? (
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -634,7 +675,7 @@ function CustomerMenuPageContent({
                 <div className="absolute inset-0 bg-white/5 blur-2xl rounded-full scale-150 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
                 <img
                   src={businessInfo.logoUrl}
-                  alt={businessInfo.name}
+                  alt={displayBusinessName}
                   className="relative max-h-20 lg:max-h-24 w-auto object-contain drop-shadow-2xl"
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = 'none';
@@ -642,8 +683,9 @@ function CustomerMenuPageContent({
                     if (fallback) fallback.style.display = 'flex';
                   }}
                 />
-                <div className="hidden absolute inset-0 items-center justify-center text-3xl font-light tracking-widest uppercase">
-                  {businessInfo?.name?.[0] || 'M'}
+                {/* Fallback: show full business name if logo fails */}
+                <div className="hidden absolute inset-0 items-center justify-center text-2xl font-light tracking-wide">
+                  {displayBusinessName}
                 </div>
               </motion.div>
             ) : (
@@ -652,9 +694,9 @@ function CustomerMenuPageContent({
                 animate={{ opacity: 1, y: 0 }}
                 className="mb-6"
               >
-                <span className="text-4xl font-extralight tracking-[0.3em] uppercase opacity-90">
-                  {businessInfo?.name || 'Menu'}
-                </span>
+                <h1 className="text-4xl font-extralight tracking-[0.3em] uppercase opacity-90">
+                  {displayBusinessName}
+                </h1>
               </motion.div>
             )}
 
@@ -664,9 +706,6 @@ function CustomerMenuPageContent({
               transition={{ delay: 0.3 }}
               className="space-y-1"
             >
-              <h1 className="text-xl font-light tracking-[0.1em] text-white/90">
-                {businessInfo?.name}
-              </h1>
               <div className="flex items-center justify-center gap-3">
                 <span className="h-[1px] w-8 bg-white/20" />
                 <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-medium">
@@ -748,16 +787,22 @@ function CustomerMenuPageContent({
             >
               <div className="text-4xl mb-4 opacity-50">✦</div>
               <h2 className="text-lg font-light tracking-wide mb-2">
-                {businessDisabled ? 'החשבון אינו פעיל' : 'המנוי פג תוקף'}
+                {businessDisabled 
+                  ? (language === 'en' ? 'Account is inactive' : 'החשבון אינו פעיל')
+                  : (language === 'en' ? 'Subscription expired' : 'המנוי פג תוקף')
+                }
               </h2>
               <p className="text-sm text-white/50 leading-relaxed max-w-xs mx-auto mb-4">
-                העסק {businessInfo?.name} אינו יכול לקבל הזמנות כרגע.
+                {language === 'en' 
+                  ? `The business ${businessInfo?.name} cannot accept orders at this time.`
+                  : `העסק ${businessInfo?.name} אינו יכול לקבל הזמנות כרגע.`
+                }
               </p>
               <div className="pt-4 border-t border-white/5">
                 <p className="text-[10px] uppercase tracking-widest text-white/30">
-                  תצוגה בלבד
-          </p>
-        </div>
+                  {language === 'en' ? 'View only' : 'תצוגה בלבד'}
+                </p>
+              </div>
             </motion.div>
           )}
 
@@ -775,7 +820,10 @@ function CustomerMenuPageContent({
                 הקישור תקף לשעה אחת בלבד. כדי להזמין שוב, אנא סרוק את קוד ה-QR מחדש.
               </p>
               <p className="text-xs text-white/50">
-                ניתן לצפות בתפריט, אך לא ניתן להוסיף פריטים לעגלה
+                {language === 'en' 
+                  ? 'You can view the menu, but cannot add items to cart'
+                  : 'ניתן לצפות בתפריט, אך לא ניתן להוסיף פריטים לעגלה'
+                }
               </p>
             </motion.div>
           )}
@@ -899,7 +947,7 @@ function CustomerMenuPageContent({
 
                       <div className="text-center max-w-md">
                         <span className="inline-block px-3 py-1 rounded-full border border-amber-200/20 text-[10px] uppercase tracking-[0.2em] text-amber-200/60 mb-4">
-                          מומלץ השבוע
+                          {language === 'en' ? 'Recommended this week' : 'מומלץ השבוע'}
                         </span>
                         <h3 className="text-3xl lg:text-4xl font-light tracking-tight text-white mb-4">
                           {language === 'en' && featuredItems[featuredIndex].nameEn
@@ -1249,7 +1297,9 @@ function CustomerMenuPageContent({
           <aside className="hidden lg:block lg:mb-0 lg:sticky lg:top-8 lg:self-start">
             <div className="relative pl-6">
               <div className="mb-8 pl-4">
-                <h2 className="text-[10px] uppercase tracking-[0.3em] text-white/30 font-bold mb-1">תפריט</h2>
+                <h2 className="text-[10px] uppercase tracking-[0.3em] text-white/30 font-bold mb-1">
+                  {language === 'en' ? 'MENU' : 'תפריט'}
+                </h2>
                 <div className="h-[1px] w-8 bg-white/20" />
               </div>
               
@@ -1262,7 +1312,7 @@ function CustomerMenuPageContent({
                   <span className={`text-sm tracking-wide transition-all duration-300 ${
                     activeCategory === 'all' ? 'text-white font-medium' : 'text-white/40 group-hover:text-white/70'
                   }`}>
-                    עמוד הבית
+                    {language === 'en' ? 'Home' : 'עמוד הבית'}
                   </span>
                   {activeCategory === 'all' && (
                     <motion.div

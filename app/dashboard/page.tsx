@@ -40,6 +40,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<'menu' | 'tables' | 'settings' | 'printer' | 'orders' | 'pos' | 'content'>('menu');
   const [businessInfo, setBusinessInfo] = useState<{
     name: string;
+    nameEn?: string;
     type: string;
     template: string;
     menuStyle?: string;
@@ -195,30 +196,58 @@ export default function DashboardPage() {
       const res = await fetch(`/api/business/info?businessId=${encodeURIComponent(businessId)}`);
       const data = await res.json();
       if (res.ok && data.business) {
-        setBusinessInfo({
-          name: data.business.name,
-          logoUrl: data.business.logoUrl || '',
-          type: data.business.type,
-          template: data.business.template,
-          menuStyle: data.business.menuStyle || 'elegant',
-          aiInstructions: data.business.aiInstructions || '',
-          businessHours: data.business.businessHours || null,
-          subscription: data.business.subscription,
-          customContent: data.business.customContent || null,
-          printerConfig: data.business.printerConfig || {
-            enabled: false,
-            type: 'http',
-            endpoint: '',
-            payloadType: 'json',
-          },
-          posConfig: data.business.posConfig || {
-            enabled: false,
-            provider: 'generic',
-            endpoint: '',
-            method: 'POST',
-            headers: {},
-            timeoutMs: 5000,
-          },
+        // Only update if values actually changed to prevent infinite re-renders
+        setBusinessInfo((prev) => {
+          const newBusinessInfo = {
+            name: data.business.name,
+            nameEn: data.business.nameEn || undefined,
+            logoUrl: data.business.logoUrl || '',
+            type: data.business.type,
+            template: data.business.template,
+            menuStyle: data.business.menuStyle || 'elegant',
+            aiInstructions: data.business.aiInstructions || '',
+            businessHours: data.business.businessHours || null,
+            subscription: data.business.subscription,
+            customContent: data.business.customContent || null,
+            printerConfig: data.business.printerConfig || {
+              enabled: false,
+              type: 'http',
+              endpoint: '',
+              payloadType: 'json',
+            },
+            posConfig: data.business.posConfig || {
+              enabled: false,
+              provider: 'generic',
+              endpoint: '',
+              method: 'POST',
+              headers: {},
+              timeoutMs: 5000,
+            },
+          };
+
+          if (!prev) return newBusinessInfo;
+
+          // Deep comparison to check if anything actually changed
+          const nameChanged = prev.name !== newBusinessInfo.name;
+          const logoChanged = prev.logoUrl !== newBusinessInfo.logoUrl;
+          const typeChanged = prev.type !== newBusinessInfo.type;
+          const templateChanged = prev.template !== newBusinessInfo.template;
+          const menuStyleChanged = prev.menuStyle !== newBusinessInfo.menuStyle;
+          const aiInstructionsChanged = prev.aiInstructions !== newBusinessInfo.aiInstructions;
+          const hoursChanged = JSON.stringify(prev.businessHours) !== JSON.stringify(newBusinessInfo.businessHours);
+          const subscriptionChanged = JSON.stringify(prev.subscription) !== JSON.stringify(newBusinessInfo.subscription);
+          const contentChanged = JSON.stringify(prev.customContent) !== JSON.stringify(newBusinessInfo.customContent);
+          const printerChanged = JSON.stringify(prev.printerConfig) !== JSON.stringify(newBusinessInfo.printerConfig);
+          const posChanged = JSON.stringify(prev.posConfig) !== JSON.stringify(newBusinessInfo.posConfig);
+
+          // If nothing changed, return previous to prevent re-render
+          if (!nameChanged && !logoChanged && !typeChanged && !templateChanged && !menuStyleChanged && 
+              !aiInstructionsChanged && !hoursChanged && !subscriptionChanged && !contentChanged && 
+              !printerChanged && !posChanged) {
+            return prev;
+          }
+
+          return newBusinessInfo;
         });
       }
     } catch (err) {
@@ -1658,6 +1687,7 @@ export default function DashboardPage() {
 
                 const formData = new FormData(e.currentTarget);
                 const name = formData.get('name') as string;
+                const nameEn = formData.get('nameEn') as string;
                 const logoUrl = formData.get('logoUrl') as string;
                 const type = formData.get('type') as string;
                 const template = formData.get('template') as string;
@@ -1693,6 +1723,7 @@ export default function DashboardPage() {
                     body: JSON.stringify({
                       businessId,
                       name,
+                      nameEn: nameEn?.trim() || undefined,
                       logoUrl: logoUrl || undefined,
                       type,
                       template,
@@ -1718,6 +1749,7 @@ export default function DashboardPage() {
 
                   setBusinessInfo({ 
                     name,
+                    nameEn: nameEn?.trim() || undefined,
                     logoUrl: logoUrl || undefined,
                     type, 
                     template,
@@ -1745,6 +1777,48 @@ export default function DashboardPage() {
                   defaultValue={businessInfo.name}
                   className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                   required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-medium text-neutral-200">
+                    שם העסק באנגלית <span className="text-neutral-500 text-xs font-normal">(אופציונלי)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!businessInfo.name) return;
+                      try {
+                        const res = await fetch('/api/ai/translate', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ text: businessInfo.name, target: 'name' }),
+                        });
+                        const data = await res.json();
+                        if (res.ok && data.translated) {
+                          const nameEnInput = document.querySelector('input[name="nameEn"]') as HTMLInputElement;
+                          if (nameEnInput) {
+                            nameEnInput.value = data.translated;
+                          }
+                          toast.success('תרגום הושלם!');
+                        } else {
+                          toast.error('נכשל בתרגום');
+                        }
+                      } catch (err) {
+                        toast.error('שגיאה בתרגום');
+                      }
+                    }}
+                    className="text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors"
+                  >
+                    ✨ תרגם אוטומטית
+                  </button>
+                </div>
+                <input
+                  name="nameEn"
+                  defaultValue={businessInfo.nameEn || ''}
+                  className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                  placeholder="e.g. Gili Restaurant"
                 />
               </div>
 

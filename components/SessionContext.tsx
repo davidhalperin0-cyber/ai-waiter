@@ -104,6 +104,21 @@ export function SessionProvider({
   function updateSession(updates: Partial<SessionState>) {
     setSession((prev) => {
       if (!prev) return null;
+      
+      // Check if any values actually changed
+      let hasChanges = false;
+      for (const key in updates) {
+        if (prev[key as keyof SessionState] !== updates[key as keyof SessionState]) {
+          hasChanges = true;
+          break;
+        }
+      }
+      
+      // Only update if values actually changed
+      if (!hasChanges) {
+        return prev;
+      }
+      
       return { ...prev, ...updates };
     });
   }
