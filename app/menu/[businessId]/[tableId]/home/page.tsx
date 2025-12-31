@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useEffect, useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import ThemeWrapper from '../../../../../components/themes/ThemeWrapper';
 
 // Modern SVG Icons
@@ -258,42 +258,53 @@ function HomePageContent({
             
             {/* 1. Top Padding (15vh) & Business Name - Brand Identity */}
             <div className="pt-[15vh] text-center w-full">
-              {businessInfo.logoUrl && businessInfo.logoUrl.trim() ? (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                  className="relative"
-                >
-                  <img
-                    src={businessInfo.logoUrl}
-                    alt={displayBusinessName}
-                    className="h-20 max-h-[80px] w-auto mx-auto object-contain"
-                    onError={(e) => {
-                      // Hide image on error and show fallback
-                      (e.target as HTMLImageElement).style.display = 'none';
-                      const parent = (e.target as HTMLImageElement).parentElement;
-                      if (parent) {
-                        const fallback = document.createElement('h1');
-                        fallback.className = 'text-4xl md:text-5xl font-semibold tracking-tight text-white uppercase';
-                        fallback.style.fontFamily = 'var(--font-sans), system-ui, -apple-system, sans-serif';
-                        fallback.textContent = displayBusinessName;
-                        parent.appendChild(fallback);
-                      }
-                    }}
-                  />
-                </motion.div>
-              ) : (
-                <motion.h1 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                  className="text-4xl md:text-5xl font-semibold tracking-tight text-white uppercase"
-                  style={{ fontFamily: 'var(--font-sans), system-ui, -apple-system, sans-serif' }}
-                >
-                  {displayBusinessName}
-                </motion.h1>
-              )}
+              <AnimatePresence mode="wait">
+                {businessInfo.logoUrl && businessInfo.logoUrl.trim() ? (
+                  <motion.div
+                    key={`logo-${displayBusinessName}-${language}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                    className="relative"
+                  >
+                    <img
+                      src={businessInfo.logoUrl}
+                      alt={displayBusinessName}
+                      className="h-20 max-h-[80px] w-auto mx-auto object-contain"
+                      onError={(e) => {
+                        // Hide image on error and show fallback
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        const parent = (e.target as HTMLImageElement).parentElement;
+                        if (parent) {
+                          // Remove existing fallback if any
+                          const existingFallback = parent.querySelector('.logo-fallback');
+                          if (existingFallback) {
+                            existingFallback.remove();
+                          }
+                          const fallback = document.createElement('h1');
+                          fallback.className = 'logo-fallback text-4xl md:text-5xl font-semibold tracking-tight text-white uppercase';
+                          fallback.style.fontFamily = 'var(--font-sans), system-ui, -apple-system, sans-serif';
+                          fallback.textContent = displayBusinessName;
+                          parent.appendChild(fallback);
+                        }
+                      }}
+                    />
+                  </motion.div>
+                ) : (
+                  <motion.h1 
+                    key={`name-${displayBusinessName}-${language}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                    className="text-4xl md:text-5xl font-semibold tracking-tight text-white uppercase"
+                    style={{ fontFamily: 'var(--font-sans), system-ui, -apple-system, sans-serif' }}
+                  >
+                    {displayBusinessName}
+                  </motion.h1>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* 2. Macro Spacer 1 (80px - 120px) */}
