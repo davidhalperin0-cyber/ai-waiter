@@ -166,6 +166,30 @@ function HomePageContent({
     }
   };
 
+  // SINGLE SOURCE OF TRUTH: Business name - name is always the fallback
+  // Rules:
+  // - English: Use nameEn if exists and non-empty, otherwise ALWAYS use name
+  // - Hebrew: Always use name
+  // - NEVER return empty/undefined - name is the guaranteed fallback
+  // IMPORTANT: This must be called BEFORE any early returns to maintain hook order
+  const displayBusinessName = useMemo(() => {
+    // If businessInfo not loaded, return placeholder
+    if (!businessInfo || !businessInfo.name) {
+      return 'Business';
+    }
+    
+    // For English: try nameEn, but ALWAYS fallback to name
+    if (language === 'en' && businessInfo.nameEn) {
+      const nameEn = String(businessInfo.nameEn).trim();
+      if (nameEn.length > 0) {
+        return nameEn;
+      }
+    }
+    
+    // ALWAYS return name as fallback (guaranteed to exist at this point)
+    return String(businessInfo.name);
+  }, [businessInfo, language]);
+
   if (loading) {
     return (
       <ThemeWrapper template="generic">
@@ -192,29 +216,6 @@ function HomePageContent({
   const hasContact = contact?.enabled && (
     contact.phone || contact.email || contact.whatsapp || contact.instagram || contact.facebook
   );
-
-  // SINGLE SOURCE OF TRUTH: Business name - name is always the fallback
-  // Rules:
-  // - English: Use nameEn if exists and non-empty, otherwise ALWAYS use name
-  // - Hebrew: Always use name
-  // - NEVER return empty/undefined - name is the guaranteed fallback
-  const displayBusinessName = useMemo(() => {
-    // If businessInfo not loaded, return placeholder
-    if (!businessInfo || !businessInfo.name) {
-      return 'Business';
-    }
-    
-    // For English: try nameEn, but ALWAYS fallback to name
-    if (language === 'en' && businessInfo.nameEn) {
-      const nameEn = String(businessInfo.nameEn).trim();
-      if (nameEn.length > 0) {
-        return nameEn;
-      }
-    }
-    
-    // ALWAYS return name as fallback (guaranteed to exist at this point)
-    return String(businessInfo.name);
-  }, [businessInfo, language]);
   
   return (
     <ThemeWrapper template={template}>

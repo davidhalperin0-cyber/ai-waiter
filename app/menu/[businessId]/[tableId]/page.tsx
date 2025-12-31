@@ -916,9 +916,16 @@ const orderedCategories = useMemo(() => {
                   // Get categoryEn from first item in category
                   const categoryItems = itemsByCategory[cat] || [];
                   const firstItem = categoryItems[0];
-                  const displayCategory = cat === 'business'
-                    ? (language === 'en' ? '💼 Business' : '💼 עסקי')
-                    : (language === 'en' && firstItem?.categoryEn ? firstItem.categoryEn : (language === 'en' ? categoryTranslations[cat] || cat : cat));
+                  let displayCategory: string;
+                  if (cat === 'business') {
+                    displayCategory = language === 'en' ? '💼 Business' : '💼 עסקי';
+                  } else if (language === 'en' && firstItem?.categoryEn) {
+                    displayCategory = firstItem.categoryEn;
+                  } else if (language === 'en') {
+                    displayCategory = categoryTranslations[cat] || cat;
+                  } else {
+                    displayCategory = cat;
+                  }
                   
                   return (
                     <motion.button
@@ -1089,9 +1096,16 @@ const orderedCategories = useMemo(() => {
 
               // Get categoryEn from first item in category
               const firstItem = categoryItems[0];
-              const displayCategory = category === 'business'
-                ? (language === 'en' ? '💼 Business Meals' : '💼 מנות עסקיות')
-                : (language === 'en' && firstItem?.categoryEn ? firstItem.categoryEn : (language === 'en' ? categoryTranslations[category] || category : category));
+              let displayCategory: string;
+              if (category === 'business') {
+                displayCategory = language === 'en' ? '💼 Business Meals' : '💼 מנות עסקיות';
+              } else if (language === 'en' && firstItem?.categoryEn) {
+                displayCategory = firstItem.categoryEn;
+              } else if (language === 'en') {
+                displayCategory = categoryTranslations[category] || category;
+              } else {
+                displayCategory = category;
+              }
 
               return (
                 <section key={category} id={`category-${category}`} className="space-y-4">
@@ -1388,9 +1402,16 @@ const orderedCategories = useMemo(() => {
                   // Get categoryEn from first item in category
                   const categoryItems = itemsByCategory[cat] || [];
                   const firstItem = categoryItems[0];
-                  const displayCategory = cat === 'business'
-                    ? (language === 'en' ? '💼 Business Meals' : '💼 מנות עסקיות')
-                    : (language === 'en' && firstItem?.categoryEn ? firstItem.categoryEn : (language === 'en' ? categoryTranslations[cat] || cat : cat));
+                  let displayCategory: string;
+                  if (cat === 'business') {
+                    displayCategory = language === 'en' ? '💼 Business Meals' : '💼 מנות עסקיות';
+                  } else if (language === 'en' && firstItem?.categoryEn) {
+                    displayCategory = firstItem.categoryEn;
+                  } else if (language === 'en') {
+                    displayCategory = categoryTranslations[cat] || cat;
+                  } else {
+                    displayCategory = cat;
+                  }
                 
                   
                   return (
