@@ -71,12 +71,6 @@ function HomePageContent({
     template: 'bar-modern' | 'bar-classic' | 'bar-mid' | 'pizza-modern' | 'pizza-classic' | 'pizza-mid' | 'sushi' | 'generic' | 'gold';
     customContent?: {
       menuButtonImageUrl?: string;
-      promotions?: Array<{
-        id: string;
-        title: string;
-        titleEn?: string;
-        enabled: boolean;
-      }>;
       contact?: {
         enabled: boolean;
         phone?: string;
@@ -87,8 +81,6 @@ function HomePageContent({
       };
       loyaltyClub?: {
         enabled: boolean;
-        title: string;
-        titleEn?: string;
       };
       reviews?: {
         enabled: boolean;
@@ -97,6 +89,12 @@ function HomePageContent({
     };
   } | null>(null);
   const [language, setLanguage] = useState<'he' | 'en'>('he');
+  const [showLoyaltyModal, setShowLoyaltyModal] = useState(false);
+  const [loyaltyName, setLoyaltyName] = useState('');
+  const [loyaltyPhone, setLoyaltyPhone] = useState('');
+  const [loyaltyEmail, setLoyaltyEmail] = useState('');
+  const [loyaltySubmitting, setLoyaltySubmitting] = useState(false);
+  const [loyaltySuccess, setLoyaltySuccess] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -114,6 +112,15 @@ function HomePageContent({
           throw new Error(infoData.message || 'Error loading information');
         }
 
+        // Debug: Log what we received from API
+        console.log('📥 API Response - customContent:', {
+          hasCustomContent: !!infoData.customContent,
+          customContent: infoData.customContent,
+          contact: infoData.customContent?.contact,
+          facebook: infoData.customContent?.contact?.facebook,
+          instagram: infoData.customContent?.contact?.instagram,
+        });
+
         // Only update if values actually changed to prevent infinite re-renders
         setBusinessInfo((prev) => {
           const newBusinessInfo = {
@@ -123,6 +130,13 @@ function HomePageContent({
             template: (infoData.template || 'generic') as any,
             customContent: infoData.customContent || null,
           };
+
+          console.log('📥 Setting businessInfo state:', {
+            hasCustomContent: !!newBusinessInfo.customContent,
+            contact: newBusinessInfo.customContent?.contact,
+            facebook: newBusinessInfo.customContent?.contact?.facebook,
+            instagram: newBusinessInfo.customContent?.contact?.instagram,
+          });
 
           if (!prev) return newBusinessInfo;
 
@@ -163,6 +177,59 @@ function HomePageContent({
     setLanguage(lang);
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('menu_language', lang);
+    }
+  };
+
+  const handleLoyaltySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate required fields
+    if (!loyaltyName.trim()) {
+      alert(language === 'en' ? 'Name is required' : 'שם הוא שדה חובה');
+      return;
+    }
+
+    if (!loyaltyPhone.trim()) {
+      alert(language === 'en' ? 'Phone is required' : 'טלפון הוא שדה חובה');
+      return;
+    }
+
+    setLoyaltySubmitting(true);
+    setLoyaltySuccess(false);
+
+    try {
+      const res = await fetch('/api/contacts/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessId,
+          name: loyaltyName.trim(),
+          phone: loyaltyPhone.trim(),
+          email: loyaltyEmail.trim() || null, // Email is optional
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to join loyalty club');
+      }
+
+      setLoyaltySuccess(true);
+      setLoyaltyName('');
+      setLoyaltyPhone('');
+      setLoyaltyEmail('');
+      
+      // Close modal after 2 seconds
+      setTimeout(() => {
+        setShowLoyaltyModal(false);
+        setLoyaltySuccess(false);
+      }, 2000);
+    } catch (error: any) {
+      console.error('Error joining loyalty club:', error);
+      alert(language === 'en' ? 'Failed to join. Please try again.' : 'נכשל בהצטרפות. נסה שוב.');
+    } finally {
+      setLoyaltySubmitting(false);
     }
   };
 
@@ -211,11 +278,105 @@ function HomePageContent({
   }
 
   const template = businessInfo.template;
-  const hasPromotions = businessInfo.customContent?.promotions?.some(p => p.enabled);
   const contact = businessInfo.customContent?.contact;
+  
+  // Debug: Log what we have in businessInfo
+  console.log('🏠 HomePage - businessInfo state:', {
+    hasBusinessInfo: !!businessInfo,
+    hasCustomContent: !!businessInfo?.customContent,
+    customContent: businessInfo?.customContent,
+    contact: contact,
+    facebook: contact?.facebook,
+    instagram: contact?.instagram,
+  });
+  
+  // Helper function to normalize URLs (add https:// if missing)
+  const normalizeUrl = (url: string | undefined, label: string = 'URL'): string | undefined => {
+    console.log(`🔧 normalizeUrl(${label}):`, { input: url, type: typeof url });
+    
+    if (!url || url.trim() === '') {
+      console.log(`🔧 normalizeUrl(${label}): Empty or undefined, returning undefined`);
+      return undefined;
+    }
+    
+    const trimmed = url.trim();
+    console.log(`🔧 normalizeUrl(${label}): Trimmed:`, trimmed);
+    
+    // Reject dangerous or invalid URLs
+    if (trimmed.startsWith('javascript:') || trimmed.startsWith('data:') || trimmed.startsWith('about:') || trimmed.startsWith('#')) {
+      console.warn(`🔧 normalizeUrl(${label}): Invalid URL detected:`, trimmed);
+      return undefined;
+    }
+    
+    // If already has protocol, validate and return
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      // Validate that it's a proper URL
+      try {
+        new URL(trimmed);
+        console.log(`🔧 normalizeUrl(${label}): Already has protocol, returning:`, trimmed);
+        return trimmed;
+      } catch (e) {
+        console.warn(`🔧 normalizeUrl(${label}): Invalid URL format:`, trimmed, e);
+        return undefined;
+      }
+    }
+    
+    // For any other string, add https:// prefix
+    // This handles cases like:
+    // - "instagram.com/username" -> "https://instagram.com/username"
+    // - "www.facebook.com/page" -> "https://www.facebook.com/page"
+    // - "g.page/r/..." -> "https://g.page/r/..."
+    if (trimmed.length > 0) {
+      const result = `https://${trimmed}`;
+      // Validate the resulting URL
+      try {
+        new URL(result);
+        console.log(`🔧 normalizeUrl(${label}): Adding https://, returning:`, result);
+        return result;
+      } catch (e) {
+        console.warn(`🔧 normalizeUrl(${label}): Invalid URL format after adding https://:`, result, e);
+        return undefined;
+      }
+    }
+    
+    console.log(`🔧 normalizeUrl(${label}): Empty after processing, returning undefined`);
+    return undefined;
+  };
+  
+  // Normalize social media URLs
+  const instagramUrl = normalizeUrl(contact?.instagram, 'Instagram');
+  const facebookUrl = normalizeUrl(contact?.facebook, 'Facebook');
+  const googleReviewsUrl = normalizeUrl(businessInfo.customContent?.reviews?.googleReviewsUrl, 'GoogleReviews');
+  
+  // Debug: Log URLs to see what we're working with - ALWAYS log, not just if they exist
+  console.log('🔗 Social media URLs:', {
+    instagram: { raw: contact?.instagram, normalized: instagramUrl, exists: !!instagramUrl },
+    facebook: { raw: contact?.facebook, normalized: facebookUrl, exists: !!facebookUrl },
+    googleReviews: { raw: businessInfo.customContent?.reviews?.googleReviewsUrl, normalized: googleReviewsUrl, exists: !!googleReviewsUrl },
+    contactObject: contact,
+  });
+  
+  // Check if we have any contact info (phone, email, whatsapp)
   const hasContact = contact?.enabled && (
-    contact.phone || contact.email || contact.whatsapp || contact.instagram || contact.facebook
+    contact.phone || contact.email || contact.whatsapp
   );
+  
+  // Check if we have social media links (these should show even if contact.enabled is false)
+  const hasSocialMedia = instagramUrl || facebookUrl;
+  
+  // Debug: Log contact and social media status
+  console.log('🔍 Contact & Social Media Debug:', {
+    contactEnabled: contact?.enabled,
+    hasContact,
+    hasSocialMedia,
+    instagramUrl,
+    facebookUrl,
+    rawInstagram: contact?.instagram,
+    rawFacebook: contact?.facebook,
+    willShowContactSection: hasContact || hasSocialMedia,
+    willShowInstagram: !!instagramUrl,
+    willShowFacebook: !!facebookUrl,
+  });
   
   return (
     <ThemeWrapper template={template}>
@@ -358,69 +519,141 @@ function HomePageContent({
             <div className="h-16 md:h-24" />
 
             {/* 5. Contact / Social Icons - Discovery Row (Secondary Whispers) */}
-            {hasContact && (
+            {/* Show if we have contact info OR social media links */}
+            {(hasContact || hasSocialMedia || instagramUrl || facebookUrl) && (
               <div className="w-full">
                 <div className="flex justify-center items-center gap-6 md:gap-8">
-                  {contact.phone && (
+                  {contact?.phone && (
                     <motion.a
                       href={`tel:${contact.phone}`}
-                      className="group"
+                      className="group relative"
                       aria-label={language === 'en' ? 'Phone' : 'טלפון'}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.4, duration: 0.5 }}
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
+                      initial={{ opacity: 0, y: 20, scale: 0.8 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ 
+                        delay: 0.4, 
+                        duration: 0.6,
+                        type: "spring",
+                        stiffness: 200,
+                        damping: 15
+                      }}
+                      whileHover={{ 
+                        scale: 1.15,
+                        y: -5,
+                        transition: { duration: 0.3 }
+                      }}
+                      whileTap={{ scale: 0.95 }}
                     >
-<PhoneIcon className="w-6 h-6 text-white/40 group-hover:text-white/80 transition-all duration-300" />
+                      <div className="absolute inset-0 bg-green-500 rounded-full opacity-0 group-hover:opacity-20 blur-md transition-opacity duration-300" />
+                      <PhoneIcon className="relative w-6 h-6 text-white/40 group-hover:text-white transition-all duration-300 group-hover:drop-shadow-lg" />
+                    </motion.a>
+                  )}
+                  {contact?.email && (
+                    <motion.a
+                      href={`mailto:${contact.email}`}
+                      className="group relative"
+                      aria-label={language === 'en' ? 'Email' : 'אימייל'}
+                      initial={{ opacity: 0, y: 20, scale: 0.8 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ 
+                        delay: 0.42, 
+                        duration: 0.6,
+                        type: "spring",
+                        stiffness: 200,
+                        damping: 15
+                      }}
+                      whileHover={{ 
+                        scale: 1.15,
+                        y: -5,
+                        transition: { duration: 0.3 }
+                      }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <div className="absolute inset-0 bg-blue-400 rounded-full opacity-0 group-hover:opacity-20 blur-md transition-opacity duration-300" />
+                      <EmailIcon className="relative w-6 h-6 text-white/40 group-hover:text-white transition-all duration-300 group-hover:drop-shadow-lg" />
 </motion.a>
                   )}
-                  {contact.whatsapp && (
+                  {contact?.whatsapp && (
                     <motion.a
                       href={`https://wa.me/${contact.whatsapp.replace(/[^0-9]/g, '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group"
+                      className="group relative"
                       aria-label="WhatsApp"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.45, duration: 0.5 }}
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
+                      initial={{ opacity: 0, y: 20, scale: 0.8 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ 
+                        delay: 0.45, 
+                        duration: 0.6,
+                        type: "spring",
+                        stiffness: 200,
+                        damping: 15
+                      }}
+                      whileHover={{ 
+                        scale: 1.15,
+                        y: -5,
+                        transition: { duration: 0.3 }
+                      }}
+                      whileTap={{ scale: 0.95 }}
                     >
-                      <WhatsAppIcon className="w-6 h-6 text-white/40 group-hover:text-white/80 transition-all duration-300" />
+                      <div className="absolute inset-0 bg-green-400 rounded-full opacity-0 group-hover:opacity-20 blur-md transition-opacity duration-300" />
+                      <WhatsAppIcon className="relative w-6 h-6 text-white/40 group-hover:text-white transition-all duration-300 group-hover:drop-shadow-lg" />
                     </motion.a>
                   )}
-                  {contact.instagram && (
+                  {instagramUrl && (
                     <motion.a
-                      href={contact.instagram}
+                      href={instagramUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group"
+                      className="group relative"
                       aria-label="Instagram"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.5, duration: 0.5 }}
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
+                      initial={{ opacity: 0, y: 20, scale: 0.8 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ 
+                        delay: 0.5, 
+                        duration: 0.6,
+                        type: "spring",
+                        stiffness: 200,
+                        damping: 15
+                      }}
+                      whileHover={{ 
+                        scale: 1.15,
+                        y: -5,
+                        rotate: [0, -5, 5, -5, 0],
+                        transition: { duration: 0.3 }
+                      }}
+                      whileTap={{ scale: 0.95 }}
                     >
-                      <InstagramIcon className="w-6 h-6 text-white/40 group-hover:text-white/80 transition-all duration-300" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 rounded-full opacity-0 group-hover:opacity-20 blur-md transition-opacity duration-300" />
+                      <InstagramIcon className="relative w-6 h-6 text-white/40 group-hover:text-white transition-all duration-300 group-hover:drop-shadow-lg" />
                     </motion.a>
                   )}
-                  {contact.facebook && (
+                  {facebookUrl && (
                     <motion.a
-                      href={contact.facebook}
+                      href={facebookUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group"
+                      className="group relative"
                       aria-label="Facebook"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.55, duration: 0.5 }}
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
+                      initial={{ opacity: 0, y: 20, scale: 0.8 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ 
+                        delay: 0.55, 
+                        duration: 0.6,
+                        type: "spring",
+                        stiffness: 200,
+                        damping: 15
+                      }}
+                      whileHover={{ 
+                        scale: 1.15,
+                        y: -5,
+                        rotate: [0, 5, -5, 5, 0],
+                        transition: { duration: 0.3 }
+                      }}
+                      whileTap={{ scale: 0.95 }}
                     >
-                      <FacebookIcon className="w-6 h-6 text-white/40 group-hover:text-white/80 transition-all duration-300" />
+                      <div className="absolute inset-0 bg-blue-500 rounded-full opacity-0 group-hover:opacity-20 blur-md transition-opacity duration-300" />
+                      <FacebookIcon className="relative w-6 h-6 text-white/40 group-hover:text-white transition-all duration-300 group-hover:drop-shadow-lg" />
                     </motion.a>
                   )}
                 </div>
@@ -428,34 +661,73 @@ function HomePageContent({
             )}
 
             {/* 6. Optional Discovery - Loyalty / Reviews (Subtle Footer) */}
-            <div className="mt-auto pt-16 pb-12 w-full flex flex-col items-center gap-4 opacity-40 hover:opacity-100 transition-opacity">
+            <div className="mt-auto pt-16 pb-12 w-full flex flex-col items-center gap-4">
               {businessInfo.customContent?.loyaltyClub?.enabled && (
                 <motion.button 
-                  className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-white/60"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.7 }}
+                  onClick={() => setShowLoyaltyModal(true)}
+                  className="group relative flex items-center gap-2 px-4 py-2 rounded-full text-xs uppercase tracking-[0.2em] text-white/60 hover:text-white/80 transition-all duration-300 cursor-pointer overflow-hidden"
+                  initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ 
+                    delay: 0.7,
+                    duration: 0.6,
+                    type: "spring",
+                    stiffness: 200,
+                    damping: 15
+                  }}
+                  whileHover={{ 
+                    scale: 1.05,
+                    y: -3,
+                    transition: { duration: 0.3 }
+                  }}
+                  whileTap={{ scale: 0.95 }}
                 >
-<LoyaltyIcon className="w-4 h-4" />
-<span>
-                    {language === 'en' 
-                      ? businessInfo.customContent.loyaltyClub.titleEn || 'Loyalty'
-                      : businessInfo.customContent.loyaltyClub.title || 'מועדון לקוחות'}
+                  <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 via-orange-400/20 to-red-400/20 opacity-0 group-hover:opacity-100 blur-sm transition-opacity duration-300" />
+                  <motion.div
+                    animate={{ 
+                      rotate: [0, 10, -10, 10, 0],
+                    }}
+                    transition={{ 
+                      duration: 2,
+                      repeat: Infinity,
+                      repeatDelay: 3,
+                      ease: "easeInOut"
+                    }}
+                  >
+                    <LoyaltyIcon className="relative w-4 h-4 group-hover:drop-shadow-lg transition-all duration-300" />
+                  </motion.div>
+                  <span className="relative">
+                    {language === 'en' ? 'Loyalty Club' : 'מועדון לקוחות'}
                   </span>
                 </motion.button>
               )}
 
-              {businessInfo.customContent?.reviews?.enabled && businessInfo.customContent.reviews.googleReviewsUrl && (
+              {businessInfo.customContent?.reviews?.enabled && googleReviewsUrl && (
                 <motion.a
-                  href={businessInfo.customContent.reviews.googleReviewsUrl}
+                  href={googleReviewsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs uppercase tracking-[0.2em] text-white/60 hover:text-white/80 transition-colors"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.8 }}
+                  className="group relative flex items-center gap-2 px-4 py-2 rounded-full text-xs uppercase tracking-[0.2em] text-white/60 hover:text-white/80 transition-all duration-300 overflow-hidden"
+                  initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ 
+                    delay: 0.8,
+                    duration: 0.6,
+                    type: "spring",
+                    stiffness: 200,
+                    damping: 15
+                  }}
+                  whileHover={{ 
+                    scale: 1.05,
+                    y: -3,
+                    transition: { duration: 0.3 }
+                  }}
+                  whileTap={{ scale: 0.95 }}
                 >
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 via-purple-400/20 to-pink-400/20 opacity-0 group-hover:opacity-100 blur-sm transition-opacity duration-300" />
+                  <span className="relative">
                   {language === 'en' ? 'Reviews' : 'ביקורות'}
+                  </span>
                 </motion.a>
               )}
             </div>
@@ -463,6 +735,137 @@ function HomePageContent({
         </div>
 
       </main>
+
+      {/* Loyalty Club Modal */}
+      <AnimatePresence>
+        {showLoyaltyModal && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !loyaltySubmitting && setShowLoyaltyModal(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+            />
+            
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="fixed inset-x-4 bottom-4 md:inset-x-auto md:bottom-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 bg-neutral-900 rounded-2xl shadow-2xl z-50 max-w-md w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 space-y-6">
+                {/* Header */}
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold text-white mb-2">
+                    {language === 'en' ? '🎁 Loyalty Club' : '🎁 מועדון הלקוחות'}
+                  </h2>
+                  <p className="text-sm text-neutral-400">
+                    {language === 'en' 
+                      ? 'Exclusive deals for members'
+                      : 'הטבות ומבצעים לחברי המועדון'}
+                  </p>
+                </div>
+
+                {/* Form */}
+                {!loyaltySuccess ? (
+                  <form onSubmit={handleLoyaltySubmit} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-white mb-2">
+                        {language === 'en' ? 'Name' : 'שם'}
+                        <span className="text-red-400 ml-1">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={loyaltyName}
+                        onChange={(e) => setLoyaltyName(e.target.value)}
+                        placeholder={language === 'en' ? 'John Doe' : 'ישראל ישראלי'}
+                        required
+                        disabled={loyaltySubmitting}
+                        className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-4 py-3 text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                        dir={language === 'he' ? 'rtl' : 'ltr'}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-white mb-2">
+                        {language === 'en' ? 'Phone Number' : 'מספר טלפון'}
+                        <span className="text-red-400 ml-1">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        value={loyaltyPhone}
+                        onChange={(e) => setLoyaltyPhone(e.target.value)}
+                        placeholder={language === 'en' ? '050-1234567' : '050-1234567'}
+                        required
+                        disabled={loyaltySubmitting}
+                        className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-4 py-3 text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                        dir="ltr"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-white mb-2">
+                        {language === 'en' ? 'Email' : 'אימייל'}
+                        <span className="text-neutral-500 ml-1 text-xs">({language === 'en' ? 'Optional' : 'אופציונלי'})</span>
+                      </label>
+                      <input
+                        type="email"
+                        value={loyaltyEmail}
+                        onChange={(e) => setLoyaltyEmail(e.target.value)}
+                        placeholder={language === 'en' ? 'email@example.com' : 'email@example.com'}
+                        disabled={loyaltySubmitting}
+                        className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-4 py-3 text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                        dir="ltr"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={loyaltySubmitting || !loyaltyName.trim() || !loyaltyPhone.trim()}
+                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg transition"
+                    >
+                      {loyaltySubmitting 
+                        ? (language === 'en' ? 'Joining...' : 'מצטרף...')
+                        : (language === 'en' ? 'Join the Club' : 'הצטרף למועדון')
+                      }
+                    </button>
+                  </form>
+                ) : (
+                  <div className="text-center py-4">
+                    <div className="text-4xl mb-4">✅</div>
+                    <p className="text-lg font-medium text-white mb-2">
+                      {language === 'en' ? 'Successfully Joined!' : 'הצטרפת בהצלחה!'}
+                    </p>
+                    <p className="text-sm text-neutral-400">
+                      {language === 'en' ? 'You will receive exclusive offers soon.' : 'תקבל מבצעים בלעדיים בקרוב.'}
+                    </p>
+                  </div>
+                )}
+
+                {/* Close Button */}
+                {!loyaltySubmitting && (
+                  <button
+                    onClick={() => {
+                      setShowLoyaltyModal(false);
+                      setLoyaltySuccess(false);
+                      setLoyaltyName('');
+                      setLoyaltyPhone('');
+                      setLoyaltyEmail('');
+                    }}
+                    className="w-full text-neutral-400 hover:text-white text-sm transition"
+                  >
+                    {language === 'en' ? 'Close' : 'סגור'}
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </ThemeWrapper>
   );
 }

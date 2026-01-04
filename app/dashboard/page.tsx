@@ -77,22 +77,8 @@ export default function DashboardPage() {
     } | null;
     customContent?: {
       menuButtonImageUrl?: string;
-      promotions?: Array<{
-        id: string;
-        title: string;
-        titleEn?: string;
-        description: string;
-        descriptionEn?: string;
-        imageUrl?: string;
-        validUntil?: string;
-        enabled: boolean;
-      }>;
       contact?: {
         enabled: boolean;
-        title: string;
-        titleEn?: string;
-        description: string;
-        descriptionEn?: string;
         phone?: string;
         email?: string;
         whatsapp?: string;
@@ -101,14 +87,6 @@ export default function DashboardPage() {
       };
       loyaltyClub?: {
         enabled: boolean;
-        title: string;
-        titleEn?: string;
-        description: string;
-        descriptionEn?: string;
-        benefits?: Array<{
-          text: string;
-          textEn?: string;
-        }>;
       };
       reviews?: {
         enabled: boolean;
@@ -122,6 +100,16 @@ export default function DashboardPage() {
     week: number;
     month: number;
   } | null>(null);
+  const [loyaltyContacts, setLoyaltyContacts] = useState<Array<{
+    id: string;
+    name: string;
+    phone: string;
+    email: string | null;
+    source: string;
+    created_at: string;
+    updated_at: string | null;
+  }>>([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
   const [editingItem, setEditingItem] = useState<DashboardMenuItem | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
@@ -180,6 +168,12 @@ export default function DashboardPage() {
   }, [businessId]);
 
   useEffect(() => {
+    if (businessId && activeTab === 'content') {
+      loadLoyaltyContacts();
+    }
+  }, [businessId, activeTab]);
+
+  useEffect(() => {
     if (businessId && activeTab === 'orders') {
       loadOrders();
       
@@ -195,9 +189,77 @@ export default function DashboardPage() {
   async function loadBusinessInfo() {
     if (!businessId) return;
     try {
-      const res = await fetch(`/api/business/info?businessId=${encodeURIComponent(businessId)}`);
+      // CRITICAL: Check localStorage for cached customContent that was saved after update
+      // This bypasses read replica lag by using the data we know was saved
+      const localStorageKey = `business_${businessId}_customContent`;
+      const cachedData = typeof window !== 'undefined' ? localStorage.getItem(localStorageKey) : null;
+      let cachedCustomContent: any = null;
+      let cachedTimestamp = 0;
+      
+      if (cachedData) {
+        try {
+          const parsed = JSON.parse(cachedData);
+          cachedCustomContent = parsed.customContent;
+          cachedTimestamp = parsed.timestamp || 0;
+          console.log('💾 Found cached customContent in localStorage:', {
+            timestamp: cachedTimestamp,
+            age: Date.now() - cachedTimestamp,
+            phone: cachedCustomContent?.contact?.phone,
+            email: cachedCustomContent?.contact?.email,
+          });
+        } catch (e) {
+          console.warn('⚠️ Failed to parse cached customContent:', e);
+        }
+      }
+      
+      // Add cache busting to ensure fresh data
+      const res = await fetch(`/api/business/info?businessId=${encodeURIComponent(businessId)}&_t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        },
+      });
       const data = await res.json();
       if (res.ok && data.business) {
+        console.log('📥 Loaded business info from API:', {
+          customContent: data.business.customContent,
+          contact: data.business.customContent?.contact,
+          instagram: data.business.customContent?.contact?.instagram,
+          instagramLength: data.business.customContent?.contact?.instagram?.length,
+        });
+        
+        // Clean customContent from old fields - define before setBusinessInfo
+        const cleanCustomContent = (content: any) => {
+          if (!content) return null;
+          return {
+            ...content,
+            contact: content.contact ? {
+              enabled: content.contact.enabled,
+              phone: content.contact.phone || '',
+              email: content.contact.email || '',
+              whatsapp: content.contact.whatsapp || '',
+              instagram: content.contact.instagram || '',
+              facebook: content.contact.facebook || '',
+            } : undefined,
+            loyaltyClub: content.loyaltyClub ? {
+              enabled: content.loyaltyClub.enabled,
+            } : undefined,
+          };
+        };
+        
+        // CRITICAL: Use cached customContent if it's newer than 5 minutes old
+        // This ensures we use the data we know was saved, not stale read replica data
+        let finalCustomContent = cleanCustomContent(data.business.customContent);
+        if (cachedCustomContent && cachedTimestamp > Date.now() - 5 * 60 * 1000) {
+          // Cached data is recent (less than 5 minutes old), use it instead of API data
+          finalCustomContent = cleanCustomContent(cachedCustomContent);
+          console.log('✅ Using cached customContent from localStorage (source of truth):', {
+            phone: finalCustomContent?.contact?.phone,
+            email: finalCustomContent?.contact?.email,
+            cachedAge: Date.now() - cachedTimestamp,
+          });
+        }
+        
         // Only update if values actually changed to prevent infinite re-renders
         setBusinessInfo((prev) => {
           const newBusinessInfo = {
@@ -210,7 +272,7 @@ export default function DashboardPage() {
             aiInstructions: data.business.aiInstructions || '',
             businessHours: data.business.businessHours || null,
             subscription: data.business.subscription,
-            customContent: data.business.customContent || null,
+            customContent: finalCustomContent, // Use cached or API data
             printerConfig: data.business.printerConfig || {
               enabled: false,
               type: 'http',
@@ -238,17 +300,64 @@ export default function DashboardPage() {
           const aiInstructionsChanged = prev.aiInstructions !== newBusinessInfo.aiInstructions;
           const hoursChanged = JSON.stringify(prev.businessHours) !== JSON.stringify(newBusinessInfo.businessHours);
           const subscriptionChanged = JSON.stringify(prev.subscription) !== JSON.stringify(newBusinessInfo.subscription);
-          const contentChanged = JSON.stringify(prev.customContent) !== JSON.stringify(newBusinessInfo.customContent);
+          
+          // CRITICAL: If customContent was updated via PUT (has _lastCustomContentUpdate), 
+          // don't overwrite it with stale data from GET request
+          if ((prev as any)._lastCustomContentUpdate && (prev as any)._lastCustomContentUpdate > Date.now() - 5000) {
+            // Keep the PUT-updated value - it's the source of truth
+            console.log('🛡️ Preserving PUT-updated customContent, ignoring stale GET data', {
+              lastUpdate: (prev as any)._lastCustomContentUpdate,
+              age: Date.now() - (prev as any)._lastCustomContentUpdate,
+            });
+            return {
+              ...newBusinessInfo,
+              customContent: prev.customContent, // Keep the PUT-updated value
+              _lastCustomContentUpdate: (prev as any)._lastCustomContentUpdate,
+            } as any;
+          }
+          
+          // Clean customContent before comparison to avoid false negatives from old fields
+          // (cleanCustomContent is defined above, outside setBusinessInfo)
+          const prevCleaned = cleanCustomContent(prev.customContent);
+          const newCleaned = cleanCustomContent(newBusinessInfo.customContent);
+          const contentChanged = JSON.stringify(prevCleaned) !== JSON.stringify(newCleaned);
+          
+          // Check if contact fields specifically changed (more granular check)
+          let contactFieldsChanged = false;
+          if (prevCleaned?.contact && newCleaned?.contact) {
+            const prevContact = prevCleaned.contact;
+            const newContact = newCleaned.contact;
+            contactFieldsChanged = 
+              prevContact.phone !== newContact.phone ||
+              prevContact.email !== newContact.email ||
+              prevContact.whatsapp !== newContact.whatsapp ||
+              prevContact.instagram !== newContact.instagram ||
+              prevContact.facebook !== newContact.facebook ||
+              prevContact.enabled !== newContact.enabled;
+          } else if (prevCleaned?.contact !== newCleaned?.contact) {
+            contactFieldsChanged = true;
+          }
+          
           const printerChanged = JSON.stringify(prev.printerConfig) !== JSON.stringify(newBusinessInfo.printerConfig);
           const posChanged = JSON.stringify(prev.posConfig) !== JSON.stringify(newBusinessInfo.posConfig);
 
-          // If nothing changed, return previous to prevent re-render
-          if (!nameChanged && !logoChanged && !typeChanged && !templateChanged && !menuStyleChanged && 
-              !aiInstructionsChanged && !hoursChanged && !subscriptionChanged && !contentChanged && 
-              !printerChanged && !posChanged) {
-            return prev;
+          // Always update if customContent or contact fields changed
+          if (contentChanged || contactFieldsChanged) {
+            console.log('🔄 customContent or contact fields changed, forcing update', {
+              contentChanged,
+              contactFieldsChanged,
+              prevContact: prevCleaned?.contact,
+              newContact: newCleaned?.contact,
+            });
+            return newBusinessInfo;
           }
 
+          // If nothing changed, return previous to prevent re-render
+          if (!nameChanged && !logoChanged && !typeChanged && !templateChanged && !menuStyleChanged && 
+              !aiInstructionsChanged && !hoursChanged && !subscriptionChanged && !printerChanged && !posChanged) {
+            return prev;
+          }
+          
           return newBusinessInfo;
         });
       }
@@ -281,6 +390,22 @@ export default function DashboardPage() {
       setError(err.message || 'נכשל בטעינת הזמנות');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadLoyaltyContacts() {
+    if (!businessId) return;
+    try {
+      setLoadingContacts(true);
+      const res = await fetch(`/api/contacts/list?businessId=${encodeURIComponent(businessId)}`);
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setLoyaltyContacts(data.contacts || []);
+      }
+    } catch (err) {
+      console.error('Failed to load loyalty contacts', err);
+    } finally {
+      setLoadingContacts(false);
     }
   }
 
@@ -1668,16 +1793,138 @@ export default function DashboardPage() {
 
           {businessId && businessInfo && (
             <CustomContentEditor 
+              key={`content-${businessId}`}
               businessId={businessId} 
               initialContent={businessInfo.customContent || null}
-              onSave={async () => {
-                await loadBusinessInfo();
+              onSave={async (savedContent) => {
+                // CRITICAL: Use the saved content from RPC response (source of truth)
+                // Don't reload from server - it returns stale data due to read replica lag
+                if (savedContent) {
+                  // CRITICAL: Save to localStorage so it persists after page refresh
+                  // This bypasses read replica lag by using the data we know was saved
+                  const localStorageKey = `business_${businessId}_customContent`;
+                  try {
+                    localStorage.setItem(localStorageKey, JSON.stringify({
+                      customContent: savedContent,
+                      timestamp: Date.now(),
+                    }));
+                    console.log('💾 Saved customContent to localStorage:', {
+                      key: localStorageKey,
+                      phone: savedContent?.contact?.phone,
+                      email: savedContent?.contact?.email,
+                    });
+                  } catch (e) {
+                    console.warn('⚠️ Failed to save to localStorage:', e);
+                  }
+                  
+                  setBusinessInfo((prev) => {
+                    if (!prev) return prev;
+                    return {
+                      ...prev,
+                      customContent: savedContent, // Use RPC result - it's the source of truth
+                      _lastCustomContentUpdate: Date.now(), // Track when updated via PUT
+                    };
+                  });
+                  console.log('✅ Updated businessInfo with RPC result (source of truth), NOT reloading from server');
+                  console.log('✅ Saved content:', {
+                    phone: savedContent?.contact?.phone,
+                    email: savedContent?.contact?.email,
+                    whatsapp: savedContent?.contact?.whatsapp,
+                    instagram: savedContent?.contact?.instagram,
+                    facebook: savedContent?.contact?.facebook,
+                  });
+                }
               }}
             />
           )}
 
           {!businessInfo && (
             <p className="text-xs text-neutral-500">טוען פרטי עסק...</p>
+          )}
+
+          {/* Loyalty Club Contacts List */}
+          {businessId && businessInfo?.customContent?.loyaltyClub?.enabled && (
+            <div className="mt-8 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">📋 רשימת אנשי קשר - מועדון לקוחות</h3>
+                  <p className="text-xs text-neutral-400 mt-1">
+                    כל האנשים שהצטרפו למועדון הלקוחות דרך דף הנחיתה
+                  </p>
+                </div>
+                <button
+                  onClick={loadLoyaltyContacts}
+                  disabled={loadingContacts}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white rounded text-xs font-medium transition"
+                >
+                  {loadingContacts ? 'מעדכן...' : '🔄 עדכן'}
+                </button>
+              </div>
+
+              {loadingContacts ? (
+                <div className="text-center py-8">
+                  <p className="text-sm text-neutral-400">טוען אנשי קשר...</p>
+                </div>
+              ) : loyaltyContacts.length === 0 ? (
+                <div className="border border-neutral-800 rounded-lg p-8 text-center">
+                  <div className="text-4xl mb-3">📭</div>
+                  <p className="text-sm text-neutral-400">עדיין אין אנשי קשר</p>
+                  <p className="text-xs text-neutral-500 mt-1">
+                    אנשי קשר יופיעו כאן לאחר שיצטרפו דרך דף הנחיתה
+                  </p>
+                </div>
+              ) : (
+                <div className="border border-neutral-800 rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-neutral-800/50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-neutral-300">שם</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-neutral-300">טלפון</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-neutral-300">אימייל</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-neutral-300">תאריך הצטרפות</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-neutral-300">עודכן לאחרונה</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-800">
+                        {loyaltyContacts.map((contact) => (
+                          <tr key={contact.id} className="hover:bg-neutral-800/30 transition">
+                            <td className="px-4 py-3 text-sm text-white">{contact.name}</td>
+                            <td className="px-4 py-3 text-sm text-white font-mono">{contact.phone}</td>
+                            <td className="px-4 py-3 text-sm text-neutral-400">
+                              {contact.email || <span className="text-neutral-600">—</span>}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-neutral-400">
+                              {new Date(contact.created_at).toLocaleDateString('he-IL', {
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-neutral-400">
+                              {contact.updated_at
+                                ? new Date(contact.updated_at).toLocaleDateString('he-IL', {
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })
+                                : <span className="text-neutral-600">—</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="bg-neutral-800/30 px-4 py-2 text-xs text-neutral-400">
+                    סה"כ: {loyaltyContacts.length} אנשי קשר
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </section>
       )}

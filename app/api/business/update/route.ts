@@ -77,7 +77,26 @@ export async function PUT(req: NextRequest) {
     let customContentToUpdate: any = null;
     if (customContent !== undefined) {
       console.log('📝 customContent update requested:', JSON.stringify(customContent, null, 2));
-      customContentToUpdate = customContent || null;
+      // Clean customContent before saving - remove old fields
+      if (customContent) {
+        customContentToUpdate = {
+          ...customContent,
+          contact: customContent.contact ? {
+            enabled: customContent.contact.enabled,
+            phone: customContent.contact.phone || '',
+            email: customContent.contact.email || '',
+            whatsapp: customContent.contact.whatsapp || '',
+            instagram: customContent.contact.instagram || '',
+            facebook: customContent.contact.facebook || '',
+          } : undefined,
+          loyaltyClub: customContent.loyaltyClub ? {
+            enabled: customContent.loyaltyClub.enabled,
+          } : undefined,
+        };
+      } else {
+        customContentToUpdate = null;
+      }
+      console.log('📝 customContent cleaned for save:', JSON.stringify(customContentToUpdate, null, 2));
     }
 
     // Handle menuOnlyMessage - update subscription JSONB
@@ -118,9 +137,13 @@ export async function PUT(req: NextRequest) {
     // Update subscription separately if needed (like in stripe webhook)
     if (optionalFieldsUpdate.subscription) {
       console.log('📝 Updating subscription separately:', JSON.stringify(optionalFieldsUpdate.subscription, null, 2));
+      // DEBUG: Set debug_last_writer to track who wrote last
       const { error: subError, data: subData } = await supabaseAdmin
         .from('businesses')
-        .update({ subscription: optionalFieldsUpdate.subscription })
+        .update({ 
+          subscription: optionalFieldsUpdate.subscription,
+          debug_last_writer: 'API:business/update:subscription',
+        })
         .eq('businessId', businessId)
         .select('subscription');
       
@@ -147,9 +170,13 @@ export async function PUT(req: NextRequest) {
     // Update name_en separately if needed (like customContent)
     if (nameEnUpdate && Object.keys(nameEnUpdate).length > 0) {
       console.log('📝 Updating name_en separately:', JSON.stringify(nameEnUpdate, null, 2));
+      // DEBUG: Set debug_last_writer to track who wrote last
       const { error: nameEnError, data: nameEnData } = await supabaseAdmin
         .from('businesses')
-        .update(nameEnUpdate)
+        .update({
+          ...nameEnUpdate,
+          debug_last_writer: 'API:business/update:name_en',
+        })
         .eq('businessId', businessId)
         .select('name_en');
       
@@ -163,83 +190,126 @@ export async function PUT(req: NextRequest) {
       }
     }
     
-    // Update customContent separately if needed (like subscription)
+    // CRITICAL: customContent MUST have ONE writer only: update_business_custom_content RPC
+    // Use RPC function to ensure the update is actually saved in the database
+    // The RPC function performs the update directly in PostgreSQL, bypassing Supabase client issues
     if (customContentToUpdate !== null) {
-      console.log('📝 Updating customContent separately:', JSON.stringify(customContentToUpdate, null, 2));
+      console.log('💾 Saving customContent via RPC function:', JSON.stringify(customContentToUpdate, null, 2));
       
-      // Try both camelCase and lowercase column names
-      let customContentError: any = null;
-      let customContentData: any = null;
-      
-      // First try with camelCase (quoted)
-      let updateResult = await supabaseAdmin
-        .from('businesses')
-        .update({ customContent: customContentToUpdate })
-        .eq('businessId', businessId)
-        .select('customContent');
-      
-      customContentError = updateResult.error;
-      customContentData = updateResult.data;
-      
-      // If error suggests column doesn't exist, try lowercase
-      if (customContentError && (customContentError.message?.includes('column') || customContentError.message?.includes('does not exist'))) {
-        console.warn('⚠️ Trying lowercase column name: customcontent');
-        updateResult = await supabaseAdmin
-          .from('businesses')
-          .update({ customcontent: customContentToUpdate })
-          .eq('businessId', businessId)
-          .select('customcontent');
+      try {
+        const rpcResult = await supabaseAdmin.rpc('update_business_custom_content', {
+          p_business_id: businessId,
+          p_custom_content: customContentToUpdate,
+        });
         
-        customContentError = updateResult.error;
-        customContentData = updateResult.data;
-      }
-      
-      if (customContentError) {
-        console.error('❌ customContent update error:', customContentError);
-        console.error('❌ Error message:', customContentError.message);
-        console.error('❌ Error code:', customContentError.code);
-        console.error('❌ Error details:', JSON.stringify(customContentError, null, 2));
-        
-        // Check if column doesn't exist
-        if (customContentError.message?.includes('column') || customContentError.message?.includes('does not exist')) {
+        if (rpcResult.error) {
+          console.error('❌ RPC function error:', rpcResult.error);
           return NextResponse.json({ 
-            message: 'customContent column does not exist. Please run the SQL migration: fix_database_schema.sql', 
-            details: customContentError.message,
-            code: customContentError.code 
+            message: 'Failed to update customContent', 
+            details: rpcResult.error.message 
           }, { status: 500 });
         }
         
+        if (!rpcResult.data || rpcResult.data.length === 0) {
+          console.error('❌ RPC function returned no data');
+          return NextResponse.json({ 
+            message: 'Failed to update customContent - no data returned' 
+          }, { status: 500 });
+        }
+        
+        console.log('✅ RPC function succeeded!', {
+          returnedCustomContent: rpcResult.data[0]?.customContent,
+          contact: rpcResult.data[0]?.customContent?.contact,
+        });
+        
+        // Verify the saved data matches what we sent
+        const savedContact = rpcResult.data[0]?.customContent?.contact;
+        const expectedContact = customContentToUpdate?.contact;
+        
+        if (savedContact && expectedContact) {
+          const phoneMatch = savedContact.phone === expectedContact.phone;
+          const emailMatch = savedContact.email === expectedContact.email;
+          const whatsappMatch = savedContact.whatsapp === expectedContact.whatsapp;
+          const instagramMatch = savedContact.instagram === expectedContact.instagram;
+          const facebookMatch = savedContact.facebook === expectedContact.facebook;
+          
+          console.log('🔍 RPC verification:', {
+            phone: { expected: expectedContact.phone, saved: savedContact.phone, match: phoneMatch },
+            email: { expected: expectedContact.email, saved: savedContact.email, match: emailMatch },
+            whatsapp: { expected: expectedContact.whatsapp, saved: savedContact.whatsapp, match: whatsappMatch },
+            instagram: { expected: expectedContact.instagram, saved: savedContact.instagram, match: instagramMatch },
+            facebook: { expected: expectedContact.facebook, saved: savedContact.facebook, match: facebookMatch },
+          });
+          
+          if (!phoneMatch || !emailMatch || !whatsappMatch || !instagramMatch || !facebookMatch) {
+            console.warn('⚠️ WARNING: RPC saved data does not match expected data!');
+          }
+        }
+        
+        // CRITICAL: IMMEDIATELY return - ZERO fallthrough, ZERO additional .update() calls
+        // This prevents any post-RPC writes that would overwrite customContent
+        return NextResponse.json({ 
+          message: 'Business updated successfully',
+          business: {
+            businessId: rpcResult.data[0]?.businessId,
+            customContent: rpcResult.data[0]?.customContent, // Return RPC result - source of truth
+          }
+        }, { status: 200 });
+      } catch (rpcErr: any) {
+        console.error('❌ RPC function exception:', rpcErr);
         return NextResponse.json({ 
           message: 'Failed to update customContent', 
-          details: customContentError.message,
-          code: customContentError.code 
+          details: rpcErr?.message || 'RPC function error' 
         }, { status: 500 });
-      } else {
-        console.log('✅ customContent update successful');
-        console.log('📝 Updated customContent:', JSON.stringify(customContentData?.[0]?.customContent || customContentData?.[0]?.customcontent, null, 2));
       }
     }
     
-    // Update other fields if any
+    // Only reach here if customContent was NOT being updated
+    // Update other fields (but NOT customContent - that's handled by RPC above)
     let updatePayload = { ...updateData, ...optionalFieldsUpdate };
+    
+    // KILL-SWITCH GUARD: If customContent somehow made it into updatePayload, throw fatal error
+    if (updatePayload.customContent !== undefined) {
+      console.error('❌ FATAL: customContent found in updatePayload after RPC check!');
+      throw new Error('FATAL: post-RPC write attempted - customContent must only be updated via RPC');
+    }
+    
     if (Object.keys(updatePayload).length > 0) {
-      console.log('📝 Updating other fields:', JSON.stringify(updatePayload, null, 2));
+      // Update other fields normally
+      // DEBUG: Set debug_last_writer to track who wrote last
+      const updateWithDebug = {
+        ...updatePayload,
+        debug_last_writer: 'API:business/update:other_fields',
+      };
+      console.log('🔍 DEBUG: Updating other fields with debug_last_writer:', updateWithDebug.debug_last_writer);
+      console.log('🔍 DEBUG: Update payload keys:', Object.keys(updateWithDebug));
       let { error, data } = await supabaseAdmin
         .from('businesses')
-        .update(updatePayload)
-        .eq('businessId', businessId)
-        .select();
+        .update(updateWithDebug)
+        .eq('businessId', businessId);
       
+      // Log any errors
       if (error) {
-        console.error('❌ Other fields update error:', error);
+        console.error('❌ Error updating business:', error);
         console.error('❌ Error details:', JSON.stringify(error, null, 2));
-        
+      } else {
+        // Fix: Be defensive about the structure/type of 'data'
+        let affectedRows: number | string = 'unknown';
+        if (Array.isArray(data)) {
+          affectedRows = (data as any[]).length;
+        } else if (data && typeof data === 'object' && 'length' in data && typeof (data as any).length === 'number') {
+          affectedRows = (data as any).length;
+        }
+        console.log('✅ Update successful, affected rows:', affectedRows);
+      }
+      
+      // If error suggests column doesn't exist, try without optional fields
+      if (error) {
         // Check if error is due to missing columns (menuStyle, businessHours)
         const isColumnError = error.message?.includes('column') || error.message?.includes('does not exist');
         
         if (isColumnError) {
-          console.warn('⚠️ Column may not exist, trying update without optional fields');
-          // Try updating only required fields (name_en was already updated separately above)
+          // Try updating without optional fields (like menu items do)
           const requiredFieldsOnly: any = {};
           if (updateData.name !== undefined) requiredFieldsOnly.name = updateData.name;
           if (updateData.logoUrl !== undefined) requiredFieldsOnly.logoUrl = updateData.logoUrl;
@@ -248,37 +318,35 @@ export async function PUT(req: NextRequest) {
           if (updateData.aiInstructions !== undefined) requiredFieldsOnly.aiInstructions = updateData.aiInstructions;
           
           if (Object.keys(requiredFieldsOnly).length > 0) {
-            const { error: retryError, data: retryData } = await supabaseAdmin
+            // DEBUG: Set debug_last_writer to track who wrote last
+            const retryWithDebug = {
+              ...requiredFieldsOnly,
+              debug_last_writer: 'API:business/update:retry_required_fields',
+            };
+            console.log('🔍 DEBUG: Retry update with debug_last_writer:', retryWithDebug.debug_last_writer);
+            const retry = await supabaseAdmin
               .from('businesses')
-              .update(requiredFieldsOnly)
-              .eq('businessId', businessId)
-              .select();
+              .update(retryWithDebug)
+              .eq('businessId', businessId);
             
-            if (retryError) {
-              console.error('❌ Retry update also failed:', retryError);
+            if (retry.error) {
+              console.error('Error updating business (retry)', retry.error);
               return NextResponse.json({ 
-                message: 'Failed to update business fields', 
-                details: retryError.message,
-                code: retryError.code 
+                message: 'Database error', 
+                details: retry.error.message 
               }, { status: 500 });
-            } else {
-              console.log('✅ Required fields updated successfully (optional fields skipped)');
-              console.log('✅ Updated data:', JSON.stringify(retryData, null, 2));
             }
           }
         } else {
-          // Return error if update failed for other reasons
+          console.error('Error updating business', error);
           return NextResponse.json({ 
-            message: 'Failed to update business fields', 
-            details: error.message,
-            code: error.code 
+            message: 'Database error', 
+            details: error.message 
           }, { status: 500 });
         }
-      } else {
-        console.log('✅ Other fields update successful');
-        console.log('✅ Updated data:', JSON.stringify(data, null, 2));
       }
     }
+    
     
     // Verify the update was successful by fetching the updated business
     // Only verify if template was updated

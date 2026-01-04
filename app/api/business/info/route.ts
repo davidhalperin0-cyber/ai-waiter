@@ -11,14 +11,50 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'businessId is required' }, { status: 400 });
     }
 
+    // Simplified: Single query without aggressive retries
+    // localStorage handles read replica lag on the frontend
+    // This makes the API much faster (no 22 second delays)
     // Try to select all columns - handle missing columns gracefully
     // Use actual DB column name: menustyle (lowercase)
     // Use loose typing here because Supabase returns dynamic shapes depending on selected columns
-    let { data: business, error }: { data: any; error: any } = await supabaseAdmin
+    // IMPORTANT: Do NOT select legacy contact columns (phone, whatsapp, instagram, facebook) - customContent.contact is the source of truth
+    // Only select business.email (the business email, not contact email)
+    const result = await supabaseAdmin
       .from('businesses')
-      .select('businessId, name, name_en, logoUrl, type, template, menustyle, email, isEnabled, subscription, printerConfig, posConfig, aiInstructions, businessHours, customContent')
+      .select('businessId, name, name_en, logoUrl, type, template, menustyle, email, isEnabled, subscription, printerConfig, posConfig, aiInstructions, businessHours, customContent, debug_last_writer')
       .eq('businessId', businessId)
       .maybeSingle();
+    
+    let business: any = result.data;
+    let error: any = result.error;
+    
+    // Log raw data from DB to see what we're getting
+    if (business) {
+      const rawInstagram = business.customContent?.contact?.instagram || business.customcontent?.contact?.instagram;
+      const rawPhone = business.customContent?.contact?.phone || business.customcontent?.contact?.phone;
+      const rawWhatsapp = business.customContent?.contact?.whatsapp || business.customcontent?.contact?.whatsapp;
+      const rawEmail = business.customContent?.contact?.email || business.customcontent?.contact?.email;
+      const rawFacebook = business.customContent?.contact?.facebook || business.customcontent?.contact?.facebook;
+      console.log('📥 API: Raw business data from DB:', {
+        hasCustomContent: !!business.customContent,
+        hasCustomcontent: !!business.customcontent,
+        customContentType: typeof business.customContent,
+        contact: business.customContent?.contact || business.customcontent?.contact,
+        phone: rawPhone,
+        phoneLength: rawPhone?.length,
+        whatsapp: rawWhatsapp,
+        whatsappLength: rawWhatsapp?.length,
+        email: rawEmail,
+        emailLength: rawEmail?.length,
+        instagram: rawInstagram,
+        instagramLength: rawInstagram?.length,
+        instagramBytes: rawInstagram ? new TextEncoder().encode(rawInstagram).length : 0,
+        facebook: rawFacebook,
+        facebookLength: rawFacebook?.length,
+        // Log the full JSON to see if it's truncated
+        customContentJson: JSON.stringify(business.customContent || business.customcontent).substring(0, 2000),
+      });
+    }
 
     // If error suggests missing column, try without problematic columns or with lowercase
     if (error && error.message?.includes('column')) {
@@ -188,7 +224,50 @@ export async function GET(req: NextRequest) {
       },
       aiInstructions: business.aiInstructions || null,
       businessHours: business.businessHours || null,
-      customContent: business.customContent || business.customcontent || null, // Try both camelCase and lowercase
+      customContent: (() => {
+        // Use the RPC result if available (it's already set in business.customContent above)
+        const content = business.customContent || business.customcontent || null;
+        if (!content) return null;
+        
+        // CRITICAL: customContent.contact is the SINGLE SOURCE OF TRUTH
+        // Do NOT merge with legacy business columns (phone, email, whatsapp, instagram, facebook)
+        // Use customContent.contact exactly as-is if it exists
+        // Legacy columns are fallback ONLY if customContent.contact is completely missing
+        
+        const cleaned = {
+          ...content,
+          contact: content.contact 
+            ? {
+                // Use customContent.contact EXACTLY as-is - NO merging, NO overriding
+                enabled: content.contact.enabled ?? false,
+                phone: content.contact.phone ?? '',
+                email: content.contact.email ?? '',
+                whatsapp: content.contact.whatsapp ?? '',
+                instagram: content.contact.instagram ?? '',
+                facebook: content.contact.facebook ?? '',
+              }
+            : // Fallback ONLY if customContent.contact doesn't exist
+              // Note: Legacy columns (phone, whatsapp, instagram, facebook) are NOT selected in the query above
+              // So this fallback will only work if they exist in the database and Supabase returns them anyway
+              // But customContent.contact should always exist, so this fallback should rarely be used
+              undefined,
+          loyaltyClub: content.loyaltyClub ? {
+            enabled: content.loyaltyClub.enabled ?? false,
+          } : undefined,
+        };
+        
+        console.log('📥 API: Cleaned customContent (customContent.contact is source of truth):', {
+          contact: cleaned.contact,
+          phone: cleaned.contact?.phone,
+          whatsapp: cleaned.contact?.whatsapp,
+          email: cleaned.contact?.email,
+          instagram: cleaned.contact?.instagram,
+          facebook: cleaned.contact?.facebook,
+          usingFallback: !content.contact && !!cleaned.contact,
+        });
+        
+        return cleaned;
+      })(),
     };
 
     return NextResponse.json({ business: businessData }, { status: 200 });

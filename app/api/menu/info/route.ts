@@ -32,6 +32,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'Business not found' }, { status: 404 });
     }
 
+    // Don't use RPC - it returns stale data! Use the regular query result instead
+    // The regular query works correctly and returns the actual saved data
+    let customContent = business.customContent || null;
+    
+    // Debug: Log customContent to see what we're getting
+    if (customContent?.contact) {
+      console.log('📋 menu/info - customContent.contact:', {
+        enabled: customContent.contact.enabled,
+        instagram: customContent.contact.instagram,
+        facebook: customContent.contact.facebook,
+        phone: customContent.contact.phone,
+        email: customContent.contact.email,
+        whatsapp: customContent.contact.whatsapp,
+      });
+    }
+
     // Check if business is enabled
     if (!business.isEnabled) {
       return NextResponse.json(
@@ -45,7 +61,6 @@ export async function GET(req: NextRequest) {
     
     // Map database column name (menustyle) to API response name (menuStyle)
     const menuStyle = business.menustyle || null;
-    const customContent = business.customContent || null;
     
     console.log('📋 Subscription data:', {
       hasSubscription: !!subscription,
@@ -58,6 +73,7 @@ export async function GET(req: NextRequest) {
     // Auto-expire safety net: if status is "active" but nextBillingDate is in the past
     if (shouldAutoExpire(subscription)) {
       // Update subscription to expired
+      // DEBUG: Set debug_last_writer to track who wrote last
       await supabaseAdmin
         .from('businesses')
         .update({
@@ -65,6 +81,7 @@ export async function GET(req: NextRequest) {
             ...subscription,
             status: 'expired',
           },
+          debug_last_writer: 'API:menu/info:auto_expire',
         })
         .eq('businessId', business.businessId);
       
