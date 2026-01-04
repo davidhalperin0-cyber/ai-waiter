@@ -71,6 +71,9 @@ export function SessionProvider({
         if (sessionAge < maxAge) {
           setSession(parsed);
           return;
+        } else {
+          // Session expired - remove it from localStorage
+          localStorage.removeItem(storageKey);
         }
       } catch (e) {
         // Invalid stored data, create new session
@@ -160,7 +163,15 @@ export function SessionProvider({
     const now = Date.now();
     const sessionAge = now - session.sessionStart;
     const maxAge = 60 * 60 * 1000; // 1 hour
-    return sessionAge < maxAge;
+    const isValid = sessionAge < maxAge;
+    
+    // If session expired, clear it
+    if (!isValid && typeof window !== 'undefined') {
+      const storageKey = `session_${businessId}_${tableId}`;
+      localStorage.removeItem(storageKey);
+    }
+    
+    return isValid;
   }
 
   return (

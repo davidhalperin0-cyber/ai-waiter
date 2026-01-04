@@ -165,6 +165,28 @@ function CustomerMenuPageContent({
     0,
   );
 
+  // Check session validity on page load and periodically
+  useEffect(() => {
+    if (!session) return;
+    
+    // Check immediately
+    if (isSessionValid && !isSessionValid()) {
+      setSessionExpired(true);
+      toast.error('הקישור פג תוקף. אנא סרוק את קוד ה-QR מחדש כדי להזמין.');
+      return;
+    }
+    
+    // Check every 10 seconds to catch expiration
+    const interval = setInterval(() => {
+      if (isSessionValid && !isSessionValid()) {
+        setSessionExpired(true);
+        toast.error('הקישור פג תוקף. אנא סרוק את קוד ה-QR מחדש כדי להזמין.');
+      }
+    }, 10000); // Check every 10 seconds
+    
+    return () => clearInterval(interval);
+  }, [session, isSessionValid]);
+
   useEffect(() => {
     async function loadData(showLoading = true) {
       try {
