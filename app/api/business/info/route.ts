@@ -15,13 +15,12 @@ export async function GET(req: NextRequest) {
     // localStorage handles read replica lag on the frontend
     // This makes the API much faster (no 22 second delays)
     // Try to select all columns - handle missing columns gracefully
-    // Use actual DB column name: menustyle (lowercase)
     // Use loose typing here because Supabase returns dynamic shapes depending on selected columns
     // IMPORTANT: Do NOT select legacy contact columns (phone, whatsapp, instagram, facebook) - customContent.contact is the source of truth
     // Only select business.email (the business email, not contact email)
     const result = await supabaseAdmin
       .from('businesses')
-      .select('businessId, name, name_en, logoUrl, type, template, menustyle, email, isEnabled, subscription, printerConfig, posConfig, aiInstructions, businessHours, customContent, debug_last_writer')
+      .select('businessId, name, name_en, logoUrl, type, template, email, isEnabled, subscription, printerConfig, posConfig, aiInstructions, businessHours, customContent, debug_last_writer')
       .eq('businessId', businessId)
       .maybeSingle();
     
@@ -65,7 +64,7 @@ export async function GET(req: NextRequest) {
         console.warn('Trying lowercase customcontent column');
         const retryLowercase = await supabaseAdmin
           .from('businesses')
-          .select('businessId, name, name_en, logoUrl, type, template, menustyle, email, isEnabled, subscription, printerConfig, posConfig, aiInstructions, businessHours, customcontent')
+          .select('businessId, name, name_en, logoUrl, type, template, email, isEnabled, subscription, printerConfig, posConfig, aiInstructions, businessHours, customcontent')
           .eq('businessId', businessId)
           .maybeSingle();
         
@@ -78,7 +77,7 @@ export async function GET(req: NextRequest) {
           delete business.customcontent; // Remove lowercase version
           error = null;
         } else {
-          // Try without optional columns (menuStyle, businessHours, customContent)
+          // Try without optional columns (businessHours, customContent)
           const retry = await supabaseAdmin
             .from('businesses')
             .select(
@@ -91,15 +90,14 @@ export async function GET(req: NextRequest) {
           business = retry.data
             ? {
                 ...retry.data,
-                menustyle: null,
                 businessHours: null,
                 customContent: null,
               }
             : null;
           error = retry.error;
         }
-      } else if (error.message?.includes('menustyle') || error.message?.includes('menuStyle') || error.message?.includes('businessHours')) {
-        // Try without menustyle and businessHours, but keep customContent
+      } else if (error.message?.includes('businessHours')) {
+        // Try without businessHours, but keep customContent
         const retry = await supabaseAdmin
           .from('businesses')
           .select(
@@ -140,7 +138,6 @@ export async function GET(req: NextRequest) {
             business = finalRetry.data
               ? {
                   ...finalRetry.data,
-                  menustyle: null,
                   businessHours: null,
                   customContent: null,
                 }
@@ -152,7 +149,6 @@ export async function GET(req: NextRequest) {
           business = retry.data
             ? {
                 ...retry.data,
-                menustyle: null,
                 businessHours: null,
                 customContent: retry.data.customContent || null,
               }
@@ -173,7 +169,6 @@ export async function GET(req: NextRequest) {
           ? {
               ...retry2.data,
               // Preserve possible values from previous fallback if they exist
-              menustyle: (business as any)?.menustyle ?? (business as any)?.menuStyle ?? null,
               businessHours: (business as any)?.businessHours ?? null,
               customContent: (business as any)?.customContent ?? null,
             }
@@ -195,16 +190,12 @@ export async function GET(req: NextRequest) {
     }
 
     // Ensure all expected fields exist with defaults
-    // Map database column name (menustyle) to API response name (menuStyle)
-    const menuStyle = business.menustyle || null;
-    
     const businessData = {
       businessId: business.businessId,
       name: business.name,
       nameEn: business.name_en || undefined,
       type: business.type || business.template || 'generic',
       template: business.template || 'generic',
-      menuStyle: menuStyle,
       email: business.email,
       isEnabled: business.isEnabled ?? true,
       subscription: business.subscription || { status: 'trial' },

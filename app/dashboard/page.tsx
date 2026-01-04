@@ -45,7 +45,6 @@ export default function DashboardPage() {
     nameEn?: string;
     type: string;
     template: string;
-    menuStyle?: string;
     logoUrl?: string;
     aiInstructions?: string;
     subscription?: {
@@ -268,7 +267,6 @@ export default function DashboardPage() {
             logoUrl: data.business.logoUrl || '',
             type: data.business.type,
             template: data.business.template,
-            menuStyle: data.business.menuStyle || 'elegant',
             aiInstructions: data.business.aiInstructions || '',
             businessHours: data.business.businessHours || null,
             subscription: data.business.subscription,
@@ -296,7 +294,6 @@ export default function DashboardPage() {
           const logoChanged = prev.logoUrl !== newBusinessInfo.logoUrl;
           const typeChanged = prev.type !== newBusinessInfo.type;
           const templateChanged = prev.template !== newBusinessInfo.template;
-          const menuStyleChanged = prev.menuStyle !== newBusinessInfo.menuStyle;
           const aiInstructionsChanged = prev.aiInstructions !== newBusinessInfo.aiInstructions;
           const hoursChanged = JSON.stringify(prev.businessHours) !== JSON.stringify(newBusinessInfo.businessHours);
           const subscriptionChanged = JSON.stringify(prev.subscription) !== JSON.stringify(newBusinessInfo.subscription);
@@ -353,7 +350,7 @@ export default function DashboardPage() {
           }
 
           // If nothing changed, return previous to prevent re-render
-          if (!nameChanged && !logoChanged && !typeChanged && !templateChanged && !menuStyleChanged && 
+          if (!nameChanged && !logoChanged && !typeChanged && !templateChanged && 
               !aiInstructionsChanged && !hoursChanged && !subscriptionChanged && !printerChanged && !posChanged) {
             return prev;
           }
@@ -1998,7 +1995,6 @@ export default function DashboardPage() {
                 const logoUrl = formData.get('logoUrl') as string;
                 const type = formData.get('type') as string;
                 const template = formData.get('template') as string;
-                const menuStyle = formData.get('menuStyle') as string;
                 const aiInstructions = formData.get('aiInstructions') as string;
                 const menuOnlyMessage = formData.get('menuOnlyMessage') as string;
                 console.log('📝 Form submitted with menuOnlyMessage:', {
@@ -2034,7 +2030,6 @@ export default function DashboardPage() {
                       logoUrl: logoUrl || undefined,
                       type,
                       template,
-                      menuStyle: menuStyle || undefined,
                       aiInstructions: aiInstructions || undefined,
                       businessHours: businessHours || null,
                       menuOnlyMessage: businessInfo.subscription?.planType === 'menu_only'
@@ -2060,7 +2055,6 @@ export default function DashboardPage() {
                     logoUrl: logoUrl || undefined,
                     type, 
                     template,
-                    menuStyle: menuStyle || 'elegant', 
                     aiInstructions: aiInstructions || '',
                     businessHours: businessHours,
                     subscription: updatedSubscription,
@@ -2199,21 +2193,6 @@ export default function DashboardPage() {
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-neutral-200">סגנון תפריט</label>
-                <select
-                  name="menuStyle"
-                  defaultValue={businessInfo.menuStyle || 'elegant'}
-                  className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
-                >
-                  <option value="elegant">אלגנטי - עיצוב מעודן ומרווח</option>
-                  <option value="compact">קומפקטי - צפוף וחסכוני במקום</option>
-                  <option value="bold">בולט - עיצוב חזק ומובלט</option>
-                </select>
-                <p className="text-xs text-neutral-400 mt-1">
-                  משפיע על עיצוב הכרטיסים, הכפתורים והטיפוגרפיה בתפריט הלקוח
-                </p>
-              </div>
 
               <div className="space-y-3 p-4 bg-blue-900/10 border border-blue-700/20 rounded-xl">
                 <label className="block text-sm font-medium text-neutral-200">

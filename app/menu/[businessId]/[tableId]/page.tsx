@@ -8,7 +8,6 @@ import { useCart } from '@/components/CartContext';
 import { SessionProvider, useSession } from '@/components/SessionContext';
 import toast from 'react-hot-toast';
 import ThemeWrapper from '../../../../components/themes/ThemeWrapper';
-import { getMenuStyle, MenuStyleVariant } from '@/lib/menuStyle';
 
 interface MenuItem {
   businessId: string;
@@ -47,7 +46,6 @@ function CustomerMenuPageContent({
     nameEn?: string; // Optional English translation
     logoUrl?: string;
     template: 'bar-modern' | 'bar-classic' | 'bar-mid' | 'pizza-modern' | 'pizza-classic' | 'pizza-mid' | 'sushi' | 'generic' | 'gold';
-    menuStyle?: MenuStyleVariant;
     subscriptionStatus?: string;
     planType?: 'full' | 'menu_only';
     menuOnlyMessage?: string; // Custom message for menu-only plan
@@ -56,16 +54,6 @@ function CustomerMenuPageContent({
       end: string;
     } | null;
     customContent?: {
-      promotions?: Array<{
-        id: string;
-        title: string;
-        titleEn?: string;
-        description: string;
-        descriptionEn?: string;
-        imageUrl?: string;
-        validUntil?: string;
-        enabled: boolean;
-      }>;
       events?: {
         enabled: boolean;
         title: string;
@@ -203,7 +191,6 @@ function CustomerMenuPageContent({
           nameEn: infoData.nameEn || undefined, // Optional English translation
           logoUrl: infoData.logoUrl,
           template: (infoData.template || 'generic') as 'bar-modern' | 'bar-classic' | 'bar-mid' | 'pizza-modern' | 'pizza-classic' | 'pizza-mid' | 'sushi' | 'generic' | 'gold',
-          menuStyle: (infoData.menuStyle || 'elegant') as MenuStyleVariant,
           subscriptionStatus: infoData.subscriptionStatus || 'active',
           planType: (infoData.planType || 'full') as 'full' | 'menu_only',
           menuOnlyMessage: infoData.menuOnlyMessage || null,
@@ -236,7 +223,6 @@ function CustomerMenuPageContent({
             const nameChanged = prev.name !== newBusinessInfo.name;
             const logoChanged = prev.logoUrl !== newBusinessInfo.logoUrl;
             const templateChanged = prev.template !== newBusinessInfo.template;
-            const menuStyleChanged = prev.menuStyle !== newBusinessInfo.menuStyle;
             const statusChanged = prev.subscriptionStatus !== newBusinessInfo.subscriptionStatus;
             const planTypeChanged = prev.planType !== newBusinessInfo.planType;
             const messageChanged = prev.menuOnlyMessage !== newBusinessInfo.menuOnlyMessage;
@@ -244,7 +230,7 @@ function CustomerMenuPageContent({
             const contentChanged = JSON.stringify(prev.customContent) !== JSON.stringify(newBusinessInfo.customContent);
             
             // If nothing changed, return previous to prevent re-render
-            if (!nameChanged && !logoChanged && !templateChanged && !menuStyleChanged && 
+            if (!nameChanged && !logoChanged && !templateChanged && 
                 !statusChanged && !planTypeChanged && !messageChanged && !hoursChanged && !contentChanged) {
               return prev;
             }
@@ -649,18 +635,44 @@ const orderedCategories = useMemo(() => {
   }
 
   const template = (businessInfo?.template || 'generic') as string;
-  const menuStyleVariant = businessInfo?.menuStyle || 'elegant';
   
-  // Use useMemo to recalculate menuStyle when menuStyleVariant changes
-  const menuStyle = useMemo(() => {
-    console.log('🎨 Calculating menuStyle for variant:', menuStyleVariant);
-    return getMenuStyle(menuStyleVariant);
-  }, [menuStyleVariant]);
-  
-  // Debug: log when menuStyleVariant changes
-  useEffect(() => {
-    console.log('📝 menuStyleVariant changed to:', menuStyleVariant);
-  }, [menuStyleVariant]);
+  // Fixed menu style (removed menuStyle system)
+  const menuStyle = {
+    card: {
+      base: 'flex flex-col rounded-[2.5rem] border border-white/10 bg-white/[0.03] backdrop-blur-xl p-5 transition-all duration-700 cursor-pointer',
+      image: 'w-full h-56 rounded-[2rem] overflow-hidden bg-white/5 border border-white/5 mb-4 shadow-2xl flex-shrink-0',
+      hover: 'hover:bg-white/[0.06] hover:border-white/20 hover:-translate-y-1',
+      content: 'px-2',
+    },
+    button: {
+      primary: 'rounded-full bg-white text-black px-8 py-3 text-sm font-light tracking-widest hover:bg-neutral-200 transition-all duration-500 uppercase',
+      category: {
+        active: 'bg-white text-black shadow-2xl scale-105',
+        inactive: 'bg-transparent border border-white/10 hover:border-white/30 text-white/60',
+      },
+    },
+    typography: {
+      itemTitle: 'text-2xl font-light tracking-tight mb-2 text-white/95',
+      itemDescription: 'text-sm text-white/50 mb-4 leading-relaxed font-light italic',
+      price: 'text-xl font-light tracking-widest text-white/90',
+      sectionTitle: 'text-3xl font-extralight tracking-[0.2em] mb-10 text-center uppercase text-white/40',
+    },
+    badge: {
+      featured: 'text-[10px] tracking-[0.2em] uppercase text-amber-200/80 border border-amber-200/20 px-3 py-1 rounded-full mb-2 inline-block',
+      pregnancy: 'text-[10px] tracking-[0.1em] text-emerald-200/70 border border-emerald-200/10 px-3 py-1 rounded-full inline-flex items-center gap-2',
+      category: 'hidden',
+    },
+    spacing: {
+      cardGap: 'gap-8',
+      sectionGap: 'mb-20',
+    },
+    expanded: {
+      container: 'bg-neutral-950/90 backdrop-blur-3xl border border-white/10 rounded-[3rem] overflow-hidden flex flex-col relative h-full',
+      image: 'relative max-h-[20vh] h-[20vh] w-full grayscale-[0.2] flex-shrink-0 overflow-hidden',
+      content: 'flex-1 overflow-y-auto p-10 lg:p-16 text-center min-h-0',
+      button: 'w-full rounded-full bg-white text-black py-5 text-sm font-light tracking-[0.3em] uppercase hover:tracking-[0.4em] transition-all duration-700',
+    },
+  };
 
   // SINGLE SOURCE OF TRUTH: Business name - name is always the fallback
   // Rules:
@@ -1220,19 +1232,11 @@ const orderedCategories = useMemo(() => {
                                   e.stopPropagation();
                                   handleAddToCart(item);
                                 }}
-                                className={`${menuStyle.button.primary} ${
-                                  menuStyleVariant === 'compact' ? 'lg:block' : 'w-full lg:w-auto'
-                                }`}
+                                className={`${menuStyle.button.primary} w-full lg:w-auto`}
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
                               >
-                                {language === 'en'
-                                  ? menuStyleVariant === 'elegant'
-                                    ? 'Add'
-                                    : 'Add to cart'
-                                  : menuStyleVariant === 'elegant'
-                                  ? 'הוסף'
-                                  : 'הוסף לעגלה'}
+                                {language === 'en' ? 'Add to Cart' : 'הוסף לעגלה'}
                               </motion.button>
                             )}
                           </div>

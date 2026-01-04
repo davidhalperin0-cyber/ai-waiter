@@ -14,12 +14,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'businessId is required' }, { status: 400 });
     }
 
-    // Query using actual database column names: menustyle (lowercase) and customContent (camelCase)
+    // Query using actual database column names: customContent (camelCase)
     console.log('📋 menu/info - Fetching business:', businessId);
     
     const { data: business, error } = await supabaseAdmin
       .from('businesses')
-      .select('businessId, name, name_en, logoUrl, template, menustyle, isEnabled, subscription, businessHours, customContent')
+      .select('businessId, name, name_en, logoUrl, template, isEnabled, subscription, businessHours, customContent')
       .eq('businessId', businessId)
       .maybeSingle();
 
@@ -59,8 +59,6 @@ export async function GET(req: NextRequest) {
     // Check subscription status
     const subscription = business.subscription as Subscription;
     
-    // Map database column name (menustyle) to API response name (menuStyle)
-    const menuStyle = business.menustyle || null;
     
     console.log('📋 Subscription data:', {
       hasSubscription: !!subscription,
@@ -94,7 +92,6 @@ export async function GET(req: NextRequest) {
           nameEn: business.name_en || undefined,
           logoUrl: business.logoUrl || null,
           template: business.template || 'generic',
-          menuStyle: menuStyle,
           businessHours: business.businessHours || null,
           customContent: customContent,
           subscriptionStatus: 'expired',
@@ -114,7 +111,6 @@ export async function GET(req: NextRequest) {
           nameEn: business.name_en || undefined,
           logoUrl: business.logoUrl || null,
           template: business.template || 'generic',
-          menuStyle: menuStyle,
           businessHours: business.businessHours || null,
           customContent: customContent,
           subscriptionStatus: 'expired',
@@ -131,7 +127,6 @@ export async function GET(req: NextRequest) {
       nameEn: business.name_en || undefined,
       logoUrl: business.logoUrl || null,
       template: business.template || 'generic',
-      menuStyle: menuStyle,
       businessHours: business.businessHours || null,
       customContent: customContent,
       subscriptionStatus: 'active',

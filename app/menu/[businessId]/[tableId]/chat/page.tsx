@@ -1,12 +1,11 @@
 'use client';
 
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '@/components/CartContext';
 import { SessionProvider, useSession } from '@/components/SessionContext';
 import toast from 'react-hot-toast';
-import { getMenuStyle, MenuStyleVariant } from '@/lib/menuStyle';
 import ThemeWrapper from '@/components/themes/ThemeWrapper';
 
 interface MenuItemLite {
@@ -94,7 +93,6 @@ function ChatPageContent({
     name: string;
     logoUrl?: string;
     template: string;
-    menuStyle?: MenuStyleVariant;
   } | null>(null);
 
   const [menuItems, setMenuItems] = useState<MenuItemLite[]>([]);
@@ -114,7 +112,6 @@ function ChatPageContent({
               name: infoData.name,
               logoUrl: infoData.logoUrl,
               template: infoData.template || 'generic',
-              menuStyle: infoData.menuStyle || 'elegant',
             };
 
             if (!prev) return newBusinessInfo;
@@ -123,10 +120,9 @@ function ChatPageContent({
             const nameChanged = prev.name !== newBusinessInfo.name;
             const logoChanged = prev.logoUrl !== newBusinessInfo.logoUrl;
             const templateChanged = prev.template !== newBusinessInfo.template;
-            const menuStyleChanged = prev.menuStyle !== newBusinessInfo.menuStyle;
 
             // If nothing changed, return previous to prevent re-render
-            if (!nameChanged && !logoChanged && !templateChanged && !menuStyleChanged) {
+            if (!nameChanged && !logoChanged && !templateChanged) {
               return prev;
             }
 
@@ -453,9 +449,43 @@ function ChatPageContent({
     }
   }
 
-  const menuStyle = useMemo(() => {
-    return getMenuStyle(businessInfo?.menuStyle || 'elegant');
-  }, [businessInfo?.menuStyle]);
+  // Fixed menu style (removed menuStyle system)
+  const menuStyle = {
+    card: {
+      base: 'flex flex-col rounded-[2.5rem] border border-white/10 bg-white/[0.03] backdrop-blur-xl p-5 transition-all duration-700 cursor-pointer',
+      image: 'w-full h-56 rounded-[2rem] overflow-hidden bg-white/5 border border-white/5 mb-4 shadow-2xl flex-shrink-0',
+      hover: 'hover:bg-white/[0.06] hover:border-white/20 hover:-translate-y-1',
+      content: 'px-2',
+    },
+    button: {
+      primary: 'rounded-full bg-white text-black px-8 py-3 text-sm font-light tracking-widest hover:bg-neutral-200 transition-all duration-500 uppercase',
+      category: {
+        active: 'bg-white text-black shadow-2xl scale-105',
+        inactive: 'bg-transparent border border-white/10 hover:border-white/30 text-white/60',
+      },
+    },
+    typography: {
+      itemTitle: 'text-2xl font-light tracking-tight mb-2 text-white/95',
+      itemDescription: 'text-sm text-white/50 mb-4 leading-relaxed font-light italic',
+      price: 'text-xl font-light tracking-widest text-white/90',
+      sectionTitle: 'text-3xl font-extralight tracking-[0.2em] mb-10 text-center uppercase text-white/40',
+    },
+    badge: {
+      featured: 'text-[10px] tracking-[0.2em] uppercase text-amber-200/80 border border-amber-200/20 px-3 py-1 rounded-full mb-2 inline-block',
+      pregnancy: 'text-[10px] tracking-[0.1em] text-emerald-200/70 border border-emerald-200/10 px-3 py-1 rounded-full inline-flex items-center gap-2',
+      category: 'hidden',
+    },
+    spacing: {
+      cardGap: 'gap-8',
+      sectionGap: 'mb-20',
+    },
+    expanded: {
+      container: 'bg-neutral-950/90 backdrop-blur-3xl border border-white/10 rounded-[3rem] overflow-hidden flex flex-col relative h-full',
+      image: 'relative max-h-[20vh] h-[20vh] w-full grayscale-[0.2] flex-shrink-0 overflow-hidden',
+      content: 'flex-1 overflow-y-auto p-10 lg:p-16 text-center min-h-0',
+      button: 'w-full rounded-full bg-white text-black py-5 text-sm font-light tracking-[0.3em] uppercase hover:tracking-[0.4em] transition-all duration-700',
+    },
+  };
 
   return (
     <ThemeWrapper template={businessInfo?.template || 'generic'}>

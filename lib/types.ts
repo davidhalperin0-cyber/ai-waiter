@@ -114,7 +114,6 @@ export interface Business {
   logoUrl?: string; // URL to business logo image
   type: BusinessType;
   template: 'bar-modern' | 'bar-classic' | 'bar-mid' | 'pizza-modern' | 'pizza-classic' | 'pizza-mid' | 'sushi' | 'generic' | 'gold';
-  menuStyle?: 'elegant' | 'compact' | 'bold'; // Menu content styling variant (independent from theme)
   email: string;
   passwordHash: string;
   isEnabled: boolean;

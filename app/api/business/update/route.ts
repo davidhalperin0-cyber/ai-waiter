@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { businessId, name, nameEn, logoUrl, type, template, menuStyle, aiInstructions, businessHours, menuOnlyMessage, customContent } = body;
+    const { businessId, name, nameEn, logoUrl, type, template, aiInstructions, businessHours, menuOnlyMessage, customContent } = body;
 
     if (!businessId) {
       return NextResponse.json({ message: 'businessId is required' }, { status: 400 });
@@ -63,12 +63,8 @@ export async function PUT(req: NextRequest) {
     }
     if (aiInstructions !== undefined) updateData.aiInstructions = aiInstructions;
     
-    // Handle menuStyle, businessHours, and customContent separately - if columns don't exist, skip them
-    // Use actual DB column name: menustyle (lowercase)
+    // Handle businessHours separately - if column doesn't exist, skip it
     let optionalFieldsUpdate: any = {};
-    if (menuStyle !== undefined) {
-      optionalFieldsUpdate.menustyle = menuStyle || null; // Use lowercase column name
-    }
     if (businessHours !== undefined) {
       optionalFieldsUpdate.businessHours = businessHours || null;
     }
@@ -305,7 +301,7 @@ export async function PUT(req: NextRequest) {
       
       // If error suggests column doesn't exist, try without optional fields
       if (error) {
-        // Check if error is due to missing columns (menuStyle, businessHours)
+        // Check if error is due to missing columns (businessHours)
         const isColumnError = error.message?.includes('column') || error.message?.includes('does not exist');
         
         if (isColumnError) {
