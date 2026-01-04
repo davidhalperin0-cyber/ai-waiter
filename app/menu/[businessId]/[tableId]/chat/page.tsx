@@ -62,29 +62,65 @@ function ChatPageContent({
   useEffect(() => {
     setIsHydrated(true);
     
+    if (!session) return; // Wait for session to load
+    
     const storageKey = getChatStorageKey();
     const stored = localStorage.getItem(storageKey);
     
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
+        
+        // Backward compatibility: handle old format (just array) and new format (object with messages and sessionStart)
+        let messagesArray: Message[] = [];
+        let storedSessionStart: number | null = null;
+        
+        if (Array.isArray(parsed)) {
+          // Old format - just array of messages
+          messagesArray = parsed;
+        } else if (parsed.messages && Array.isArray(parsed.messages)) {
+          // New format - object with messages and sessionStart
+          messagesArray = parsed.messages;
+          storedSessionStart = parsed.sessionStart || null;
+        }
+        
+        // Check if stored messages belong to current session
+        // If sessionStart doesn't match, clear old messages (new session after expiration)
+        if (storedSessionStart !== null && storedSessionStart !== session.sessionStart) {
+          // Session changed - clear old messages
+          localStorage.removeItem(storageKey);
+          // Keep welcome message
+          const welcomeMessage: Message = {
+            id: Date.now(),
+            role: 'assistant',
+            content:
+              'היי! אני העוזר החכם של המסעדה. אני יודע מה הוספתם להזמנה. אפשר לשאול אותי על אלרגיות, מרכיבים או שינויים במנות, ואני אעזור לכם לסיים את ההזמנה בצורה בטוחה ונוחה.',
+          };
+          setMessages([welcomeMessage]);
+          return;
+        }
+        
         // Check if messages are not too old (24 hours)
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setMessages(parsed);
+        if (messagesArray.length > 0) {
+          setMessages(messagesArray);
         }
       } catch (e) {
         // Invalid stored data
       }
     }
-  }, [businessId, tableId, session?.deviceId]);
+  }, [businessId, tableId, session?.deviceId, session?.sessionStart]);
   
   // Save messages to localStorage whenever they change (only after hydration)
   useEffect(() => {
-    if (!isHydrated || typeof window === 'undefined') return;
+    if (!isHydrated || typeof window === 'undefined' || !session) return;
     
     const storageKey = getChatStorageKey();
-    localStorage.setItem(storageKey, JSON.stringify(messages));
-  }, [messages, businessId, tableId, isHydrated, session?.deviceId]);
+    // Store messages with sessionStart to detect session changes
+    localStorage.setItem(storageKey, JSON.stringify({
+      messages: messages,
+      sessionStart: session.sessionStart, // Store sessionStart to detect new sessions
+    }));
+  }, [messages, businessId, tableId, isHydrated, session?.deviceId, session?.sessionStart]);
   const [input, setInput] = useState('');
   const [isFinalReady, setIsFinalReady] = useState(false);
   const [lastSummary, setLastSummary] = useState<string | null>(null);
@@ -435,9 +471,12 @@ function ChatPageContent({
         setMessages([welcomeMessage]);
         
         // Clear from localStorage
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined' && session) {
           const storageKey = getChatStorageKey();
-          localStorage.setItem(storageKey, JSON.stringify([welcomeMessage]));
+          localStorage.setItem(storageKey, JSON.stringify({
+            messages: [welcomeMessage],
+            sessionStart: session.sessionStart, // Store sessionStart with messages
+          }));
         }
         
         toast.success(`הזמנה אושרה! מזהה: ${data.orderId}`);
