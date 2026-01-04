@@ -47,9 +47,9 @@ export interface CustomContent {
   };
   contact?: {
     enabled: boolean;
-    title: string;
+    title?: string;
     titleEn?: string;
-    description: string;
+    description?: string;
     descriptionEn?: string;
     phone?: string;
     email?: string;
@@ -59,9 +59,9 @@ export interface CustomContent {
   };
   loyaltyClub?: {
     enabled: boolean;
-    title: string;
+    title?: string;
     titleEn?: string;
-    description: string;
+    description?: string;
     descriptionEn?: string;
     benefits?: Array<{
       text: string;
