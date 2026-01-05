@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { businessId, testOrder } = body;
+    const { businessId, testOrder, printerConfig: providedPrinterConfig } = body;
 
     if (!businessId) {
       return NextResponse.json({ message: 'businessId is required' }, { status: 400 });
@@ -18,29 +18,58 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'testOrder.items must be a non-empty array' }, { status: 400 });
     }
 
-    // Get business printer config
-    const { data: business, error: fetchError } = await supabaseAdmin
-      .from('businesses')
-      .select('printerConfig')
-      .eq('businessId', businessId)
-      .maybeSingle();
-
-    if (fetchError || !business) {
-      return NextResponse.json({ message: 'Business not found' }, { status: 404 });
-    }
-
-    const printerConfig = business.printerConfig as any;
+    // Use provided printerConfig from frontend (to bypass read replica lag) or fetch from DB
+    let printerConfig: any = providedPrinterConfig;
 
     if (!printerConfig) {
-      return NextResponse.json({ message: 'Printer configuration not found' }, { status: 400 });
+      // Fallback: Get business printer config from DB if not provided
+      const { data: business, error: fetchError } = await supabaseAdmin
+        .from('businesses')
+        .select('printerConfig')
+        .eq('businessId', businessId)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error('Error fetching business printer config:', fetchError);
+        return NextResponse.json({ 
+          message: 'Database error', 
+          details: fetchError.message 
+        }, { status: 500 });
+      }
+
+      if (!business) {
+        return NextResponse.json({ message: 'Business not found' }, { status: 404 });
+      }
+
+      printerConfig = business.printerConfig as any;
+    }
+
+    console.log('Printer config (provided or from DB):', {
+      businessId,
+      provided: !!providedPrinterConfig,
+      hasPrinterConfig: !!printerConfig,
+      enabled: printerConfig?.enabled,
+      type: printerConfig?.type,
+      endpoint: printerConfig?.endpoint,
+      payloadType: printerConfig?.payloadType,
+    });
+
+    if (!printerConfig) {
+      return NextResponse.json({ 
+        message: 'Printer configuration not found. Please save printer settings first.' 
+      }, { status: 400 });
     }
 
     if (!printerConfig.enabled) {
-      return NextResponse.json({ message: 'Printer is not enabled. Please enable it in settings.' }, { status: 400 });
+      return NextResponse.json({ 
+        message: 'Printer is not enabled. Please enable it in settings and save before testing.' 
+      }, { status: 400 });
     }
 
     if (!printerConfig.endpoint || printerConfig.endpoint.trim() === '') {
-      return NextResponse.json({ message: 'Printer endpoint is not configured. Please set an IP address or URL.' }, { status: 400 });
+      return NextResponse.json({ 
+        message: 'Printer endpoint is not configured. Please set an IP address or URL and save before testing.' 
+      }, { status: 400 });
     }
 
     // Try to send test order to printer

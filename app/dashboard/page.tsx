@@ -2515,17 +2515,36 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={async () => {
-                    if (!businessId || !businessInfo?.printerConfig?.endpoint) {
+                    console.log('🔍 Testing printer - current state:', {
+                      businessId,
+                      hasPrinterConfig: !!businessInfo?.printerConfig,
+                      enabled: businessInfo?.printerConfig?.enabled,
+                      endpoint: businessInfo?.printerConfig?.endpoint,
+                      type: businessInfo?.printerConfig?.type,
+                      payloadType: businessInfo?.printerConfig?.payloadType,
+                    });
+                    
+                    if (!businessId) {
+                      toast.error('שגיאה: לא נמצא מזהה עסק');
+                      return;
+                    }
+                    if (!businessInfo?.printerConfig?.endpoint || businessInfo.printerConfig.endpoint.trim() === '') {
                       toast.error('אנא הגדירו כתובת IP/URL תחילה');
+                      return;
+                    }
+                    if (!businessInfo?.printerConfig?.enabled) {
+                      toast.error('אנא הפעילו את המדפסת ושמרו את ההגדרות תחילה');
                       return;
                     }
                     try {
                       setLoading(true);
+                      // Send printerConfig from state to bypass read replica lag
                       const res = await fetch('/api/printer/test', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                           businessId,
+                          printerConfig: businessInfo.printerConfig, // Send from state to bypass read replica lag
                           testOrder: {
                             orderId: 'test-' + Date.now(),
                             tableId: 'test-table',
@@ -2546,10 +2565,10 @@ export default function DashboardPage() {
                       setLoading(false);
                     }
                   }}
-                  disabled={loading || !businessInfo?.printerConfig?.endpoint}
-                  className="flex-1 sm:flex-initial rounded-lg bg-gradient-to-r from-green-600 to-green-500 text-white px-6 py-3 text-sm font-semibold disabled:opacity-60 hover:from-green-500 hover:to-green-400 transition-all shadow-lg hover:shadow-xl active:scale-95"
+                  disabled={loading || !businessInfo?.printerConfig?.endpoint || businessInfo?.printerConfig?.endpoint?.trim() === ''}
+                  className="flex-1 sm:flex-initial rounded-lg bg-gradient-to-r from-green-600 to-green-500 text-white px-6 py-3 text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed hover:from-green-500 hover:to-green-400 transition-all shadow-lg hover:shadow-xl active:scale-95"
                 >
-                  🔍 בדוק חיבור למדפסת
+                  {loading ? '⏳ בודק...' : '🔍 בדוק חיבור למדפסת'}
                 </button>
               </div>
             </form>
