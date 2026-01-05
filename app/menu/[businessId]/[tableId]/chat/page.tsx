@@ -24,6 +24,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   mentionedItem?: MenuItemLite;
+  quickReplies?: { text: string; label?: string }[];
 }
 
 function ChatPageContent({
@@ -337,9 +338,8 @@ function ChatPageContent({
     }
   }
 
-  async function sendMessage(e: React.FormEvent) {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
+  async function sendMessageWithText(messageText: string) {
+    if (!messageText.trim() || loading) return;
 
     // Check if session is still valid
     if (!isSessionValid || !isSessionValid()) {
@@ -351,7 +351,7 @@ function ChatPageContent({
     const userMessage: Message = {
       id: Date.now(),
       role: 'user',
-      content: input,
+      content: messageText,
     };
 
     const nextMessages = [...messages, userMessage];
@@ -379,17 +379,114 @@ function ChatPageContent({
 
       // Find the mentioned item in full menu items
       let mentionedItem: MenuItemLite | undefined;
+      
+      console.log('🔍 Frontend: Received data.mentionedItem:', data.mentionedItem);
+      console.log('🔍 Frontend: Received data.actions:', data.actions);
+      console.log('🔍 Frontend: fullMenuItems count:', fullMenuItems.length);
+      
+      // First, try to find in fullMenuItems (which has all fields including imageUrl from /api/menu)
+      // This is the most reliable source for complete item data
       if (data.mentionedItem) {
+        console.log('🔍 Frontend: Searching in fullMenuItems for:', data.mentionedItem.name);
+        // Try exact match first
         mentionedItem = fullMenuItems.find(
           (m) => m.name.toLowerCase() === data.mentionedItem.name.toLowerCase(),
         );
+        // Try match without spaces
+        if (!mentionedItem) {
+          const itemNameNoSpaces = data.mentionedItem.name.toLowerCase().replace(/\s/g, '');
+          mentionedItem = fullMenuItems.find(
+            (m) => m.name.toLowerCase().replace(/\s/g, '') === itemNameNoSpaces,
+          );
+        }
+        // Try partial match
+        if (!mentionedItem) {
+          mentionedItem = fullMenuItems.find(
+            (m) => m.name.toLowerCase().includes(data.mentionedItem.name.toLowerCase()) || 
+                  data.mentionedItem.name.toLowerCase().includes(m.name.toLowerCase()),
+          );
+        }
+        if (mentionedItem) {
+          console.log('✅ Frontend: Found in fullMenuItems:', mentionedItem.name, 'imageUrl:', mentionedItem.imageUrl);
+        } else {
+          console.warn('❌ Frontend: Not found in fullMenuItems, using data.mentionedItem as fallback');
+          // Fallback to data.mentionedItem if not found in fullMenuItems
+          mentionedItem = {
+            businessId: data.mentionedItem.businessId || '',
+            name: data.mentionedItem.name || '',
+            price: data.mentionedItem.price || 0,
+            imageUrl: data.mentionedItem.imageUrl || data.mentionedItem.image_url || undefined,
+            ingredients: data.mentionedItem.ingredients || undefined,
+            allergens: data.mentionedItem.allergens || undefined,
+            category: data.mentionedItem.category || undefined,
+            isPregnancySafe: data.mentionedItem.isPregnancySafe || data.mentionedItem.is_pregnancy_safe || false,
+          };
+        }
       }
+      
+      // If mentionedItem not found but there's a show_item action, try to find it manually
+      if (!mentionedItem && data.actions) {
+        const showItemAction = data.actions.find((a: any) => a?.type === 'show_item');
+        if (showItemAction?.itemName) {
+          console.log('🔍 Frontend: Searching for show_item action:', showItemAction.itemName);
+          const normalizedActionName = showItemAction.itemName.trim().toLowerCase();
+          // Try exact match
+          mentionedItem = fullMenuItems.find(
+            (m) => m.name.toLowerCase().trim() === normalizedActionName,
+          );
+          // Try match without spaces
+          if (!mentionedItem) {
+            const actionNameNoSpaces = normalizedActionName.replace(/\s/g, '');
+            mentionedItem = fullMenuItems.find(
+              (m) => m.name.toLowerCase().replace(/\s/g, '') === actionNameNoSpaces,
+            );
+          }
+          // Try partial match
+          if (!mentionedItem) {
+            mentionedItem = fullMenuItems.find(
+              (m) => m.name.toLowerCase().includes(normalizedActionName) || 
+                    normalizedActionName.includes(m.name.toLowerCase()),
+            );
+          }
+          if (mentionedItem) {
+            console.log('✅ Frontend: Found via show_item action:', mentionedItem.name, 'imageUrl:', mentionedItem.imageUrl);
+          } else {
+            console.warn('❌ Frontend: Not found via show_item action');
+          }
+        }
+      }
+      
+      // If still not found but data.mentionedItem exists, use it as fallback (even if missing some fields)
+      if (!mentionedItem && data.mentionedItem) {
+        console.log('⚠️ Frontend: Using data.mentionedItem as fallback (may be missing imageUrl)');
+        mentionedItem = {
+          businessId: data.mentionedItem.businessId || '',
+          name: data.mentionedItem.name || '',
+          price: data.mentionedItem.price || 0,
+          imageUrl: data.mentionedItem.imageUrl || data.mentionedItem.image_url || undefined,
+          ingredients: data.mentionedItem.ingredients || undefined,
+          allergens: data.mentionedItem.allergens || undefined,
+          category: data.mentionedItem.category || undefined,
+          isPregnancySafe: data.mentionedItem.isPregnancySafe || data.mentionedItem.is_pregnancy_safe || false,
+        };
+      }
+      
+      console.log('📦 Frontend: Final mentionedItem:', mentionedItem ? { name: mentionedItem.name, imageUrl: mentionedItem.imageUrl } : 'null');
+
+      // Extract quick_reply actions
+      const quickReplies = data.actions
+        ?.filter((a: any) => a.type === 'quick_reply')
+        .map((a: any) => ({
+          text: a.text || '',
+          label: a.label || a.text || '',
+        })) || [];
 
       const assistantMessage: Message = {
         id: Date.now() + 1,
         role: 'assistant',
         content: reply,
         mentionedItem,
+        quickReplies: quickReplies.length > 0 ? quickReplies : undefined,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -428,6 +525,13 @@ function ChatPageContent({
     } finally {
       setLoading(false);
     }
+  }
+
+  async function sendMessage(e: React.FormEvent) {
+    e.preventDefault();
+    if (!input.trim()) return;
+    await sendMessageWithText(input);
+    setInput('');
   }
 
   async function confirmOrder() {
@@ -625,6 +729,28 @@ function ChatPageContent({
                       {m.content}
                     </div>
                   </div>
+                  
+                  {/* Quick Reply Buttons */}
+                  {m.role === 'assistant' && m.quickReplies && m.quickReplies.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 }}
+                      className="flex flex-wrap gap-2 mt-2"
+                    >
+                      {m.quickReplies.map((button, idx) => (
+                        <motion.button
+                          key={idx}
+                          onClick={() => sendMessageWithText(button.text)}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="px-4 py-2 rounded-full bg-white/10 border border-white/20 text-white/90 text-sm font-light tracking-wide hover:bg-white/20 hover:border-white/30 transition-all backdrop-blur-sm"
+                        >
+                          {button.text}
+                        </motion.button>
+                      ))}
+                    </motion.div>
+                  )}
                   
                   {/* Show mentioned item card - Redesigned to be Premium */}
                   {m.role === 'assistant' && m.mentionedItem && (
