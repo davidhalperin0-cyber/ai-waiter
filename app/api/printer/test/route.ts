@@ -10,6 +10,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'businessId is required' }, { status: 400 });
     }
 
+    if (!testOrder) {
+      return NextResponse.json({ message: 'testOrder is required' }, { status: 400 });
+    }
+
+    if (!testOrder.items || !Array.isArray(testOrder.items) || testOrder.items.length === 0) {
+      return NextResponse.json({ message: 'testOrder.items must be a non-empty array' }, { status: 400 });
+    }
+
     // Get business printer config
     const { data: business, error: fetchError } = await supabaseAdmin
       .from('businesses')
@@ -23,12 +31,16 @@ export async function POST(req: NextRequest) {
 
     const printerConfig = business.printerConfig as any;
 
-    if (!printerConfig || !printerConfig.enabled) {
-      return NextResponse.json({ message: 'Printer is not enabled' }, { status: 400 });
+    if (!printerConfig) {
+      return NextResponse.json({ message: 'Printer configuration not found' }, { status: 400 });
     }
 
-    if (!printerConfig.endpoint) {
-      return NextResponse.json({ message: 'Printer endpoint is not configured' }, { status: 400 });
+    if (!printerConfig.enabled) {
+      return NextResponse.json({ message: 'Printer is not enabled. Please enable it in settings.' }, { status: 400 });
+    }
+
+    if (!printerConfig.endpoint || printerConfig.endpoint.trim() === '') {
+      return NextResponse.json({ message: 'Printer endpoint is not configured. Please set an IP address or URL.' }, { status: 400 });
     }
 
     // Try to send test order to printer
@@ -90,14 +102,19 @@ export async function POST(req: NextRequest) {
 
 function formatOrderAsText(order: any): string {
   let text = '=== הזמנה ===\n';
-  text += `מספר הזמנה: ${order.orderId}\n`;
-  text += `שולחן: ${order.tableId}\n`;
+  text += `מספר הזמנה: ${order.orderId || 'N/A'}\n`;
+  text += `שולחן: ${order.tableId || 'N/A'}\n`;
   text += '---\n';
-  order.items.forEach((item: any) => {
-    text += `${item.name} x${item.quantity} - ₪${(item.price * item.quantity).toFixed(2)}\n`;
-  });
+  if (order.items && Array.isArray(order.items)) {
+    order.items.forEach((item: any) => {
+      const name = item.name || 'פריט ללא שם';
+      const quantity = item.quantity || 1;
+      const price = item.price || 0;
+      text += `${name} x${quantity} - ₪${(price * quantity).toFixed(2)}\n`;
+    });
+  }
   text += '---\n';
-  text += `סה"כ: ₪${order.totalAmount.toFixed(2)}\n`;
+  text += `סה"כ: ₪${(order.totalAmount || 0).toFixed(2)}\n`;
   text += '==========\n';
   return text;
 }
@@ -105,18 +122,20 @@ function formatOrderAsText(order: any): string {
 function formatOrderAsXML(order: any): string {
   let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
   xml += '<order>\n';
-  xml += `  <orderId>${order.orderId}</orderId>\n`;
-  xml += `  <tableId>${order.tableId}</tableId>\n`;
+  xml += `  <orderId>${order.orderId || 'N/A'}</orderId>\n`;
+  xml += `  <tableId>${order.tableId || 'N/A'}</tableId>\n`;
   xml += '  <items>\n';
-  order.items.forEach((item: any) => {
-    xml += '    <item>\n';
-    xml += `      <name>${item.name}</name>\n`;
-    xml += `      <quantity>${item.quantity}</quantity>\n`;
-    xml += `      <price>${item.price}</price>\n`;
-    xml += '    </item>\n';
-  });
+  if (order.items && Array.isArray(order.items)) {
+    order.items.forEach((item: any) => {
+      xml += '    <item>\n';
+      xml += `      <name>${(item.name || 'פריט ללא שם').replace(/[<>&"']/g, '')}</name>\n`;
+      xml += `      <quantity>${item.quantity || 1}</quantity>\n`;
+      xml += `      <price>${item.price || 0}</price>\n`;
+      xml += '    </item>\n';
+    });
+  }
   xml += '  </items>\n';
-  xml += `  <totalAmount>${order.totalAmount}</totalAmount>\n`;
+  xml += `  <totalAmount>${order.totalAmount || 0}</totalAmount>\n`;
   xml += '</order>\n';
   return xml;
 }
