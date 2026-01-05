@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '@/components/CartContext';
 import { SessionProvider, useSession } from '@/components/SessionContext';
@@ -34,6 +35,7 @@ function ChatPageContent({
   businessId: string;
   tableId: string;
 }) {
+  const router = useRouter();
   const { items, addItem, removeItem, clear } = useCart();
   const { session, markOrderConfirmed, markCartUpdated, updateSession, isSessionValid } = useSession();
   const [sessionExpired, setSessionExpired] = useState(false);
@@ -45,6 +47,10 @@ function ChatPageContent({
       role: 'assistant',
       content:
         'היי! אני העוזר החכם של המסעדה. אני יודע מה הוספתם להזמנה. אפשר לשאול אותי על אלרגיות, מרכיבים או שינויים במנות, ואני אעזור לכם לסיים את ההזמנה בצורה בטוחה ונוחה.',
+      quickReplies: [
+        { text: 'לסגור את ההזמנה', label: 'לסגור את ההזמנה' },
+        { text: 'להמשיך בצ\'אט', label: 'להמשיך בצ\'אט' },
+      ],
     },
   ]);
   
@@ -96,6 +102,10 @@ function ChatPageContent({
             role: 'assistant',
             content:
               'היי! אני העוזר החכם של המסעדה. אני יודע מה הוספתם להזמנה. אפשר לשאול אותי על אלרגיות, מרכיבים או שינויים במנות, ואני אעזור לכם לסיים את ההזמנה בצורה בטוחה ונוחה.',
+            quickReplies: [
+              { text: 'לסגור את ההזמנה', label: 'לסגור את ההזמנה' },
+              { text: 'להמשיך בצ\'אט', label: 'להמשיך בצ\'אט' },
+            ],
           };
           setMessages([welcomeMessage]);
           return;
@@ -278,6 +288,7 @@ function ChatPageContent({
           name: menuItem.name,
           price: menuItem.price,
           quantity,
+          customizations: Array.isArray(action.customizations) ? action.customizations : undefined,
         });
         addedCount += quantity;
         const existingSummary = addedItemsSummary.find((i) => i.name === menuItem.name);
@@ -336,6 +347,24 @@ function ChatPageContent({
 
       setMessages((prev) => [...prev, assistantMessage]);
     }
+  }
+
+  function handleQuickReplyClick(buttonText: string) {
+    // Handle special quick reply buttons
+    if (buttonText === 'לסגור את ההזמנה') {
+      // Request order summary from AI
+      if (items.length > 0) {
+        // If there are items in cart, ask AI for summary
+        sendMessageWithText('תראה לי סיכום של ההזמנה שלי');
+      } else {
+        // If no items, navigate to menu page
+        router.push(`/menu/${businessId}/${tableId}`);
+      }
+      return;
+    }
+    
+    // For other buttons, send as regular message
+    sendMessageWithText(buttonText);
   }
 
   async function sendMessageWithText(messageText: string) {
@@ -695,7 +724,14 @@ function ChatPageContent({
         {/* Messages Section - Scrollable */}
         <section className="flex-1 overflow-y-auto px-6 py-8 space-y-8 scrollbar-hide no-scrollbar">
           <AnimatePresence initial={false}>
-            {messages.map((m, index) => (
+            {messages.map((m, index) => {
+              // Check if this is an order summary message (don't show item cards in summaries)
+              const isOrderSummary = m.content.includes('סיכום') || 
+                                    m.content.includes('סה"כ') || 
+                                    (m.content.includes('×') && m.content.match(/\d+\s*×/)) ||
+                                    m.content.includes('סיכום ההזמנה');
+              
+              return (
               <motion.div
                 key={m.id}
                 initial={{ opacity: 0, y: 20, scale: 0.98 }}
@@ -741,7 +777,7 @@ function ChatPageContent({
                       {m.quickReplies.map((button, idx) => (
                         <motion.button
                           key={idx}
-                          onClick={() => sendMessageWithText(button.text)}
+                          onClick={() => handleQuickReplyClick(button.text)}
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                           className="px-4 py-2 rounded-full bg-white/10 border border-white/20 text-white/90 text-sm font-light tracking-wide hover:bg-white/20 hover:border-white/30 transition-all backdrop-blur-sm"
@@ -753,7 +789,8 @@ function ChatPageContent({
                   )}
                   
                   {/* Show mentioned item card - Redesigned to be Premium */}
-                  {m.role === 'assistant' && m.mentionedItem && (
+                  {/* Don't show item cards in order summary messages to avoid confusion */}
+                  {m.role === 'assistant' && m.mentionedItem && !isOrderSummary && (
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -840,7 +877,8 @@ function ChatPageContent({
                   )}
                 </div>
               </motion.div>
-            ))}
+              );
+            })}
           </AnimatePresence>
           
           {loading && (

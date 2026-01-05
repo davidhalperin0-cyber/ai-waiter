@@ -14,7 +14,11 @@ function formatOrderAsText(order: Order): string {
   text += `תאריך: ${new Date(order.createdAt).toLocaleString('he-IL')}\n\n`;
   text += 'פריטים:\n';
   order.items.forEach((item, index) => {
-    text += `${index + 1}. ${item.name} x${item.quantity} - ₪${(item.price * item.quantity).toFixed(2)}\n`;
+    text += `${index + 1}. ${item.name} x${item.quantity} - ₪${(item.price * item.quantity).toFixed(2)}`;
+    if (item.customizations && item.customizations.length > 0) {
+      text += `\n   הערות: ${item.customizations.join(', ')}`;
+    }
+    text += '\n';
   });
   text += `\nסה"כ: ₪${order.totalAmount.toFixed(2)}\n`;
   if (order.aiSummary) {
@@ -37,6 +41,13 @@ function formatOrderAsXML(order: Order): string {
     xml += `      <name>${item.name}</name>\n`;
     xml += `      <quantity>${item.quantity}</quantity>\n`;
     xml += `      <price>${item.price}</price>\n`;
+    if (item.customizations && item.customizations.length > 0) {
+      xml += '      <customizations>\n';
+      item.customizations.forEach((customization) => {
+        xml += `        <customization>${customization}</customization>\n`;
+      });
+      xml += '      </customizations>\n';
+    }
     xml += '    </item>\n';
   });
   xml += '  </items>\n';
