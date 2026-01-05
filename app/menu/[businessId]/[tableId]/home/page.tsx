@@ -173,6 +173,42 @@ function HomePageContent({
     }
   }, []);
 
+  // Track QR/NFC scan when page loads
+  useEffect(() => {
+    if (!businessId || !tableId) return;
+
+    // Detect source (QR, NFC, or direct link)
+    const referer = typeof window !== 'undefined' ? document.referrer : '';
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const source = urlParams?.get('source') || (referer.includes('nfc') ? 'nfc' : 'qr');
+
+    // Detect device type
+    const userAgent = typeof window !== 'undefined' ? navigator.userAgent : '';
+    let deviceType = 'desktop';
+    if (/mobile|android|iphone|ipad/i.test(userAgent)) {
+      deviceType = 'mobile';
+    } else if (/tablet|ipad/i.test(userAgent)) {
+      deviceType = 'tablet';
+    }
+
+    // Track scan (fire and forget - don't wait for response)
+    fetch('/api/scans/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        businessId,
+        tableId,
+        source: source as 'qr' | 'nfc' | 'direct_link',
+        deviceType,
+        userAgent: typeof window !== 'undefined' ? navigator.userAgent : undefined,
+        referer: typeof window !== 'undefined' ? document.referrer : undefined,
+      }),
+    }).catch((err) => {
+      // Silently fail - tracking is not critical
+      console.error('Failed to track scan:', err);
+    });
+  }, [businessId, tableId]);
+
   const switchLanguage = (lang: 'he' | 'en') => {
     setLanguage(lang);
     if (typeof window !== 'undefined') {

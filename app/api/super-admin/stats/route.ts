@@ -72,6 +72,67 @@ export async function GET(req: NextRequest) {
       console.error('Error counting tables', tablesError);
     }
 
+    // Get total QR/NFC scans
+    const { count: totalScans, error: scansError } = await supabaseAdmin
+      .from('qr_scans')
+      .select('*', { count: 'exact', head: true });
+
+    if (scansError) {
+      console.error('Error counting scans', scansError);
+    }
+
+    // Get scans in last 24 hours
+    const { count: scansLast24h, error: scans24hError } = await supabaseAdmin
+      .from('qr_scans')
+      .select('*', { count: 'exact', head: true })
+      .gte('scanned_at', todayStart.toISOString());
+
+    if (scans24hError) {
+      console.error('Error counting scans last 24h', scans24hError);
+    }
+
+    // Get total chat entries
+    const { count: totalChatEntries, error: chatEntriesError } = await supabaseAdmin
+      .from('chat_interactions')
+      .select('*', { count: 'exact', head: true })
+      .not('entered_chat_at', 'is', null);
+
+    if (chatEntriesError) {
+      console.error('Error counting chat entries', chatEntriesError);
+    }
+
+    // Get chat entries in last 24 hours
+    const { count: chatEntriesLast24h, error: chatEntries24hError } = await supabaseAdmin
+      .from('chat_interactions')
+      .select('*', { count: 'exact', head: true })
+      .not('entered_chat_at', 'is', null)
+      .gte('entered_chat_at', todayStart.toISOString());
+
+    if (chatEntries24hError) {
+      console.error('Error counting chat entries last 24h', chatEntries24hError);
+    }
+
+    // Get total chat orders
+    const { count: totalChatOrders, error: chatOrdersError } = await supabaseAdmin
+      .from('chat_interactions')
+      .select('*', { count: 'exact', head: true })
+      .not('placed_order_at', 'is', null);
+
+    if (chatOrdersError) {
+      console.error('Error counting chat orders', chatOrdersError);
+    }
+
+    // Get chat orders in last 24 hours
+    const { count: chatOrdersLast24h, error: chatOrders24hError } = await supabaseAdmin
+      .from('chat_interactions')
+      .select('*', { count: 'exact', head: true })
+      .not('placed_order_at', 'is', null)
+      .gte('placed_order_at', todayStart.toISOString());
+
+    if (chatOrders24hError) {
+      console.error('Error counting chat orders last 24h', chatOrders24hError);
+    }
+
     return NextResponse.json(
       {
         totalBusinesses: totalBusinesses || 0,
@@ -80,6 +141,14 @@ export async function GET(req: NextRequest) {
         ordersToday: ordersToday || 0,
         totalRevenue: Math.round(totalRevenue * 100) / 100,
         totalTables: totalTables || 0,
+        // Scan statistics
+        totalScans: totalScans || 0,
+        scansLast24h: scansLast24h || 0,
+        // Chat statistics
+        totalChatEntries: totalChatEntries || 0,
+        chatEntriesLast24h: chatEntriesLast24h || 0,
+        totalChatOrders: totalChatOrders || 0,
+        chatOrdersLast24h: chatOrdersLast24h || 0,
       },
       { status: 200 },
     );

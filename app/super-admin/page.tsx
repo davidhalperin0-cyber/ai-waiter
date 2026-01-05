@@ -15,6 +15,9 @@ interface Business {
   createdAt: string;
   ordersCount: number;
   tablesCount: number;
+  scansCount?: number;
+  chatEntriesCount?: number;
+  chatOrdersCount?: number;
 }
 
 interface PlatformStats {
@@ -24,6 +27,12 @@ interface PlatformStats {
   ordersToday: number;
   totalRevenue: number;
   totalTables: number;
+  totalScans: number;
+  scansLast24h: number;
+  totalChatEntries: number;
+  chatEntriesLast24h: number;
+  totalChatOrders: number;
+  chatOrdersLast24h: number;
 }
 
 export default function SuperAdminPage() {
@@ -402,6 +411,38 @@ export default function SuperAdminPage() {
                 <div className="text-2xl font-bold mb-1">{stats.totalTables}</div>
                 <div className="text-xs text-neutral-400">סה"כ שולחנות</div>
               </div>
+              <div className="rounded-xl border border-neutral-800 bg-neutral-900/60 p-4">
+                <div className="text-2xl font-bold mb-1">{stats.totalScans}</div>
+                <div className="text-xs text-neutral-400">סה"כ סריקות QR/NFC</div>
+                <div className="text-[10px] text-cyan-400 mt-1">
+                  {stats.scansLast24h} אחרונות 24 שעות
+                </div>
+              </div>
+              <div className="rounded-xl border border-neutral-800 bg-neutral-900/60 p-4">
+                <div className="text-2xl font-bold mb-1">{stats.totalChatEntries}</div>
+                <div className="text-xs text-neutral-400">סה"כ כניסות לצ'אט</div>
+                <div className="text-[10px] text-purple-400 mt-1">
+                  {stats.chatEntriesLast24h} אחרונות 24 שעות
+                </div>
+              </div>
+              <div className="rounded-xl border border-neutral-800 bg-neutral-900/60 p-4">
+                <div className="text-2xl font-bold mb-1">{stats.totalChatOrders}</div>
+                <div className="text-xs text-neutral-400">הזמנות דרך צ'אט</div>
+                <div className="text-[10px] text-emerald-400 mt-1">
+                  {stats.chatOrdersLast24h} אחרונות 24 שעות
+                </div>
+              </div>
+              {stats.totalChatEntries > 0 && (
+                <div className="rounded-xl border border-neutral-800 bg-neutral-900/60 p-4">
+                  <div className="text-2xl font-bold mb-1">
+                    {((stats.totalChatOrders / stats.totalChatEntries) * 100).toFixed(1)}%
+                  </div>
+                  <div className="text-xs text-neutral-400">שיעור המרה צ'אט</div>
+                  <div className="text-[10px] text-amber-400 mt-1">
+                    {stats.totalChatOrders} מתוך {stats.totalChatEntries}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <p className="text-xs text-neutral-500">לא ניתן לטעון סטטיסטיקות</p>
@@ -427,13 +468,17 @@ export default function SuperAdminPage() {
           ) : businesses.length === 0 ? (
             <p className="text-xs text-neutral-500">אין עסקים במערכת</p>
           ) : (
-            <div className="border border-neutral-800 rounded-lg overflow-hidden">
-              <div className="bg-neutral-900/70 text-[11px] text-neutral-400 px-3 py-2 grid grid-cols-8 gap-2">
+            <div className="border border-neutral-800 rounded-lg overflow-x-auto">
+              <div className="bg-neutral-900/70 text-[11px] text-neutral-400 px-3 py-2 grid grid-cols-12 gap-2 min-w-[1200px]">
                 <div>שם עסק</div>
                 <div>אימייל</div>
                 <div>סוג</div>
                 <div>שולחנות</div>
                 <div>הזמנות</div>
+                <div>סריקות QR/NFC</div>
+                <div>כניסות צ'אט</div>
+                <div>הזמנות צ'אט</div>
+                <div>שיעור המרה</div>
                 <div>סטטוס</div>
                 <div>מנוי</div>
                 <div className="text-right">פעולות</div>
@@ -442,13 +487,21 @@ export default function SuperAdminPage() {
                 {businesses.map((business) => (
                   <div
                     key={business.businessId}
-                    className="grid grid-cols-8 gap-2 items-center px-3 py-2 hover:bg-neutral-900/50"
+                    className="grid grid-cols-12 gap-2 items-center px-3 py-2 hover:bg-neutral-900/50 min-w-[1200px]"
                   >
                     <div className="font-semibold truncate">{business.name}</div>
                     <div className="text-neutral-400 text-[11px] truncate">{business.email}</div>
                     <div className="text-[11px]">{business.type}</div>
                     <div>{business.tablesCount}</div>
                     <div>{business.ordersCount}</div>
+                    <div className="text-cyan-400 font-semibold">{business.scansCount || 0}</div>
+                    <div className="text-purple-400 font-semibold">{business.chatEntriesCount || 0}</div>
+                    <div className="text-emerald-400 font-semibold">{business.chatOrdersCount || 0}</div>
+                    <div className="text-amber-400 font-semibold">
+                      {business.chatEntriesCount && business.chatEntriesCount > 0
+                        ? `${((business.chatOrdersCount || 0) / business.chatEntriesCount * 100).toFixed(1)}%`
+                        : '0%'}
+                    </div>
                     <div>
                       <span
                         key={`status-${business.businessId}-${business.isEnabled}`}

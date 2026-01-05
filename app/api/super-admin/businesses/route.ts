@@ -125,13 +125,27 @@ export async function GET(req: NextRequest) {
               .from('tables')
               .select('tableId', { count: 'exact', head: true })
               .eq('businessId', business.businessId),
+            supabaseAdmin
+              .from('qr_scans')
+              .select('id', { count: 'exact', head: true })
+              .eq('business_id', business.businessId),
+            supabaseAdmin
+              .from('chat_interactions')
+              .select('id', { count: 'exact', head: true })
+              .eq('business_id', business.businessId)
+              .not('entered_chat_at', 'is', null),
+            supabaseAdmin
+              .from('chat_interactions')
+              .select('id', { count: 'exact', head: true })
+              .eq('business_id', business.businessId)
+              .not('placed_order_at', 'is', null),
           ]);
 
           const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout')), 2000)
+            setTimeout(() => reject(new Error('Timeout')), 3000)
           );
 
-          const [ordersRes, tablesRes] = await Promise.race([
+          const [ordersRes, tablesRes, scansRes, chatEntriesRes, chatOrdersRes] = await Promise.race([
             statsPromise,
             timeoutPromise,
           ]) as any[];
@@ -142,11 +156,23 @@ export async function GET(req: NextRequest) {
           if (tablesRes?.error) {
             console.error('Error counting tables for business', business.businessId, tablesRes.error);
           }
+          if (scansRes?.error) {
+            console.error('Error counting scans for business', business.businessId, scansRes.error);
+          }
+          if (chatEntriesRes?.error) {
+            console.error('Error counting chat entries for business', business.businessId, chatEntriesRes.error);
+          }
+          if (chatOrdersRes?.error) {
+            console.error('Error counting chat orders for business', business.businessId, chatOrdersRes.error);
+          }
 
           return {
             ...business,
             ordersCount: ordersRes?.count || 0,
             tablesCount: tablesRes?.count || 0,
+            scansCount: scansRes?.count || 0,
+            chatEntriesCount: chatEntriesRes?.count || 0,
+            chatOrdersCount: chatOrdersRes?.count || 0,
           };
         } catch (err: any) {
           // If timeout or error, return with 0 counts

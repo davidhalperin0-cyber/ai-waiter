@@ -99,6 +99,19 @@ export default function DashboardPage() {
     week: number;
     month: number;
   } | null>(null);
+  const [scanStats, setScanStats] = useState<{
+    totalScans: number;
+    scansLast24h: number;
+    scansLast7d: number;
+    scansByTable: Record<string, number>;
+    scansBySource: Record<string, number>;
+    totalChatEntries: number;
+    totalChatOrders: number;
+    chatEntriesLast24h: number;
+    chatOrdersLast24h: number;
+    chatEntriesLast7d: number;
+    chatOrdersLast7d: number;
+  } | null>(null);
   const [loyaltyContacts, setLoyaltyContacts] = useState<Array<{
     id: string;
     name: string;
@@ -363,6 +376,20 @@ export default function DashboardPage() {
     }
   }
 
+  async function loadScanStats() {
+    if (!businessId) return;
+    try {
+      const res = await fetch(`/api/scans/stats?businessId=${encodeURIComponent(businessId)}`);
+      const data = await res.json();
+      
+      if (res.ok) {
+        setScanStats(data);
+      }
+    } catch (err) {
+      console.error('Failed to load scan stats:', err);
+    }
+  }
+
   async function loadOrders() {
     if (!businessId) return;
     try {
@@ -383,6 +410,9 @@ export default function DashboardPage() {
       if (statsRes.ok) {
         setRevenueStats(statsData);
       }
+
+      // Load scan stats
+      await loadScanStats();
     } catch (err: any) {
       setError(err.message || 'נכשל בטעינת הזמנות');
     } finally {
@@ -2777,6 +2807,135 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+
+          {/* Scan Statistics Section */}
+          {scanStats && (
+            <div className="bg-neutral-900/60 backdrop-blur-sm border border-neutral-800/50 rounded-2xl overflow-hidden shadow-xl">
+              <div className="bg-gradient-to-r from-neutral-800/50 to-neutral-800/30 px-5 py-4 border-b border-neutral-800/50">
+                <h3 className="text-base font-bold text-white">📱 סטטיסטיקות סריקות QR/NFC</h3>
+                <p className="text-xs text-neutral-400 mt-1">מעקב אחרי סריקות קוד QR ותגי NFC</p>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gradient-to-br from-blue-900/40 to-cyan-900/40 border border-blue-500/30 rounded-xl px-4 py-3 backdrop-blur-sm">
+                    <div className="text-xs text-blue-300/80 mb-1">סה"כ סריקות</div>
+                    <div className="text-2xl font-bold text-white">{scanStats.totalScans}</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-green-900/40 to-emerald-900/40 border border-green-500/30 rounded-xl px-4 py-3 backdrop-blur-sm">
+                    <div className="text-xs text-green-300/80 mb-1">אחרונות 24 שעות</div>
+                    <div className="text-2xl font-bold text-white">{scanStats.scansLast24h}</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-900/40 to-pink-900/40 border border-purple-500/30 rounded-xl px-4 py-3 backdrop-blur-sm">
+                    <div className="text-xs text-purple-300/80 mb-1">אחרונות 7 ימים</div>
+                    <div className="text-2xl font-bold text-white">{scanStats.scansLast7d}</div>
+                  </div>
+                </div>
+
+                {/* Scans by Source */}
+                {Object.keys(scanStats.scansBySource).length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="text-sm font-semibold text-neutral-300 mb-3">סריקות לפי מקור</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(scanStats.scansBySource).map(([source, count]) => (
+                        <div
+                          key={source}
+                          className="bg-neutral-800/60 border border-neutral-700/30 rounded-lg px-3 py-2"
+                        >
+                          <span className="text-xs text-neutral-400">
+                            {source === 'qr' ? 'QR' : source === 'nfc' ? 'NFC' : source === 'direct_link' ? 'קישור ישיר' : source}:
+                          </span>
+                          <span className="text-sm font-bold text-white ml-2">{count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Scans by Table */}
+                {Object.keys(scanStats.scansByTable).length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="text-sm font-semibold text-neutral-300 mb-3">סריקות לפי שולחן</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {Object.entries(scanStats.scansByTable)
+                        .sort(([, a], [, b]) => b - a)
+                        .map(([tableId, count]) => (
+                          <div
+                            key={tableId}
+                            className="bg-neutral-800/60 border border-neutral-700/30 rounded-lg px-3 py-2"
+                          >
+                            <div className="text-xs text-neutral-400">שולחן {tableId}</div>
+                            <div className="text-sm font-bold text-white">{count} סריקות</div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Chat Statistics Section */}
+          {scanStats && (
+            <div className="bg-neutral-900/60 backdrop-blur-sm border border-neutral-800/50 rounded-2xl overflow-hidden shadow-xl">
+              <div className="bg-gradient-to-r from-neutral-800/50 to-neutral-800/30 px-5 py-4 border-b border-neutral-800/50">
+                <h3 className="text-base font-bold text-white">💬 סטטיסטיקות צ'אט AI</h3>
+                <p className="text-xs text-neutral-400 mt-1">מעקב אחרי כניסות לצ'אט והזמנות דרך הצ'אט</p>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-neutral-300">כניסות לצ'אט</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-gradient-to-br from-indigo-900/40 to-purple-900/40 border border-indigo-500/30 rounded-xl px-3 py-2 backdrop-blur-sm">
+                        <div className="text-xs text-indigo-300/80 mb-1">סה"כ</div>
+                        <div className="text-xl font-bold text-white">{scanStats.totalChatEntries}</div>
+                      </div>
+                      <div className="bg-gradient-to-br from-indigo-900/40 to-purple-900/40 border border-indigo-500/30 rounded-xl px-3 py-2 backdrop-blur-sm">
+                        <div className="text-xs text-indigo-300/80 mb-1">24 שעות</div>
+                        <div className="text-xl font-bold text-white">{scanStats.chatEntriesLast24h}</div>
+                      </div>
+                      <div className="bg-gradient-to-br from-indigo-900/40 to-purple-900/40 border border-indigo-500/30 rounded-xl px-3 py-2 backdrop-blur-sm">
+                        <div className="text-xs text-indigo-300/80 mb-1">7 ימים</div>
+                        <div className="text-xl font-bold text-white">{scanStats.chatEntriesLast7d}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-neutral-300">הזמנות דרך הצ'אט</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-gradient-to-br from-emerald-900/40 to-teal-900/40 border border-emerald-500/30 rounded-xl px-3 py-2 backdrop-blur-sm">
+                        <div className="text-xs text-emerald-300/80 mb-1">סה"כ</div>
+                        <div className="text-xl font-bold text-white">{scanStats.totalChatOrders}</div>
+                      </div>
+                      <div className="bg-gradient-to-br from-emerald-900/40 to-teal-900/40 border border-emerald-500/30 rounded-xl px-3 py-2 backdrop-blur-sm">
+                        <div className="text-xs text-emerald-300/80 mb-1">24 שעות</div>
+                        <div className="text-xl font-bold text-white">{scanStats.chatOrdersLast24h}</div>
+                      </div>
+                      <div className="bg-gradient-to-br from-emerald-900/40 to-teal-900/40 border border-emerald-500/30 rounded-xl px-3 py-2 backdrop-blur-sm">
+                        <div className="text-xs text-emerald-300/80 mb-1">7 ימים</div>
+                        <div className="text-xl font-bold text-white">{scanStats.chatOrdersLast7d}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Conversion Rate */}
+                {scanStats.totalChatEntries > 0 && (
+                  <div className="mt-4 pt-4 border-t border-neutral-800/50">
+                    <div className="bg-gradient-to-br from-amber-900/40 to-orange-900/40 border border-amber-500/30 rounded-xl px-4 py-3 backdrop-blur-sm">
+                      <div className="text-xs text-amber-300/80 mb-1">שיעור המרה (הזמנות מתוך כניסות)</div>
+                      <div className="text-2xl font-bold text-white">
+                        {((scanStats.totalChatOrders / scanStats.totalChatEntries) * 100).toFixed(1)}%
+                      </div>
+                      <div className="text-xs text-amber-200/60 mt-1">
+                        {scanStats.totalChatOrders} מתוך {scanStats.totalChatEntries} כניסות
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="bg-neutral-900/60 backdrop-blur-sm border border-neutral-800/50 rounded-2xl overflow-hidden shadow-xl">
             <div className="bg-gradient-to-r from-neutral-800/50 to-neutral-800/30 px-5 py-4 border-b border-neutral-800/50">

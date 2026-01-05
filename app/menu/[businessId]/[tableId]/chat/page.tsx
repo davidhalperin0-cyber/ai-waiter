@@ -120,6 +120,24 @@ function ChatPageContent({
       }
     }
   }, [businessId, tableId, session?.deviceId, session?.sessionStart]);
+
+  // Track chat entry when page loads
+  useEffect(() => {
+    if (!businessId || !tableId) return;
+
+    // Track chat entry (fire and forget - don't wait for response)
+    fetch('/api/chat/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        businessId,
+        tableId,
+      }),
+    }).catch((err) => {
+      // Silently fail - tracking is not critical
+      console.error('Failed to track chat entry:', err);
+    });
+  }, [businessId, tableId]);
   
   // Save messages to localStorage whenever they change (only after hydration)
   useEffect(() => {

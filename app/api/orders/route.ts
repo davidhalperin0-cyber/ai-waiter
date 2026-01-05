@@ -148,6 +148,47 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Database error' }, { status: 500 });
     }
 
+    // Track order placed through chat (if aiSummary exists, it's likely from chat)
+    if (aiSummary) {
+      try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const { data: existing } = await supabaseAdmin
+          .from('chat_interactions')
+          .select('id')
+          .eq('business_id', businessId)
+          .eq('table_id', tableId)
+          .gte('created_at', today.toISOString())
+          .limit(1)
+          .single();
+
+        if (existing) {
+          // Update existing record
+          await supabaseAdmin
+            .from('chat_interactions')
+            .update({
+              placed_order_at: new Date().toISOString(),
+              order_id: order.orderId,
+            })
+            .eq('id', existing.id);
+        } else {
+          // Create new record
+          await supabaseAdmin
+            .from('chat_interactions')
+            .insert({
+              business_id: businessId,
+              table_id: tableId,
+              placed_order_at: new Date().toISOString(),
+              order_id: order.orderId,
+            });
+        }
+      } catch (error) {
+        // Silently fail - tracking is not critical
+        console.error('Failed to track chat order:', error);
+      }
+    }
+
     // Track status results for both printer and POS
     // Status hierarchy: sent_to_pos > sent_to_printer > received
     // Errors: pos_error > printer_error > received
