@@ -223,6 +223,29 @@ export default function DashboardPage() {
           console.warn('⚠️ Failed to parse cached customContent:', e);
         }
       }
+
+      // CRITICAL: Check localStorage for cached printerConfig that was saved after update
+      // This bypasses read replica lag by using the data we know was saved
+      const printerConfigKey = `business_${businessId}_printerConfig`;
+      const cachedPrinterData = typeof window !== 'undefined' ? localStorage.getItem(printerConfigKey) : null;
+      let cachedPrinterConfig: any = null;
+      let cachedPrinterTimestamp = 0;
+      
+      if (cachedPrinterData) {
+        try {
+          const parsed = JSON.parse(cachedPrinterData);
+          cachedPrinterConfig = parsed.printerConfig;
+          cachedPrinterTimestamp = parsed.timestamp || 0;
+          console.log('💾 Found cached printerConfig in localStorage:', {
+            timestamp: cachedPrinterTimestamp,
+            age: Date.now() - cachedPrinterTimestamp,
+            enabled: cachedPrinterConfig?.enabled,
+            endpoint: cachedPrinterConfig?.endpoint,
+          });
+        } catch (e) {
+          console.warn('⚠️ Failed to parse cached printerConfig:', e);
+        }
+      }
       
       // Add cache busting to ensure fresh data
       const res = await fetch(`/api/business/info?businessId=${encodeURIComponent(businessId)}&_t=${Date.now()}`, {
@@ -271,6 +294,24 @@ export default function DashboardPage() {
             cachedAge: Date.now() - cachedTimestamp,
           });
         }
+
+        // CRITICAL: Use cached printerConfig if it's newer than 5 minutes old
+        // This ensures we use the data we know was saved, not stale read replica data
+        let finalPrinterConfig = data.business.printerConfig || {
+          enabled: false,
+          type: 'http',
+          endpoint: '',
+          payloadType: 'json',
+        };
+        if (cachedPrinterConfig && cachedPrinterTimestamp > Date.now() - 5 * 60 * 1000) {
+          // Cached data is recent (less than 5 minutes old), use it instead of API data
+          finalPrinterConfig = cachedPrinterConfig;
+          console.log('✅ Using cached printerConfig from localStorage (source of truth):', {
+            enabled: finalPrinterConfig?.enabled,
+            endpoint: finalPrinterConfig?.endpoint,
+            cachedAge: Date.now() - cachedPrinterTimestamp,
+          });
+        }
         
         // Only update if values actually changed to prevent infinite re-renders
         setBusinessInfo((prev) => {
@@ -284,12 +325,7 @@ export default function DashboardPage() {
             businessHours: data.business.businessHours || null,
             subscription: data.business.subscription,
             customContent: finalCustomContent, // Use cached or API data
-            printerConfig: data.business.printerConfig || {
-              enabled: false,
-              type: 'http',
-              endpoint: '',
-              payloadType: 'json',
-            },
+            printerConfig: finalPrinterConfig, // Use cached or API data
             posConfig: data.business.posConfig || {
               enabled: false,
               provider: 'generic',
@@ -2364,16 +2400,32 @@ export default function DashboardPage() {
                   if (!res.ok) {
                     throw new Error(data.message || 'נכשל בעדכון הגדרות המדפסת');
                   }
+                  
+                  // Use the printerConfig returned from the API (source of truth)
+                  const savedPrinterConfig = data.printerConfig || {
+                    enabled,
+                    type,
+                    endpoint,
+                    payloadType,
+                    port,
+                  };
+                  
                   setBusinessInfo({
                     ...businessInfo,
-                    printerConfig: {
-                      enabled,
-                      type,
-                      endpoint,
-                      payloadType,
-                      port,
-                    },
+                    printerConfig: savedPrinterConfig,
                   });
+                  
+                  // CRITICAL: Save to localStorage to bypass read replica lag
+                  // This ensures we use the data we know was saved, not stale read replica data
+                  if (typeof window !== 'undefined') {
+                    const localStorageKey = `business_${businessId}_printerConfig`;
+                    localStorage.setItem(localStorageKey, JSON.stringify({
+                      printerConfig: savedPrinterConfig,
+                      timestamp: Date.now(),
+                    }));
+                    console.log('💾 Saved printerConfig to localStorage:', savedPrinterConfig);
+                  }
+                  
                   toast.success('הגדרות המדפסת עודכנו בהצלחה!');
                 } catch (err: any) {
                   const message = err.message || 'נכשל בעדכון הגדרות המדפסת';
