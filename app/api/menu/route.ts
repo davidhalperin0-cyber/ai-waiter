@@ -264,6 +264,7 @@ export async function POST(req: NextRequest) {
         delete itemFallback.ingredients_en;
         delete itemFallback.allergens_en;
         delete itemFallback.sortOrder;
+        delete itemFallback.priceData; // Remove priceData if column doesn't exist
 
         const retry = await supabaseAdmin.from('menuItems').insert(itemFallback);
 
