@@ -321,7 +321,7 @@ export async function PUT(req: NextRequest) {
         if (savedAiInstructions !== expectedAiInstructions) {
           console.warn('⚠️ WARNING: RPC saved aiInstructions does not match expected!', {
             expectedLength: expectedAiInstructions.length,
-            savedLength: savedAiInstructions.length,
+            savedLength: savedAiInstructions?.length || 0,
           });
         }
         
