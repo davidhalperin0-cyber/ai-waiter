@@ -1601,8 +1601,25 @@ export default function DashboardPage() {
                   <input
                     type="number"
                     step="0.01"
-                    value={newItem.price}
-                    onChange={(e) => setNewItem((v) => ({ ...v, price: e.target.value }))}
+                    min="0"
+                    value={newItem.price === '' || newItem.price === '0' ? '' : newItem.price}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Allow empty string, but prevent showing 0 when typing
+                      // Remove leading zeros except for decimal numbers
+                      if (value === '0') {
+                        setNewItem((v) => ({ ...v, price: '' }));
+                      } else {
+                        setNewItem((v) => ({ ...v, price: value }));
+                      }
+                    }}
+                    onBlur={(e) => {
+                      // If empty or invalid, set to empty string (not 0)
+                      const value = e.target.value;
+                      if (value === '' || value === '0' || isNaN(Number(value)) || Number(value) <= 0) {
+                        setNewItem((v) => ({ ...v, price: '' }));
+                      }
+                    }}
                     className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                     placeholder="12.50"
                     required
