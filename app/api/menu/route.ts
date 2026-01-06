@@ -131,6 +131,22 @@ export async function POST(req: NextRequest) {
       item.isBusiness = isBusiness || false;
     }
 
+    // Set sortOrder to a high value so new items appear at the end
+    // Get the max sortOrder for this business and add 1
+    const { data: existingItems } = await supabaseAdmin
+      .from('menuItems')
+      .select('sortOrder')
+      .eq('businessId', businessId)
+      .order('sortOrder', { ascending: false })
+      .limit(1);
+
+    if (existingItems && existingItems.length > 0 && existingItems[0].sortOrder !== null && existingItems[0].sortOrder !== undefined) {
+      item.sortOrder = (existingItems[0].sortOrder as number) + 1;
+    } else {
+      // If no items exist or sortOrder column doesn't exist, set to 0 (will be handled by fallback)
+      item.sortOrder = 0;
+    }
+
     // Try to insert with all optional columns first
     let { error } = await supabaseAdmin.from('menuItems').insert(item);
 
@@ -142,7 +158,8 @@ export async function POST(req: NextRequest) {
         message.includes('category_en') ||
         message.includes('name_en') ||
         message.includes('ingredients_en') ||
-        message.includes('allergens_en');
+        message.includes('allergens_en') ||
+        message.includes('sortOrder');
 
       if (relatesToOptionalColumn) {
         console.warn('Optional menuItems columns may not exist yet, retrying without them:', message);
@@ -153,6 +170,7 @@ export async function POST(req: NextRequest) {
         delete itemFallback.name_en;
         delete itemFallback.ingredients_en;
         delete itemFallback.allergens_en;
+        delete itemFallback.sortOrder;
 
         const retry = await supabaseAdmin.from('menuItems').insert(itemFallback);
 

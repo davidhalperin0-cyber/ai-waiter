@@ -1739,7 +1739,13 @@ export default function DashboardPage() {
                     onBlur={(e) => {
                       // If empty or invalid, set to empty string (not 0)
                       const value = e.target.value;
-                      if (value === '' || value === '0' || isNaN(Number(value)) || Number(value) <= 0) {
+                      // Remove trailing zeros and decimal point if not needed
+                      if (value && !isNaN(Number(value)) && Number(value) > 0) {
+                        const numValue = Number(value);
+                        // Format to remove trailing zeros
+                        const formatted = numValue % 1 === 0 ? numValue.toString() : numValue.toFixed(2).replace(/\.?0+$/, '');
+                        setNewItem((v) => ({ ...v, price: formatted }));
+                      } else if (value === '' || value === '0' || isNaN(Number(value)) || Number(value) <= 0) {
                         setNewItem((v) => ({ ...v, price: '' }));
                       }
                     }}
