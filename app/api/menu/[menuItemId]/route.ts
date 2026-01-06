@@ -30,10 +30,22 @@ export async function PUT(
       isBusiness,
       isHidden,
       sortOrder,
-    } = body as Partial<MenuItem> & { businessId?: string; price?: number; isHidden?: boolean; sortOrder?: number };
+    } = body as Partial<MenuItem> & { businessId?: string; price?: number | { min: number; max: number }; isHidden?: boolean; sortOrder?: number };
 
     if (!businessId) {
       return NextResponse.json({ message: 'businessId is required' }, { status: 400 });
+    }
+    
+    // Validate price if provided - can be number or range object
+    if (price !== undefined && price !== null) {
+      const isPriceRange = typeof price === 'object' && 'min' in price && 'max' in price;
+      if (isPriceRange) {
+        if (typeof price.min !== 'number' || typeof price.max !== 'number' || price.min >= price.max || price.min < 0) {
+          return NextResponse.json({ message: 'Invalid price range' }, { status: 400 });
+        }
+      } else if (typeof price !== 'number' || price < 0) {
+        return NextResponse.json({ message: 'Price must be a positive number' }, { status: 400 });
+      }
     }
 
     const updateData: any = {};
@@ -79,7 +91,14 @@ export async function PUT(
       return cleaned.length > 0 ? cleaned : undefined;
     };
 
-    if (price !== undefined) updateData.price = price;
+    if (price !== undefined) {
+      // Store price as JSONB to support both single number and range {min, max}
+      // For backward compatibility, also store numeric value in price column
+      const priceValue = typeof price === 'object' && 'min' in price && 'max' in price ? price.min : price;
+      const priceData = typeof price === 'object' && 'min' in price && 'max' in price ? price : price;
+      updateData.price = priceValue; // Store min value for backward compatibility
+      updateData.priceData = priceData; // Store full price data (number or range) as JSONB
+    }
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
     if (ingredients !== undefined) updateData.ingredients = cleanArrayField(ingredients);
     if (ingredientsEn !== undefined) {

@@ -13,7 +13,7 @@ interface DashboardMenuItem {
   categoryEn?: string;
   name: string;
   nameEn?: string;
-  price: number;
+  price: number | { min: number; max: number };
   imageUrl?: string;
   ingredients?: string[];
   allergens?: string[];
@@ -139,6 +139,9 @@ export default function DashboardPage() {
     name: '',
     nameEn: '',
     price: '',
+    priceMin: '',
+    priceMax: '',
+    isPriceRange: false,
     imageUrl: '',
     ingredients: '',
     ingredientsEn: '',
@@ -766,12 +769,37 @@ export default function DashboardPage() {
 
   async function handleAddItem(e: React.FormEvent) {
     e.preventDefault();
-    if (!businessId || !newItem.category || !newItem.name || !newItem.price) return;
-
-    const priceNumber = Number(newItem.price);
-    if (Number.isNaN(priceNumber)) {
-      setError('המחיר חייב להיות מספר');
-      return;
+    if (!businessId || !newItem.category || !newItem.name) return;
+    
+    // Validate price - either single price or price range
+    let price: number | { min: number; max: number };
+    if (newItem.isPriceRange) {
+      if (!newItem.priceMin || !newItem.priceMax) {
+        setError('יש להזין גם מחיר מינימלי וגם מקסימלי');
+        return;
+      }
+      const minPrice = Number(newItem.priceMin);
+      const maxPrice = Number(newItem.priceMax);
+      if (Number.isNaN(minPrice) || Number.isNaN(maxPrice)) {
+        setError('המחירים חייבים להיות מספרים');
+        return;
+      }
+      if (minPrice >= maxPrice) {
+        setError('המחיר המינימלי חייב להיות קטן מהמקסימלי');
+        return;
+      }
+      price = { min: minPrice, max: maxPrice };
+    } else {
+      if (!newItem.price) {
+        setError('יש להזין מחיר');
+        return;
+      }
+      const priceNumber = Number(newItem.price);
+      if (Number.isNaN(priceNumber)) {
+        setError('המחיר חייב להיות מספר');
+        return;
+      }
+      price = priceNumber;
     }
 
     try {
@@ -815,7 +843,7 @@ export default function DashboardPage() {
           categoryEn: newItem.categoryEn?.trim() || null,
           name: newItem.name,
           nameEn: newItem.nameEn || undefined,
-          price: priceNumber,
+          price: price,
           imageUrl: newItem.imageUrl || undefined,
           ingredients: ingredients.length > 0 ? ingredients : undefined,
           ingredientsEn: ingredientsEn.length > 0 ? ingredientsEn : undefined,
@@ -836,6 +864,9 @@ export default function DashboardPage() {
         name: '',
         nameEn: '',
         price: '',
+        priceMin: '',
+        priceMax: '',
+        isPriceRange: false,
         imageUrl: '',
         ingredients: '',
         ingredientsEn: '',
@@ -862,12 +893,18 @@ export default function DashboardPage() {
     const cleanIngredientsEn = cleanTextField(item.ingredientsEn?.join(', ') || '');
     const cleanAllergensEn = cleanTextField(item.allergensEn?.join(', ') || '');
     
+    // Check if price is a range or single value
+    const isPriceRange = typeof item.price === 'object' && 'min' in item.price && 'max' in item.price;
+    
     setNewItem({
       category: item.category,
       categoryEn: item.categoryEn || '',
       name: item.name,
       nameEn: item.nameEn || '',
-      price: item.price.toString(),
+      price: isPriceRange ? '' : (typeof item.price === 'number' ? item.price.toString() : ''),
+      priceMin: isPriceRange && typeof item.price === 'object' && 'min' in item.price ? item.price.min.toString() : '',
+      priceMax: isPriceRange && typeof item.price === 'object' && 'max' in item.price ? item.price.max.toString() : '',
+      isPriceRange: isPriceRange,
       imageUrl: item.imageUrl || '',
       ingredients: cleanIngredients,
       ingredientsEn: cleanIngredientsEn,
@@ -881,12 +918,37 @@ export default function DashboardPage() {
 
   async function handleUpdateItem(e: React.FormEvent) {
     e.preventDefault();
-    if (!businessId || !editingItem || !newItem.category || !newItem.name || !newItem.price) return;
-
-    const priceNumber = Number(newItem.price);
-    if (Number.isNaN(priceNumber)) {
-      setError('המחיר חייב להיות מספר');
-      return;
+    if (!businessId || !editingItem || !newItem.category || !newItem.name) return;
+    
+    // Validate price - either single price or price range
+    let price: number | { min: number; max: number };
+    if (newItem.isPriceRange) {
+      if (!newItem.priceMin || !newItem.priceMax) {
+        setError('יש להזין גם מחיר מינימלי וגם מקסימלי');
+        return;
+      }
+      const minPrice = Number(newItem.priceMin);
+      const maxPrice = Number(newItem.priceMax);
+      if (Number.isNaN(minPrice) || Number.isNaN(maxPrice)) {
+        setError('המחירים חייבים להיות מספרים');
+        return;
+      }
+      if (minPrice >= maxPrice) {
+        setError('המחיר המינימלי חייב להיות קטן מהמקסימלי');
+        return;
+      }
+      price = { min: minPrice, max: maxPrice };
+    } else {
+      if (!newItem.price) {
+        setError('יש להזין מחיר');
+        return;
+      }
+      const priceNumber = Number(newItem.price);
+      if (Number.isNaN(priceNumber)) {
+        setError('המחיר חייב להיות מספר');
+        return;
+      }
+      price = priceNumber;
     }
 
     try {
@@ -932,7 +994,7 @@ export default function DashboardPage() {
           categoryEn: categoryEnValue,
           name: newItem.name,
           nameEn: newItem.nameEn?.trim() || undefined,
-          price: priceNumber,
+          price: price,
           imageUrl: newItem.imageUrl || undefined,
           ingredients: ingredients.length > 0 ? ingredients : undefined,
           ingredientsEn: ingredientsEn.length > 0 ? ingredientsEn : undefined,
@@ -958,6 +1020,9 @@ export default function DashboardPage() {
         name: '',
         nameEn: '',
         price: '',
+        priceMin: '',
+        priceMax: '',
+        isPriceRange: false,
         imageUrl: '',
         ingredients: '',
         ingredientsEn: '',
@@ -983,6 +1048,9 @@ export default function DashboardPage() {
       name: '',
       nameEn: '',
       price: '',
+      priceMin: '',
+      priceMax: '',
+      isPriceRange: false,
       imageUrl: '',
       ingredients: '',
       ingredientsEn: '',
@@ -1773,39 +1841,105 @@ export default function DashboardPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-neutral-200">מחיר (₪)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={newItem.price === '' || newItem.price === '0' ? '' : newItem.price}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      // Allow empty string, but prevent showing 0 when typing
-                      // Remove leading zeros except for decimal numbers
-                      if (value === '0') {
-                        setNewItem((v) => ({ ...v, price: '' }));
-                      } else {
-                        setNewItem((v) => ({ ...v, price: value }));
-                      }
-                    }}
-                    onBlur={(e) => {
-                      // If empty or invalid, set to empty string (not 0)
-                      const value = e.target.value;
-                      // Remove trailing zeros and decimal point if not needed
-                      if (value && !isNaN(Number(value)) && Number(value) > 0) {
-                        const numValue = Number(value);
-                        // Format to remove trailing zeros
-                        const formatted = numValue % 1 === 0 ? numValue.toString() : numValue.toFixed(2).replace(/\.?0+$/, '');
-                        setNewItem((v) => ({ ...v, price: formatted }));
-                      } else if (value === '' || value === '0' || isNaN(Number(value)) || Number(value) <= 0) {
-                        setNewItem((v) => ({ ...v, price: '' }));
-                      }
-                    }}
-                    className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
-                    placeholder="12.50"
-                    required
-                  />
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-neutral-200">מחיר (₪)</label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newItem.isPriceRange}
+                        onChange={(e) => setNewItem((v) => ({ ...v, isPriceRange: e.target.checked }))}
+                        className="w-4 h-4 rounded border-2 border-neutral-600 bg-neutral-800/80 text-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all cursor-pointer"
+                      />
+                      <span className="text-xs text-neutral-400">טווח מחירים</span>
+                    </label>
+                  </div>
+                  {!newItem.isPriceRange ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={newItem.price === '' || newItem.price === '0' ? '' : newItem.price}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === '0') {
+                          setNewItem((v) => ({ ...v, price: '' }));
+                        } else {
+                          setNewItem((v) => ({ ...v, price: value }));
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const value = e.target.value;
+                        if (value && !isNaN(Number(value)) && Number(value) > 0) {
+                          const numValue = Number(value);
+                          const formatted = numValue % 1 === 0 ? numValue.toString() : numValue.toFixed(2).replace(/\.?0+$/, '');
+                          setNewItem((v) => ({ ...v, price: formatted }));
+                        } else if (value === '' || value === '0' || isNaN(Number(value)) || Number(value) <= 0) {
+                          setNewItem((v) => ({ ...v, price: '' }));
+                        }
+                      }}
+                      className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                      placeholder="למשל: 45.90"
+                      required
+                    />
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={newItem.priceMin}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '0') {
+                            setNewItem((v) => ({ ...v, priceMin: '' }));
+                          } else {
+                            setNewItem((v) => ({ ...v, priceMin: value }));
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const value = e.target.value;
+                          if (value && !isNaN(Number(value)) && Number(value) > 0) {
+                            const numValue = Number(value);
+                            const formatted = numValue % 1 === 0 ? numValue.toString() : numValue.toFixed(2).replace(/\.?0+$/, '');
+                            setNewItem((v) => ({ ...v, priceMin: formatted }));
+                          } else if (value === '' || value === '0' || isNaN(Number(value)) || Number(value) <= 0) {
+                            setNewItem((v) => ({ ...v, priceMin: '' }));
+                          }
+                        }}
+                        className="flex-1 rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                        placeholder="מ-"
+                        required
+                      />
+                      <span className="self-center text-neutral-400">-</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={newItem.priceMax}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '0') {
+                            setNewItem((v) => ({ ...v, priceMax: '' }));
+                          } else {
+                            setNewItem((v) => ({ ...v, priceMax: value }));
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const value = e.target.value;
+                          if (value && !isNaN(Number(value)) && Number(value) > 0) {
+                            const numValue = Number(value);
+                            const formatted = numValue % 1 === 0 ? numValue.toString() : numValue.toFixed(2).replace(/\.?0+$/, '');
+                            setNewItem((v) => ({ ...v, priceMax: formatted }));
+                          } else if (value === '' || value === '0' || isNaN(Number(value)) || Number(value) <= 0) {
+                            setNewItem((v) => ({ ...v, priceMax: '' }));
+                          }
+                        }}
+                        className="flex-1 rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                        placeholder="עד"
+                        required
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="space-y-3">
@@ -2136,7 +2270,11 @@ export default function DashboardPage() {
                             🤰 מתאים להריון
                           </span>
                         )}
-                        <span className="text-lg font-bold text-white ml-auto">₪{item.price.toFixed(2)}</span>
+                        <span className="text-lg font-bold text-white ml-auto">
+                          {typeof item.price === 'object' && 'min' in item.price && 'max' in item.price
+                            ? `₪${item.price.min.toFixed(2)} - ₪${item.price.max.toFixed(2)}`
+                            : `₪${item.price.toFixed(2)}`}
+                        </span>
                       </div>
                       <h4 className={`text-base font-semibold mb-2 ${item.isHidden ? 'text-neutral-500 line-through' : 'text-white'}`}>{item.name}</h4>
                       {item.ingredients && item.ingredients.length > 0 && (

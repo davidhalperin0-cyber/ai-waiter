@@ -150,7 +150,8 @@ export interface MenuItem {
   // Optional English variants for multi-language menu
   nameEn?: string;
   imageUrl?: string;
-  price: number;
+  // Price can be a single number or a range {min: number, max: number}
+  price: number | { min: number; max: number };
   ingredients?: string[];
   allergens?: string[];
   ingredientsEn?: string[];

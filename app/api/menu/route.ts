@@ -116,10 +116,24 @@ export async function POST(req: NextRequest) {
       isFeatured,
       isPregnancySafe,
       isBusiness,
-    } = body as Partial<MenuItem> & { businessId?: string; price?: number };
+    } = body as Partial<MenuItem> & { businessId?: string; price?: number | { min: number; max: number } };
 
-    if (!businessId || !category || !name || typeof price !== 'number') {
+    if (!businessId || !category || !name) {
       return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
+    }
+    
+    // Validate price - can be number or range object
+    if (price === undefined || price === null) {
+      return NextResponse.json({ message: 'Price is required' }, { status: 400 });
+    }
+    
+    const isPriceRange = typeof price === 'object' && 'min' in price && 'max' in price;
+    if (isPriceRange) {
+      if (typeof price.min !== 'number' || typeof price.max !== 'number' || price.min >= price.max || price.min < 0) {
+        return NextResponse.json({ message: 'Invalid price range' }, { status: 400 });
+      }
+    } else if (typeof price !== 'number' || price < 0) {
+      return NextResponse.json({ message: 'Price must be a positive number' }, { status: 400 });
     }
 
     // Helper function to clean trailing 0s from array fields
@@ -142,11 +156,17 @@ export async function POST(req: NextRequest) {
       return cleaned.length > 0 ? cleaned : undefined;
     };
 
+    // Store price as JSONB to support both single number and range {min, max}
+    // For backward compatibility, also store numeric value in price column
+    const priceValue = typeof price === 'object' && 'min' in price && 'max' in price ? price.min : price;
+    const priceData = typeof price === 'object' && 'min' in price && 'max' in price ? price : price;
+    
     const item: any = {
       businessId,
       category,
       name,
-      price,
+      price: priceValue, // Store min value for backward compatibility
+      priceData: priceData, // Store full price data (number or range) as JSONB
       imageUrl,
       ingredients: cleanArrayField(ingredients),
       allergens: cleanArrayField(allergens),

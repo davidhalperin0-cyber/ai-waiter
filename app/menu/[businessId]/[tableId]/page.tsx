@@ -15,7 +15,7 @@ interface MenuItem {
   categoryEn?: string;
   name: string;
   nameEn?: string;
-  price: number;
+  price: number | { min: number; max: number };
   imageUrl?: string;
   ingredients?: string[];
   ingredientsEn?: string[];
@@ -33,6 +33,22 @@ function CustomerMenuPageContent({
   businessId: string;
   tableId: string;
 }) {
+  // Helper function to format price (single or range)
+  const formatPrice = (price: number | { min: number; max: number }): string => {
+    if (typeof price === 'object' && 'min' in price && 'max' in price) {
+      return `₪${price.min.toFixed(2)} - ₪${price.max.toFixed(2)}`;
+    }
+    return `₪${price.toFixed(2)}`;
+  };
+  
+  // Helper function to get numeric price for calculations (use min for range)
+  const getPriceValue = (price: number | { min: number; max: number }): number => {
+    if (typeof price === 'object' && 'min' in price && 'max' in price) {
+      return price.min; // Use min for cart calculations
+    }
+    return price;
+  };
+  
   const { items, addItem } = useCart();
   const { session, markCartUpdated, updateSession, isSessionValid } = useSession();
   const [sessionExpired, setSessionExpired] = useState(false);
@@ -161,7 +177,7 @@ function CustomerMenuPageContent({
   
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const totalPrice = items.reduce(
-    (sum, item) => sum + item.price * item.quantity,
+    (sum, item) => sum + getPriceValue(item.price) * item.quantity,
     0,
   );
 
@@ -1464,7 +1480,7 @@ const orderedCategories = useMemo(() => {
                         <div className="flex items-center justify-center gap-4 mb-6">
                           <span className="h-[1px] w-8 bg-white/10" />
                           <span className="text-2xl font-light tracking-widest text-white/90">
-                            ₪{featuredItems[featuredIndex].price.toFixed(2)}
+                            {formatPrice(featuredItems[featuredIndex].price)}
                           </span>
                           <span className="h-[1px] w-8 bg-white/10" />
                         </div>
@@ -1618,7 +1634,7 @@ const orderedCategories = useMemo(() => {
                           <div className="flex items-start justify-between gap-4 mb-2">
                             <h3 className={menuStyle.typography.itemTitle}>{displayName}</h3>
                             <span className={`${menuStyle.typography.price} hidden lg:block whitespace-nowrap`}>
-                              ₪{item.price.toFixed(2)}
+                              {formatPrice(item.price)}
                             </span>
                           </div>
 
@@ -1650,7 +1666,7 @@ const orderedCategories = useMemo(() => {
                           {/* Price & Button Row */}
                           <div className="flex items-center justify-between mt-auto pt-2">
                             <span className={`${menuStyle.typography.price} lg:hidden`}>
-                              ₪{item.price.toFixed(2)}
+                              {formatPrice(item.price)}
                             </span>
                             {businessInfo?.planType !== 'menu_only' && (
                               <motion.button
@@ -1695,7 +1711,7 @@ const orderedCategories = useMemo(() => {
                               {displayName}
                             </h2>
                             <span className={`${menuStyle.typography.price} text-2xl lg:text-3xl text-white whitespace-nowrap`}>
-                              ₪{item.price.toFixed(2)}
+                              {formatPrice(item.price)}
                             </span>
                           </div>
                           <span className={menuStyle.badge.category}>
@@ -1782,7 +1798,7 @@ const orderedCategories = useMemo(() => {
                               whileTap={{ scale: 0.98 }}
                             >
                               {language === 'en' ? 'Add to cart' : 'הוסף לעגלה'} - ₪
-                              {item.price.toFixed(2)}
+                              {formatPrice(item.price)}
                             </motion.button>
                           )}
                         </div>
@@ -1914,7 +1930,7 @@ const orderedCategories = useMemo(() => {
                             : expandedItem.name}
                         </h2>
                         <span className={`${menuStyle.typography.price} text-2xl text-white whitespace-nowrap`}>
-                          ₪{expandedItem.price.toFixed(2)}
+                          {formatPrice(expandedItem.price)}
                         </span>
                       </div>
                       <span className={menuStyle.badge.category}>
@@ -2005,8 +2021,7 @@ const orderedCategories = useMemo(() => {
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
                         >
-                          {language === 'en' ? 'Add to cart' : 'הוסף לעגלה'} - ₪
-                          {expandedItem.price.toFixed(2)}
+                          {language === 'en' ? 'Add to cart' : 'הוסף לעגלה'} - {formatPrice(expandedItem.price)}
                         </motion.button>
                       )}
                     </div>
