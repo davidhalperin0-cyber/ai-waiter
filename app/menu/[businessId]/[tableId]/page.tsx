@@ -395,7 +395,31 @@ function CustomerMenuPageContent({
             throw new Error(menuData.message || 'טעינה נכשלה');
           }
           // Filter out hidden items (isHidden = true) from customer menu
-          const visibleItems = (menuData.items ?? []).filter((item: any) => !item.isHidden);
+          // Also clean ingredients and allergens arrays from trailing 0s
+          const cleanArray = (arr: string[] | undefined): string[] | undefined => {
+            if (!arr || !Array.isArray(arr)) return arr;
+            return arr.map(str => {
+              // Clean each string in the array
+              const parts = str.split(',').map(part => {
+                return part.replace(/([^\d])0+$/g, '$1').trim();
+              });
+              let cleaned = parts.join(', ');
+              cleaned = cleaned.replace(/[\s,]*0+[\s,]*$/g, '');
+              cleaned = cleaned.replace(/\s*,\s*,/g, ',').replace(/\s+/g, ' ').trim();
+              cleaned = cleaned.replace(/^,|,$/g, '');
+              return cleaned;
+            }).filter(Boolean);
+          };
+          
+          const visibleItems = (menuData.items ?? [])
+            .filter((item: any) => !item.isHidden)
+            .map((item: MenuItem) => ({
+              ...item,
+              ingredients: cleanArray(item.ingredients),
+              allergens: cleanArray(item.allergens),
+              ingredientsEn: cleanArray(item.ingredientsEn),
+              allergensEn: cleanArray(item.allergensEn),
+            }));
           setMenuItems(visibleItems);
         }
       } catch (err: any) {

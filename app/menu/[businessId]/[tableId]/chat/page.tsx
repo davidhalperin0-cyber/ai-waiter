@@ -28,6 +28,22 @@ interface Message {
   quickReplies?: { text: string; label?: string }[];
 }
 
+// Helper function to clean trailing 0s from array fields
+function cleanArrayField(arr: string[]): string[] {
+  if (!arr || !Array.isArray(arr)) return arr;
+  return arr.map(str => {
+    // Clean each string in the array
+    const parts = str.split(',').map(part => {
+      return part.replace(/([^\d])0+$/g, '$1').trim();
+    });
+    let cleaned = parts.join(', ');
+    cleaned = cleaned.replace(/[\s,]*0+[\s,]*$/g, '');
+    cleaned = cleaned.replace(/\s*,\s*,/g, ',').replace(/\s+/g, ' ').trim();
+    cleaned = cleaned.replace(/^,|,$/g, '');
+    return cleaned;
+  }).filter(Boolean);
+}
+
 function ChatPageContent({
   businessId,
   tableId,
@@ -627,8 +643,8 @@ function ChatPageContent({
             name: data.mentionedItem.name || '',
             price: data.mentionedItem.price || 0,
             imageUrl: data.mentionedItem.imageUrl || data.mentionedItem.image_url || undefined,
-            ingredients: data.mentionedItem.ingredients || undefined,
-            allergens: data.mentionedItem.allergens || undefined,
+            ingredients: data.mentionedItem.ingredients ? cleanArrayField(data.mentionedItem.ingredients) : undefined,
+            allergens: data.mentionedItem.allergens ? cleanArrayField(data.mentionedItem.allergens) : undefined,
             category: data.mentionedItem.category || undefined,
             isPregnancySafe: data.mentionedItem.isPregnancySafe || data.mentionedItem.is_pregnancy_safe || false,
           };
