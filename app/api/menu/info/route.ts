@@ -102,8 +102,12 @@ export async function GET(req: NextRequest) {
       );
     }
     
-    // Check if subscription is active
-    if (!isSubscriptionActive(subscription)) {
+    // Check if subscription is active or trial
+    // Allow access for both 'active' and 'trial' status
+    const isActive = isSubscriptionActive(subscription);
+    const isTrial = subscription?.status === 'trial';
+    
+    if (!isActive && !isTrial) {
       return NextResponse.json(
         {
           businessId: business.businessId,
@@ -113,9 +117,9 @@ export async function GET(req: NextRequest) {
           template: business.template || 'generic',
           businessHours: business.businessHours || null,
           customContent: customContent,
-          subscriptionStatus: 'expired',
-          planType: subscription.planType || 'full',
-          menuOnlyMessage: subscription.menuOnlyMessage || null,
+          subscriptionStatus: subscription?.status || 'expired',
+          planType: subscription?.planType || 'full',
+          menuOnlyMessage: subscription?.menuOnlyMessage || null,
         },
         { status: 403 },
       );
