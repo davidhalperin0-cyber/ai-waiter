@@ -691,8 +691,8 @@ function ChatPageContent({
           name: data.mentionedItem.name || '',
           price: data.mentionedItem.price || 0,
           imageUrl: data.mentionedItem.imageUrl || data.mentionedItem.image_url || undefined,
-          ingredients: data.mentionedItem.ingredients || undefined,
-          allergens: data.mentionedItem.allergens || undefined,
+          ingredients: data.mentionedItem.ingredients ? cleanArrayField(data.mentionedItem.ingredients) : undefined,
+          allergens: data.mentionedItem.allergens ? cleanArrayField(data.mentionedItem.allergens) : undefined,
           category: data.mentionedItem.category || undefined,
           isPregnancySafe: data.mentionedItem.isPregnancySafe || data.mentionedItem.is_pregnancy_safe || false,
         };
