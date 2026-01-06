@@ -780,17 +780,26 @@ export default function DashboardPage() {
       const cleanIngredientsEn = cleanTextField(newItem.ingredientsEn || '');
       const cleanAllergensEn = cleanTextField(newItem.allergensEn || '');
       
+      // Helper to clean each part after splitting
+      const cleanPart = (part: string): string => {
+        let cleaned = part.trim();
+        // Remove trailing 0s from each part
+        cleaned = cleaned.replace(/([^\d])0+$/g, '$1');
+        cleaned = cleaned.replace(/[\s,]*0+[\s,]*$/g, '');
+        return cleaned;
+      };
+      
       const ingredients = cleanIngredients
-        ? cleanIngredients.split(',').map((i) => i.trim()).filter(Boolean)
+        ? cleanIngredients.split(',').map(cleanPart).filter(Boolean)
         : [];
       const allergens = cleanAllergens
-        ? cleanAllergens.split(',').map((a) => a.trim()).filter(Boolean)
+        ? cleanAllergens.split(',').map(cleanPart).filter(Boolean)
         : [];
       const ingredientsEn = cleanIngredientsEn
-        ? cleanIngredientsEn.split(',').map((i) => i.trim()).filter(Boolean)
+        ? cleanIngredientsEn.split(',').map(cleanPart).filter(Boolean)
         : [];
       const allergensEn = cleanAllergensEn
-        ? cleanAllergensEn.split(',').map((a) => a.trim()).filter(Boolean)
+        ? cleanAllergensEn.split(',').map(cleanPart).filter(Boolean)
         : [];
 
       const res = await fetch('/api/menu', {
@@ -886,17 +895,26 @@ export default function DashboardPage() {
       const cleanIngredientsEn = cleanTextField(newItem.ingredientsEn || '');
       const cleanAllergensEn = cleanTextField(newItem.allergensEn || '');
       
+      // Helper to clean each part after splitting
+      const cleanPart = (part: string): string => {
+        let cleaned = part.trim();
+        // Remove trailing 0s from each part
+        cleaned = cleaned.replace(/([^\d])0+$/g, '$1');
+        cleaned = cleaned.replace(/[\s,]*0+[\s,]*$/g, '');
+        return cleaned;
+      };
+      
       const ingredients = cleanIngredients
-        ? cleanIngredients.split(',').map((i) => i.trim()).filter(Boolean)
+        ? cleanIngredients.split(',').map(cleanPart).filter(Boolean)
         : [];
       const allergens = cleanAllergens
-        ? cleanAllergens.split(',').map((a) => a.trim()).filter(Boolean)
+        ? cleanAllergens.split(',').map(cleanPart).filter(Boolean)
         : [];
       const ingredientsEn = cleanIngredientsEn
-        ? cleanIngredientsEn.split(',').map((i) => i.trim()).filter(Boolean)
+        ? cleanIngredientsEn.split(',').map(cleanPart).filter(Boolean)
         : [];
       const allergensEn = cleanAllergensEn
-        ? cleanAllergensEn.split(',').map((a) => a.trim()).filter(Boolean)
+        ? cleanAllergensEn.split(',').map(cleanPart).filter(Boolean)
         : [];
 
       const categoryEnValue = newItem.categoryEn?.trim() || null;
