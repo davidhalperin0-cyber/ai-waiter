@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Try to select all columns including isBusiness
+    // Try with sortOrder first, but fallback if column doesn't exist
     let { data: items, error } = await supabaseAdmin
       .from('menuItems')
       .select('*')
@@ -23,16 +24,26 @@ export async function GET(req: NextRequest) {
       .order('is_featured', { ascending: false })
       .order('name', { ascending: true });
 
-    // If error suggests missing column, try without isBusiness
-    if (error && error.message?.includes('column')) {
-      console.warn('Column may not exist, retrying:', error.message);
-      // The select('*') should work even if isBusiness doesn't exist
-      // But if it fails, we'll handle it in the mapping
-    }
-
-    if (error) {
+    // If error suggests missing sortOrder column, retry without it
+    if (error && error.message?.toLowerCase().includes('sortorder')) {
+      console.warn('sortOrder column may not exist, retrying without it:', error.message);
+      const retry = await supabaseAdmin
+        .from('menuItems')
+        .select('*')
+        .eq('businessId', businessId)
+        .order('is_featured', { ascending: false })
+        .order('name', { ascending: true });
+      
+      if (retry.error) {
+        console.error('Error fetching menu items (retry)', retry.error);
+        return NextResponse.json({ message: 'Database error', details: retry.error.message }, { status: 500 });
+      }
+      
+      items = retry.data;
+      error = null;
+    } else if (error) {
       console.error('Error fetching menu items', error);
-      return NextResponse.json({ message: 'Database error' }, { status: 500 });
+      return NextResponse.json({ message: 'Database error', details: error.message }, { status: 500 });
     }
 
     // Map DB columns to frontend fields
