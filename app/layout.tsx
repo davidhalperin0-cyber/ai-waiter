@@ -8,6 +8,9 @@ import { AccessibilityWidget } from '@/components/AccessibilityWidget';
 export const metadata: Metadata = {
   title: 'AI QR Ordering SaaS',
   description: 'Multi-tenant AI-powered QR ordering for restaurants and bars',
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({
