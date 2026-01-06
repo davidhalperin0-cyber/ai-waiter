@@ -90,6 +90,38 @@ function LoginPageInner() {
         >
           {loading ? "מתחבר..." : "התחברות"}
         </button>
+
+        <div className="pt-2 space-y-2">
+          <div className="flex justify-between items-center text-xs">
+            <button
+              type="button"
+              onClick={() => router.push('/forgot-password')}
+              className="text-neutral-400 hover:text-white transition"
+            >
+              שכחתי סיסמה
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push('/forgot-email')}
+              className="text-neutral-400 hover:text-white transition"
+            >
+              שכחתי אימייל
+            </button>
+          </div>
+
+          <div className="pt-2 border-t border-neutral-800">
+            <p className="text-xs text-center text-neutral-500">
+              אין לך חשבון?{' '}
+              <button
+                type="button"
+                onClick={() => router.push('/register')}
+                className="text-white hover:underline"
+              >
+                הירשם כאן
+              </button>
+            </p>
+          </div>
+        </div>
       </form>
     </main>
   );

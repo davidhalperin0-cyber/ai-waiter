@@ -143,6 +143,19 @@ export default function RegisterPage() {
         >
           {loading ? "יוצר חשבון..." : "יצירת חשבון"}
         </button>
+
+        <div className="pt-2 border-t border-neutral-800">
+          <p className="text-xs text-center text-neutral-500">
+            כבר יש לך חשבון?{' '}
+            <button
+              type="button"
+              onClick={() => router.push('/login')}
+              className="text-white hover:underline"
+            >
+              התחבר כאן
+            </button>
+          </p>
+        </div>
       </form>
     </main>
   );
