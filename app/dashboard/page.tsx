@@ -688,8 +688,8 @@ export default function DashboardPage() {
       // Clean ingredients and allergens arrays from trailing 0s
       const cleanedItems = (data.items ?? []).map((item: DashboardMenuItem) => {
         const cleanArray = (arr: string[] | undefined): string[] | undefined => {
-          if (!arr || !Array.isArray(arr)) return arr;
-          return arr.map(str => {
+          if (!arr || !Array.isArray(arr)) return undefined;
+          const cleaned = arr.map(str => {
             // Clean each string in the array
             const parts = str.split(',').map(part => {
               return part.replace(/([^\d])0+$/g, '$1').trim();
@@ -699,7 +699,11 @@ export default function DashboardPage() {
             cleaned = cleaned.replace(/\s*,\s*,/g, ',').replace(/\s+/g, ' ').trim();
             cleaned = cleaned.replace(/^,|,$/g, '');
             return cleaned;
-          }).filter(Boolean);
+          })
+          .filter(str => str && str.trim() !== '' && str.trim() !== '0'); // Remove empty strings and standalone "0"
+          
+          // Return undefined if array is empty, not []
+          return cleaned.length > 0 ? cleaned : undefined;
         };
         
         return {

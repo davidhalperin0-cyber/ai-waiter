@@ -61,8 +61,8 @@ export async function PUT(
     }
     // Helper function to clean trailing 0s from array fields
     const cleanArrayField = (arr: string[] | undefined): string[] | undefined => {
-      if (!arr || !Array.isArray(arr)) return arr;
-      return arr.map(str => {
+      if (!arr || !Array.isArray(arr)) return undefined;
+      const cleaned = arr.map(str => {
         // Clean each string in the array
         const parts = str.split(',').map(part => {
           return part.replace(/([^\d])0+$/g, '$1').trim();
@@ -72,7 +72,11 @@ export async function PUT(
         cleaned = cleaned.replace(/\s*,\s*,/g, ',').replace(/\s+/g, ' ').trim();
         cleaned = cleaned.replace(/^,|,$/g, '');
         return cleaned;
-      }).filter(Boolean);
+      })
+      .filter(str => str && str.trim() !== '' && str.trim() !== '0'); // Remove empty strings and standalone "0"
+      
+      // Return undefined if array is empty, not []
+      return cleaned.length > 0 ? cleaned : undefined;
     };
 
     if (price !== undefined) updateData.price = price;
