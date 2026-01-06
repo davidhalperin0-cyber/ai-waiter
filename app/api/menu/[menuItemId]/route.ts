@@ -146,6 +146,7 @@ export async function PUT(
         message.includes('name_en') ||
         message.includes('ingredients_en') ||
         message.includes('allergens_en') ||
+        message.includes('pricedata') ||
         (message.includes('column') && message.includes('_en'));
 
       if (relatesToOptionalColumn) {
@@ -157,6 +158,7 @@ export async function PUT(
         delete fallbackUpdate.name_en;
         delete fallbackUpdate.ingredients_en;
         delete fallbackUpdate.allergens_en;
+        delete fallbackUpdate.priceData; // Remove priceData if column doesn't exist
         delete extraUpdates.isBusiness;
 
         const retry = await supabaseAdmin
