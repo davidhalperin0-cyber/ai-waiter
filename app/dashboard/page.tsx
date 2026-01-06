@@ -1902,7 +1902,20 @@ export default function DashboardPage() {
                   <label className="block text-sm font-medium text-neutral-200">מרכיבים (מופרדים בפסיקים)</label>
                   <input
                     value={newItem.ingredients}
-                    onChange={(e) => setNewItem((v) => ({ ...v, ingredients: e.target.value }))}
+                    onChange={(e) => {
+                      let value = e.target.value;
+                      // Remove trailing 0
+                      if (value.endsWith('0') && value.length > 1) {
+                        value = value.slice(0, -1);
+                      }
+                      setNewItem((v) => ({ ...v, ingredients: value }));
+                    }}
+                    onBlur={(e) => {
+                      let value = e.target.value.trim();
+                      // Remove trailing 0 and clean up
+                      value = value.replace(/0+$/, '').trim();
+                      setNewItem((v) => ({ ...v, ingredients: value }));
+                    }}
                     className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                     placeholder="למשל: עגבניות, מוצרלה, בזיליקום"
                   />
@@ -1911,7 +1924,20 @@ export default function DashboardPage() {
                   <label className="block text-sm font-medium text-neutral-200">אלרגנים (מופרדים בפסיקים)</label>
                   <input
                     value={newItem.allergens}
-                    onChange={(e) => setNewItem((v) => ({ ...v, allergens: e.target.value }))}
+                    onChange={(e) => {
+                      let value = e.target.value;
+                      // Remove trailing 0
+                      if (value.endsWith('0') && value.length > 1) {
+                        value = value.slice(0, -1);
+                      }
+                      setNewItem((v) => ({ ...v, allergens: value }));
+                    }}
+                    onBlur={(e) => {
+                      let value = e.target.value.trim();
+                      // Remove trailing 0 and clean up
+                      value = value.replace(/0+$/, '').trim();
+                      setNewItem((v) => ({ ...v, allergens: value }));
+                    }}
                     className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                     placeholder="למשל: גלוטן, חלב"
                   />
@@ -1931,7 +1957,20 @@ export default function DashboardPage() {
                   </div>
                   <input
                     value={newItem.ingredientsEn}
-                    onChange={(e) => setNewItem((v) => ({ ...v, ingredientsEn: e.target.value }))}
+                    onChange={(e) => {
+                      let value = e.target.value;
+                      // Remove trailing 0
+                      if (value.endsWith('0') && value.length > 1) {
+                        value = value.slice(0, -1);
+                      }
+                      setNewItem((v) => ({ ...v, ingredientsEn: value }));
+                    }}
+                    onBlur={(e) => {
+                      let value = e.target.value.trim();
+                      // Remove trailing 0 and clean up
+                      value = value.replace(/0+$/, '').trim();
+                      setNewItem((v) => ({ ...v, ingredientsEn: value }));
+                    }}
                     className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                     placeholder="e.g. Tomatoes, Mozzarella, Basil"
                   />
@@ -1951,7 +1990,20 @@ export default function DashboardPage() {
                   </div>
                   <input
                     value={newItem.allergensEn}
-                    onChange={(e) => setNewItem((v) => ({ ...v, allergensEn: e.target.value }))}
+                    onChange={(e) => {
+                      let value = e.target.value;
+                      // Remove trailing 0
+                      if (value.endsWith('0') && value.length > 1) {
+                        value = value.slice(0, -1);
+                      }
+                      setNewItem((v) => ({ ...v, allergensEn: value }));
+                    }}
+                    onBlur={(e) => {
+                      let value = e.target.value.trim();
+                      // Remove trailing 0 and clean up
+                      value = value.replace(/0+$/, '').trim();
+                      setNewItem((v) => ({ ...v, allergensEn: value }));
+                    }}
                     className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                     placeholder="e.g. Gluten, Milk"
                   />
