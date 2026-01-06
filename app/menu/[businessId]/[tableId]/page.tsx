@@ -208,11 +208,45 @@ function CustomerMenuPageContent({
           hasMessage: !!infoData.menuOnlyMessage,
         });
 
+        // CRITICAL: Check localStorage for cached template that was saved after update
+        // This bypasses read replica lag by using the data we know was saved
+        const templateKey = `business_${businessId}_template`;
+        const cachedTemplateData = typeof window !== 'undefined' ? localStorage.getItem(templateKey) : null;
+        let cachedTemplate: string | null = null;
+        let cachedTemplateTimestamp = 0;
+        
+        if (cachedTemplateData) {
+          try {
+            const parsed = JSON.parse(cachedTemplateData);
+            cachedTemplate = parsed.template;
+            cachedTemplateTimestamp = parsed.timestamp || 0;
+            console.log('💾 Found cached template in localStorage:', {
+              timestamp: cachedTemplateTimestamp,
+              age: Date.now() - cachedTemplateTimestamp,
+              template: cachedTemplate,
+            });
+          } catch (e) {
+            console.warn('⚠️ Failed to parse cached template:', e);
+          }
+        }
+
+        // CRITICAL: Use cached template if it's newer than 5 minutes old
+        // This ensures we use the data we know was saved, not stale read replica data
+        let finalTemplate = (infoData.template || 'generic') as 'bar-modern' | 'bar-classic' | 'bar-mid' | 'pizza-modern' | 'pizza-classic' | 'pizza-mid' | 'sushi' | 'generic' | 'gold';
+        if (cachedTemplate && cachedTemplateTimestamp > Date.now() - 5 * 60 * 1000) {
+          // Cached data is recent (less than 5 minutes old), use it instead of API data
+          finalTemplate = cachedTemplate as any;
+          console.log('✅ Using cached template from localStorage (source of truth):', {
+            template: finalTemplate,
+            cachedAge: Date.now() - cachedTemplateTimestamp,
+          });
+        }
+
         const newBusinessInfo = {
           name: infoData.name || 'העסק',
           nameEn: infoData.nameEn || undefined, // Optional English translation
           logoUrl: infoData.logoUrl,
-          template: (infoData.template || 'generic') as 'bar-modern' | 'bar-classic' | 'bar-mid' | 'pizza-modern' | 'pizza-classic' | 'pizza-mid' | 'sushi' | 'generic' | 'gold',
+          template: finalTemplate, // Use cached or API data
           subscriptionStatus: infoData.subscriptionStatus || 'active',
           planType: (infoData.planType || 'full') as 'full' | 'menu_only',
           menuOnlyMessage: infoData.menuOnlyMessage || null,
@@ -271,7 +305,9 @@ function CustomerMenuPageContent({
           if (!menuRes.ok) {
             throw new Error(menuData.message || 'טעינה נכשלה');
           }
-          setMenuItems(menuData.items ?? []);
+          // Filter out hidden items (isHidden = true) from customer menu
+          const visibleItems = (menuData.items ?? []).filter((item: any) => !item.isHidden);
+          setMenuItems(visibleItems);
         }
       } catch (err: any) {
         setError(err.message || 'שגיאה בטעינת התפריט');

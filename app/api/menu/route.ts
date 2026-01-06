@@ -42,6 +42,8 @@ export async function GET(req: NextRequest) {
       isPregnancySafe: item.is_pregnancy_safe || false,
       // Business flag (may not exist on older schemas)
       isBusiness: item.isBusiness !== undefined ? item.isBusiness : false,
+      // Hidden flag (may not exist on older schemas)
+      isHidden: item.isHidden !== undefined ? item.isHidden : false,
       // English fields (may be null / missing)
       categoryEn: item.category_en || undefined,
       nameEn: item.name_en || undefined,

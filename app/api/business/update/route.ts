@@ -186,6 +186,66 @@ export async function PUT(req: NextRequest) {
       }
     }
     
+    // Store template from RPC result to return in response
+    let savedTemplate: string | undefined = undefined;
+    
+    // CRITICAL: template MUST have ONE writer only: update_business_template RPC
+    // Use RPC function to ensure the update is actually saved in the database
+    // The RPC function performs the update directly in PostgreSQL, bypassing Supabase client issues
+    if (template !== undefined && updateData.template) {
+      console.log('💾 Saving template via RPC function:', updateData.template);
+      
+      try {
+        const rpcResult = await supabaseAdmin.rpc('update_business_template', {
+          p_business_id: businessId,
+          p_template: updateData.template,
+        });
+        
+        if (rpcResult.error) {
+          console.error('❌ RPC function error:', rpcResult.error);
+          return NextResponse.json({ 
+            message: 'Failed to update template', 
+            details: rpcResult.error.message 
+          }, { status: 500 });
+        }
+        
+        if (!rpcResult.data || rpcResult.data.length === 0) {
+          console.error('❌ RPC function returned no data');
+          return NextResponse.json({ 
+            message: 'Failed to update template - no data returned' 
+          }, { status: 500 });
+        }
+        
+        // Store the saved template from RPC result (source of truth)
+        savedTemplate = rpcResult.data[0]?.template;
+        
+        console.log('✅ RPC function succeeded!', {
+          returnedTemplate: savedTemplate,
+        });
+        
+        // Verify the saved data matches what we sent
+        const expectedTemplate = updateData.template;
+        
+        if (savedTemplate !== expectedTemplate) {
+          console.warn('⚠️ WARNING: RPC saved template does not match expected template!', {
+            expected: expectedTemplate,
+            saved: savedTemplate,
+          });
+        }
+        
+        // Remove template from updateData since it's already updated via RPC
+        delete updateData.template;
+        
+        console.log('✅ Template updated via RPC, continuing with other fields...');
+      } catch (rpcErr: any) {
+        console.error('❌ RPC function exception:', rpcErr);
+        return NextResponse.json({ 
+          message: 'Failed to update template', 
+          details: rpcErr?.message || 'RPC function error' 
+        }, { status: 500 });
+      }
+    }
+    
     // CRITICAL: customContent MUST have ONE writer only: update_business_custom_content RPC
     // Use RPC function to ensure the update is actually saved in the database
     // The RPC function performs the update directly in PostgreSQL, bypassing Supabase client issues
@@ -343,40 +403,27 @@ export async function PUT(req: NextRequest) {
       }
     }
     
-    
-    // Verify the update was successful by fetching the updated business
-    // Only verify if template was updated
-    if (template !== undefined) {
-      const { data: verifyData, error: verifyError } = await supabaseAdmin
+    // Return the updated template if it was updated
+    const response: any = { message: 'Business updated successfully' };
+    if (savedTemplate !== undefined) {
+      // Use template from RPC result (source of truth)
+      response.template = savedTemplate;
+      console.log('✅ Returning updated template from RPC:', response.template);
+    } else if (template !== undefined) {
+      // Fallback: Fetch the updated template from DB if RPC wasn't used
+      const { data: templateData } = await supabaseAdmin
         .from('businesses')
         .select('template')
         .eq('businessId', businessId)
         .maybeSingle();
       
-      if (verifyError) {
-        console.error('❌ Verification error:', verifyError);
-        // Don't fail the request if verification fails - the update might have succeeded
-        console.warn('⚠️ Could not verify template update, but update may have succeeded');
-      } else {
-        console.log('✅ Verification successful');
-        console.log('✅ Template in DB:', verifyData?.template);
-        console.log('✅ Template requested:', template);
-        
-        // Verify that template was updated if it was in the request
-        if (verifyData?.template !== template) {
-          console.error('❌ Template mismatch!', {
-            requested: template,
-            actual: verifyData?.template
-          });
-          // Don't fail - just log the warning, the update might still be processing
-          console.warn('⚠️ Template value mismatch - may be a timing issue');
-        } else {
-          console.log('✅ Template matches requested value');
-        }
+      if (templateData?.template) {
+        response.template = templateData.template;
+        console.log('✅ Returning updated template from DB:', response.template);
       }
     }
-
-    return NextResponse.json({ message: 'Business updated successfully' }, { status: 200 });
+    
+    return NextResponse.json(response, { status: 200 });
   } catch (error: any) {
     console.error('❌ Error updating business:', error);
     console.error('❌ Error stack:', error?.stack);

@@ -8,3 +8,4 @@ ADD COLUMN IF NOT EXISTS name_en TEXT;
 -- Comment for documentation
 COMMENT ON COLUMN businesses.name_en IS 'English display name for the business';
 
+

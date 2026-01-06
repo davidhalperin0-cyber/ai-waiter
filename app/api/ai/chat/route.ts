@@ -41,6 +41,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Database error' }, { status: 500 });
     }
 
+    // Filter out hidden items (isHidden = true) - only show available items to AI
+    const availableMenuItems = (menuItems || []).filter((item: any) => !item.isHidden);
+    
+    // Keep all items (including hidden) for reference when user asks about unavailable items
+    const allMenuItems = menuItems || [];
+
     // Base system prompt
     let systemPrompt = `🧠 SYSTEM PROMPT — Chat Waiter (Restaurant)
 
@@ -243,6 +249,14 @@ show_item — הצגת פרטים
 TECHNICAL REQUIREMENTS:
 
 You MUST only reference menu items that exist in the provided Menu JSON.
+The Menu JSON contains ONLY items that are currently available (in stock).
+If a customer asks about a menu item that is NOT in the Menu JSON, it means the item is currently out of stock (not available).
+When a customer asks about an item that is not in the Menu JSON, you MUST politely inform them that the item is currently not available/out of stock.
+Example responses for unavailable items:
+- "מצטער, המנה הזו לא במלאי כרגע"
+- "לצערי, המנה הזו לא זמינה כרגע"
+- "המנה הזו לא במלאי כרגע, אבל יש לנו מנות אחרות דומות"
+
 You help with allergies, ingredients, sugar, gluten, pregnancy safety (using the isPregnancySafe flag), and custom modifications.
 
 CRITICAL SAFETY RULES - ALLERGEN, HEALTH, AND PREGNANCY SAFETY:
@@ -450,7 +464,8 @@ Rules:
       systemPrompt += `\n\nIMPORTANT BUSINESS-SPECIFIC INSTRUCTIONS:\n${business.aiInstructions}\n\nFollow these instructions strictly when answering customer questions.`;
     }
 
-    const menuContext = JSON.stringify(menuItems);
+    // Only send available items to AI (hidden items are filtered out)
+    const menuContext = JSON.stringify(availableMenuItems);
     const cartContext = JSON.stringify(cart);
 
     const openAIMessages = [
@@ -493,36 +508,56 @@ Rules:
             const normalizedActionName = showItemAction.itemName.trim().toLowerCase().replace(/\s+/g, ' ');
             
             console.log('🔍 Looking for menu item:', showItemAction.itemName, 'normalized:', normalizedActionName);
-            console.log('📋 Available menu items:', menuItems.map((m: any) => m.name).slice(0, 5));
+            console.log('📋 Available menu items:', availableMenuItems.map((m: any) => m.name).slice(0, 5));
             
-            // Try to find exact match first
-            let item = menuItems.find(
-              (m: any) => m.name.toLowerCase().trim() === normalizedActionName,
+            // First, check if the item exists in all items (including hidden) to detect if it's hidden
+            const normalizedActionNameNoSpaces = normalizedActionName.replace(/\s/g, '');
+            const allItemMatch = allMenuItems.find(
+              (m: any) => m.name.toLowerCase().trim() === normalizedActionName ||
+                         m.name.toLowerCase().replace(/\s/g, '') === normalizedActionNameNoSpaces ||
+                         m.name.toLowerCase().includes(normalizedActionName) ||
+                         normalizedActionName.includes(m.name.toLowerCase())
             );
             
-            // If no exact match, try to find by normalized comparison (remove all spaces)
-            if (!item) {
-              const actionNameNoSpaces = normalizedActionName.replace(/\s/g, '');
-              item = menuItems.find(
-                (m: any) => m.name.toLowerCase().replace(/\s/g, '') === actionNameNoSpaces,
-              );
-            }
+            let item: any = null;
             
-            // If still no match, try partial match (contains)
-            if (!item) {
-              item = menuItems.find(
-                (m: any) => m.name.toLowerCase().includes(normalizedActionName) || 
-                          normalizedActionName.includes(m.name.toLowerCase()),
+            // If item exists but is hidden, remove show_item action and let AI know it's not available
+            if (allItemMatch && allItemMatch.isHidden) {
+              console.log('⚠️ Item is hidden (not in stock):', allItemMatch.name);
+              // Remove show_item action for hidden items
+              actions = actions.filter((a: any) => !(a.type === 'show_item' && a.itemName === showItemAction.itemName));
+              // The AI should already have responded that it's not available based on system prompt
+              item = null; // Don't show hidden items
+            } else {
+              // Try to find exact match first in available items
+              item = availableMenuItems.find(
+                (m: any) => m.name.toLowerCase().trim() === normalizedActionName,
               );
-            }
-            
-            // If still no match, try fuzzy match (check if any word matches)
-            if (!item) {
-              const actionWords = normalizedActionName.split(/\s+/);
-              item = menuItems.find((m: any) => {
-                const menuWords = m.name.toLowerCase().split(/\s+/);
-                return actionWords.some((aw: string) => menuWords.some((mw: string) => mw.includes(aw) || aw.includes(mw)));
-              });
+              
+              // If no exact match, try to find by normalized comparison (remove all spaces)
+              if (!item) {
+                const actionNameNoSpaces = normalizedActionName.replace(/\s/g, '');
+                item = availableMenuItems.find(
+                  (m: any) => m.name.toLowerCase().replace(/\s/g, '') === actionNameNoSpaces,
+                );
+              }
+              
+              // If still no match, try partial match (contains)
+              if (!item) {
+                item = availableMenuItems.find(
+                  (m: any) => m.name.toLowerCase().includes(normalizedActionName) || 
+                            normalizedActionName.includes(m.name.toLowerCase()),
+                );
+              }
+              
+              // If still no match, try fuzzy match (check if any word matches)
+              if (!item) {
+                const actionWords = normalizedActionName.split(/\s+/);
+                item = availableMenuItems.find((m: any) => {
+                  const menuWords = m.name.toLowerCase().split(/\s+/);
+                  return actionWords.some((aw: string) => menuWords.some((mw: string) => mw.includes(aw) || aw.includes(mw)));
+                });
+              }
             }
             
             if (item) {
@@ -554,7 +589,7 @@ Rules:
               });
             } else {
               console.warn('❌ Could not find menu item for show_item action:', showItemAction.itemName);
-              console.warn('Available items:', menuItems.map((m: any) => m.name));
+              console.warn('Available items:', availableMenuItems.map((m: any) => m.name));
             }
           } else {
             console.warn('⚠️ No show_item action found in actions:', parsed);
@@ -568,10 +603,11 @@ Rules:
     }
     
     // Fallback: If no mentionedItem was found but the reply mentions menu items, try to find them automatically
-    if (!mentionedItem && menuItems.length > 0) {
+    // Only search in available items (not hidden ones)
+    if (!mentionedItem && availableMenuItems.length > 0) {
       // Look for menu item names in the reply text
       const replyTextLower = replyText.toLowerCase();
-      for (const menuItem of menuItems) {
+      for (const menuItem of availableMenuItems) {
         const itemNameLower = menuItem.name.toLowerCase();
         // Check if the menu item name appears in the reply (as a whole word or phrase)
         if (replyTextLower.includes(itemNameLower) || 
@@ -628,7 +664,30 @@ Rules:
       .join('\n')
       .trim();
 
-    return NextResponse.json({ reply: replyText, actions, mentionedItem }, { status: 200 });
+    // Filter out actions for hidden items (add_to_cart, show_item)
+    const filteredActions = actions.filter((action: any) => {
+      if (action.type === 'add_to_cart' || action.type === 'show_item') {
+        if (action.itemName) {
+          // Check if item is hidden
+          const normalizedActionName = action.itemName.trim().toLowerCase().replace(/\s+/g, ' ');
+          const normalizedActionNameNoSpaces = normalizedActionName.replace(/\s/g, '');
+          const itemMatch = allMenuItems.find(
+            (m: any) => m.name.toLowerCase().trim() === normalizedActionName ||
+                       m.name.toLowerCase().replace(/\s/g, '') === normalizedActionNameNoSpaces ||
+                       m.name.toLowerCase().includes(normalizedActionName) ||
+                       normalizedActionName.includes(m.name.toLowerCase())
+          );
+          
+          if (itemMatch && itemMatch.isHidden) {
+            console.log('⚠️ Filtering out action for hidden item:', action.itemName);
+            return false; // Remove this action
+          }
+        }
+      }
+      return true; // Keep other actions
+    });
+
+    return NextResponse.json({ reply: replyText, actions: filteredActions, mentionedItem }, { status: 200 });
   } catch (error) {
     console.error('AI chat error', error);
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });

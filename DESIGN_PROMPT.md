@@ -302,3 +302,4 @@ Focus on making both interfaces feel:
 **Remember:** This is a premium product. Every pixel matters. Design with intention.
 
 
+

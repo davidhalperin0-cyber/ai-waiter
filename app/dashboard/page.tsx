@@ -23,6 +23,7 @@ interface DashboardMenuItem {
   isFeatured?: boolean;
   isPregnancySafe?: boolean;
   isBusiness?: boolean;
+  isHidden?: boolean;
 }
 
 interface DashboardTable {
@@ -246,6 +247,28 @@ export default function DashboardPage() {
           console.warn('⚠️ Failed to parse cached printerConfig:', e);
         }
       }
+
+      // CRITICAL: Check localStorage for cached template that was saved after update
+      // This bypasses read replica lag by using the data we know was saved
+      const templateKey = `business_${businessId}_template`;
+      const cachedTemplateData = typeof window !== 'undefined' ? localStorage.getItem(templateKey) : null;
+      let cachedTemplate: string | null = null;
+      let cachedTemplateTimestamp = 0;
+      
+      if (cachedTemplateData) {
+        try {
+          const parsed = JSON.parse(cachedTemplateData);
+          cachedTemplate = parsed.template;
+          cachedTemplateTimestamp = parsed.timestamp || 0;
+          console.log('💾 Found cached template in localStorage:', {
+            timestamp: cachedTemplateTimestamp,
+            age: Date.now() - cachedTemplateTimestamp,
+            template: cachedTemplate,
+          });
+        } catch (e) {
+          console.warn('⚠️ Failed to parse cached template:', e);
+        }
+      }
       
       // Add cache busting to ensure fresh data
       const res = await fetch(`/api/business/info?businessId=${encodeURIComponent(businessId)}&_t=${Date.now()}`, {
@@ -312,6 +335,18 @@ export default function DashboardPage() {
             cachedAge: Date.now() - cachedPrinterTimestamp,
           });
         }
+
+        // CRITICAL: Use cached template if it's newer than 5 minutes old
+        // This ensures we use the data we know was saved, not stale read replica data
+        let finalTemplate = data.business.template || 'generic';
+        if (cachedTemplate && cachedTemplateTimestamp > Date.now() - 5 * 60 * 1000) {
+          // Cached data is recent (less than 5 minutes old), use it instead of API data
+          finalTemplate = cachedTemplate;
+          console.log('✅ Using cached template from localStorage (source of truth):', {
+            template: finalTemplate,
+            cachedAge: Date.now() - cachedTemplateTimestamp,
+          });
+        }
         
         // Only update if values actually changed to prevent infinite re-renders
         setBusinessInfo((prev) => {
@@ -320,7 +355,7 @@ export default function DashboardPage() {
             nameEn: data.business.nameEn || undefined,
             logoUrl: data.business.logoUrl || '',
             type: data.business.type,
-            template: data.business.template,
+            template: finalTemplate, // Use cached or API data
             aiInstructions: data.business.aiInstructions || '',
             businessHours: data.business.businessHours || null,
             subscription: data.business.subscription,
@@ -715,6 +750,34 @@ export default function DashboardPage() {
       await loadMenu();
     } catch (err: any) {
       setError(err.message || 'נכשל בעדכון');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function toggleHidden(item: DashboardMenuItem) {
+    if (!businessId) return;
+    try {
+      setLoading(true);
+      setError(null);
+      const newIsHidden = !item.isHidden;
+      const res = await fetch(`/api/menu/${encodeURIComponent(item.name)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessId,
+          isHidden: newIsHidden,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'נכשל בעדכון');
+      }
+      toast.success(newIsHidden ? 'המנה הוסרה מהמלאי' : 'המנה הוחזרה למלאי');
+      await loadMenu();
+    } catch (err: any) {
+      setError(err.message || 'נכשל בעדכון');
+      toast.error(err.message || 'נכשל בעדכון');
     } finally {
       setLoading(false);
     }
@@ -1527,6 +1590,11 @@ export default function DashboardPage() {
                         <span className="text-xs font-medium text-neutral-300 bg-neutral-800/60 px-2.5 py-1 rounded-lg">
                           {item.category}
                         </span>
+                        {item.isHidden && (
+                          <span className="text-xs font-medium text-orange-300 bg-orange-900/40 px-2.5 py-1 rounded-lg border border-orange-700/30">
+                            👁️ לא במלאי
+                          </span>
+                        )}
                         {item.isFeatured && (
                           <span className="text-xs font-medium text-yellow-300 bg-yellow-900/40 px-2.5 py-1 rounded-lg border border-yellow-700/30">
                             ⭐ מומלץ
@@ -1544,7 +1612,7 @@ export default function DashboardPage() {
                         )}
                         <span className="text-lg font-bold text-white ml-auto">₪{item.price.toFixed(2)}</span>
                       </div>
-                      <h4 className="text-base font-semibold text-white mb-2">{item.name}</h4>
+                      <h4 className={`text-base font-semibold mb-2 ${item.isHidden ? 'text-neutral-500 line-through' : 'text-white'}`}>{item.name}</h4>
                       {item.ingredients && item.ingredients.length > 0 && (
                         <p className="text-sm text-neutral-400 mb-1">
                           <span className="text-neutral-500 font-medium">מרכיבים:</span> {item.ingredients.join(', ')}
@@ -1557,6 +1625,17 @@ export default function DashboardPage() {
                       )}
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2 lg:flex-col">
+                      <button
+                        onClick={() => toggleHidden(item)}
+                        className={`text-sm px-4 py-2 rounded-lg font-medium transition-all active:scale-95 ${
+                          item.isHidden
+                            ? 'text-orange-300 bg-orange-900/40 border border-orange-700/30 hover:bg-orange-900/50'
+                            : 'text-green-300 bg-green-900/40 border border-green-700/30 hover:bg-green-900/50'
+                        }`}
+                        title={item.isHidden ? 'המנה לא במלאי - לחץ להחזיר למלאי' : 'המנה במלאי - לחץ להסיר מהמלאי'}
+                      >
+                        👁️
+                      </button>
                       <button
                         onClick={() => toggleFeatured(item)}
                         className={`text-sm px-4 py-2 rounded-lg font-medium transition-all active:scale-95 ${
@@ -2115,17 +2194,32 @@ export default function DashboardPage() {
                       }
                     : businessInfo.subscription;
 
+                  // Use template from API response if available (source of truth), otherwise use form value
+                  const finalTemplate = data.template || template;
+
                   setBusinessInfo({ 
                     name,
                     nameEn: nameEn?.trim() || undefined,
                     logoUrl: logoUrl || undefined,
                     type, 
-                    template,
+                    template: finalTemplate, // Use API response as source of truth
                     aiInstructions: aiInstructions || '',
                     businessHours: businessHours,
                     subscription: updatedSubscription,
                     printerConfig: businessInfo.printerConfig,
+                    customContent: businessInfo.customContent,
                   });
+                  
+                  // CRITICAL: Save template to localStorage to bypass read replica lag
+                  if (typeof window !== 'undefined' && finalTemplate) {
+                    const localStorageKey = `business_${businessId}_template`;
+                    localStorage.setItem(localStorageKey, JSON.stringify({
+                      template: finalTemplate,
+                      timestamp: Date.now(),
+                    }));
+                    console.log('💾 Saved template to localStorage:', finalTemplate);
+                  }
+                  
                   toast.success('פרטי העסק עודכנו בהצלחה!');
                 } catch (err: any) {
                   const message = err.message || 'נכשל בעדכון פרטי העסק';

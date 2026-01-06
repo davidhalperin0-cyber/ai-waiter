@@ -132,9 +132,13 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     nextBillingDate: nextBillingDateISO,
   };
 
+  // DEBUG: Set debug_last_writer to track who wrote last
   const { error: updateError } = await supabaseAdmin
     .from('businesses')
-    .update({ subscription: updatedSubscription })
+    .update({ 
+      subscription: updatedSubscription,
+      debug_last_writer: 'API:stripe/webhook:subscription_active',
+    })
     .eq('businessId', businessId);
 
   if (updateError) {
@@ -199,9 +203,13 @@ async function handleInvoicePaymentFailed(invoice: any) {
     status: 'past_due' as const,
   };
 
+  // DEBUG: Set debug_last_writer to track who wrote last
   const { error: updateError } = await supabaseAdmin
     .from('businesses')
-    .update({ subscription: updatedSubscription })
+    .update({ 
+      subscription: updatedSubscription,
+      debug_last_writer: 'API:stripe/webhook:subscription_active',
+    })
     .eq('businessId', businessId);
 
   if (updateError) {
@@ -247,9 +255,13 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     nextBillingDate: null,
   };
 
+  // DEBUG: Set debug_last_writer to track who wrote last
   const { error: updateError } = await supabaseAdmin
     .from('businesses')
-    .update({ subscription: updatedSubscription })
+    .update({ 
+      subscription: updatedSubscription,
+      debug_last_writer: 'API:stripe/webhook:subscription_active',
+    })
     .eq('businessId', businessId);
 
   if (updateError) {
