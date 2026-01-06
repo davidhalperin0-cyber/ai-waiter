@@ -178,7 +178,6 @@ export async function POST(req: NextRequest) {
 
     // Store price as JSONB to support both single number and range {min, max}
     // For backward compatibility, also store numeric value in price column
-    const isPriceRange = typeof price === 'object' && 'min' in price && 'max' in price;
     const priceValue = isPriceRange ? price.min : price;
     
     const item: any = {
