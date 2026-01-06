@@ -91,10 +91,15 @@ export async function GET(req: NextRequest) {
             console.warn('Failed to parse priceData, using numeric price:', e);
             price = item.price || 0;
           }
-        } else if (item.priceMax !== undefined && item.priceMax !== null && typeof item.priceMax === 'number' && item.priceMax > (item.price || 0)) {
-          // Fallback: if priceMax exists and is greater than price, it's a range
-          // This is a temporary solution until priceData column is added
-          price = { min: item.price || 0, max: item.priceMax };
+        } else if (item.priceMax !== undefined && item.priceMax !== null) {
+          // Check if priceMax is a valid number and greater than price
+          const priceMaxNum = typeof item.priceMax === 'number' ? item.priceMax : parseFloat(item.priceMax);
+          const priceNum = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 0;
+          if (!isNaN(priceMaxNum) && !isNaN(priceNum) && priceMaxNum > priceNum) {
+            // Fallback: if priceMax exists and is greater than price, it's a range
+            // This is a temporary solution until priceData column is added
+            price = { min: priceNum, max: priceMaxNum };
+          }
         }
         
         return {
