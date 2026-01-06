@@ -90,28 +90,47 @@ export async function GET(req: NextRequest) {
           // This is a temporary solution until priceData column is added
           price = { min: item.price || 0, max: item.priceMax };
         }
-      
-      return {
-        ...item,
-        price, // Use parsed price
-        // Featured / pregnancy flags (snake_case in DB)
-        isFeatured: item.is_featured || false,
-        isPregnancySafe: item.is_pregnancy_safe || false,
-        // Business flag (may not exist on older schemas)
-        isBusiness: item.isBusiness !== undefined ? item.isBusiness : false,
-        // Hidden flag (may not exist on older schemas)
-        isHidden: item.isHidden !== undefined ? item.isHidden : false,
-        // Sort order (may not exist on older schemas)
-        sortOrder: item.sortOrder !== undefined ? item.sortOrder : 0,
-        // English fields (may be null / missing)
-        categoryEn: item.category_en || undefined,
-        nameEn: item.name_en || undefined,
-        // Clean ingredients and allergens arrays from trailing 0s
-        ingredients: cleanArrayField(item.ingredients),
-        allergens: cleanArrayField(item.allergens),
-        ingredientsEn: cleanArrayField(item.ingredients_en),
-        allergensEn: cleanArrayField(item.allergens_en),
-      };
+        
+        return {
+          ...item,
+          price, // Use parsed price
+          // Featured / pregnancy flags (snake_case in DB)
+          isFeatured: item.is_featured || false,
+          isPregnancySafe: item.is_pregnancy_safe || false,
+          // Business flag (may not exist on older schemas)
+          isBusiness: item.isBusiness !== undefined ? item.isBusiness : false,
+          // Hidden flag (may not exist on older schemas)
+          isHidden: item.isHidden !== undefined ? item.isHidden : false,
+          // Sort order (may not exist on older schemas)
+          sortOrder: item.sortOrder !== undefined ? item.sortOrder : 0,
+          // English fields (may be null / missing)
+          categoryEn: item.category_en || undefined,
+          nameEn: item.name_en || undefined,
+          // Clean ingredients and allergens arrays from trailing 0s
+          ingredients: cleanArrayField(item.ingredients),
+          allergens: cleanArrayField(item.allergens),
+          ingredientsEn: cleanArrayField(item.ingredients_en),
+          allergensEn: cleanArrayField(item.allergens_en),
+        };
+      } catch (itemError: any) {
+        // If there's an error processing an item, log it and return a safe fallback
+        console.error('Error processing menu item:', itemError, 'Item:', item);
+        return {
+          ...item,
+          price: item.price || 0,
+          isFeatured: item.is_featured || false,
+          isPregnancySafe: item.is_pregnancy_safe || false,
+          isBusiness: false,
+          isHidden: false,
+          sortOrder: 0,
+          categoryEn: item.category_en || undefined,
+          nameEn: item.name_en || undefined,
+          ingredients: cleanArrayField(item.ingredients),
+          allergens: cleanArrayField(item.allergens),
+          ingredientsEn: cleanArrayField(item.ingredients_en),
+          allergensEn: cleanArrayField(item.allergens_en),
+        };
+      }
     }) || [];
 
     return NextResponse.json({ items: mappedItems }, { status: 200 });
