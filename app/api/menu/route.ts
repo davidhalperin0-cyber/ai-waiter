@@ -67,26 +67,46 @@ export async function GET(req: NextRequest) {
     };
 
     // Map DB columns to frontend fields
-    const mappedItems = items?.map((item: any) => ({
-      ...item,
-      // Featured / pregnancy flags (snake_case in DB)
-      isFeatured: item.is_featured || false,
-      isPregnancySafe: item.is_pregnancy_safe || false,
-      // Business flag (may not exist on older schemas)
-      isBusiness: item.isBusiness !== undefined ? item.isBusiness : false,
-      // Hidden flag (may not exist on older schemas)
-      isHidden: item.isHidden !== undefined ? item.isHidden : false,
-      // Sort order (may not exist on older schemas)
-      sortOrder: item.sortOrder !== undefined ? item.sortOrder : 0,
-      // English fields (may be null / missing)
-      categoryEn: item.category_en || undefined,
-      nameEn: item.name_en || undefined,
-      // Clean ingredients and allergens arrays from trailing 0s
-      ingredients: cleanArrayField(item.ingredients),
-      allergens: cleanArrayField(item.allergens),
-      ingredientsEn: cleanArrayField(item.ingredients_en),
-      allergensEn: cleanArrayField(item.allergens_en),
-    })) || [];
+    const mappedItems = items?.map((item: any) => {
+      // Parse price - can be from priceData (JSONB) or price (numeric)
+      let price: number | { min: number; max: number } = item.price;
+      if (item.priceData) {
+        // If priceData exists, use it (supports both number and range)
+        try {
+          const parsed = typeof item.priceData === 'string' ? JSON.parse(item.priceData) : item.priceData;
+          if (typeof parsed === 'object' && 'min' in parsed && 'max' in parsed) {
+            price = { min: parsed.min, max: parsed.max };
+          } else if (typeof parsed === 'number') {
+            price = parsed;
+          }
+        } catch (e) {
+          // If parsing fails, fall back to numeric price
+          price = item.price;
+        }
+      }
+      
+      return {
+        ...item,
+        price, // Use parsed price
+        // Featured / pregnancy flags (snake_case in DB)
+        isFeatured: item.is_featured || false,
+        isPregnancySafe: item.is_pregnancy_safe || false,
+        // Business flag (may not exist on older schemas)
+        isBusiness: item.isBusiness !== undefined ? item.isBusiness : false,
+        // Hidden flag (may not exist on older schemas)
+        isHidden: item.isHidden !== undefined ? item.isHidden : false,
+        // Sort order (may not exist on older schemas)
+        sortOrder: item.sortOrder !== undefined ? item.sortOrder : 0,
+        // English fields (may be null / missing)
+        categoryEn: item.category_en || undefined,
+        nameEn: item.name_en || undefined,
+        // Clean ingredients and allergens arrays from trailing 0s
+        ingredients: cleanArrayField(item.ingredients),
+        allergens: cleanArrayField(item.allergens),
+        ingredientsEn: cleanArrayField(item.ingredients_en),
+        allergensEn: cleanArrayField(item.allergens_en),
+      };
+    }) || [];
 
     return NextResponse.json({ items: mappedItems }, { status: 200 });
   } catch (error) {
