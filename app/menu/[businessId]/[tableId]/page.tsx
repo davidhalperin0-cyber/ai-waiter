@@ -786,6 +786,41 @@ const orderedCategories = useMemo(() => {
     return String(businessInfo.name);
   }, [businessInfo, language]);
 
+  // Detect if this is pizza-classic template for special branding treatment
+  const isPizzaBrand = useMemo(() => {
+    if (!businessInfo) return false;
+    // Only apply special branding to pizza-classic template
+    return template === 'pizza-classic';
+  }, [businessInfo, template]);
+
+  // Parse pizza brand name into hero and sub-branding
+  const pizzaBrandParts = useMemo(() => {
+    if (!isPizzaBrand) return null;
+    const nameUpper = displayBusinessName.toUpperCase();
+    
+    // Try to split on common patterns: "CLASSIC PIZZA CO." -> ["CLASSIC", "PIZZA CO."]
+    // Look for "PIZZA" as the divider
+    const pizzaIndex = nameUpper.indexOf('PIZZA');
+    if (pizzaIndex > 0) {
+      return {
+        hero: displayBusinessName.substring(0, pizzaIndex).trim(),
+        subBrand: displayBusinessName.substring(pizzaIndex).trim(),
+      };
+    }
+    
+    // If no "PIZZA" found, try to split on common words
+    const words = displayBusinessName.split(/\s+/);
+    if (words.length >= 2) {
+      // Take first word as hero, rest as sub-brand
+      return {
+        hero: words[0],
+        subBrand: words.slice(1).join(' '),
+      };
+    }
+    
+    return null;
+  }, [isPizzaBrand, displayBusinessName]);
+
   if (!businessInfo) {
     return (
       <div className="min-h-screen flex items-center justify-center text-white" dir={language === 'he' ? 'rtl' : 'ltr'}>
@@ -835,33 +870,60 @@ const orderedCategories = useMemo(() => {
                 />
                 {/* Fallback: show full business name if logo fails */}
                 <div className="hidden logo-fallback absolute inset-0 items-center justify-center">
-                  <h1
-                    className="text-5xl lg:text-6xl font-light tracking-[0.15em] uppercase"
-                    style={{
-                      fontFamily: 'system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif',
-                      letterSpacing: '0.15em',
-                      color: isBarClassic ? '#FAF8F3' : '#FFFFFF',
-                      fontWeight: 300,
-                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-                    }}
-                  >
-                    {displayBusinessName.split('').map((char, index) => {
-                      const isFirstLetter = index === 0;
-                      const accentColor = isBarClassic ? '#D4AF37' : '#F5D76E';
-                      
-                      return (
-                        <span
-                          key={index}
-                          style={{
-                            color: isFirstLetter ? accentColor : 'inherit',
-                            fontWeight: isFirstLetter ? 400 : 300,
-                          }}
-                        >
-                          {char === ' ' ? '\u00A0' : char}
-                        </span>
-                      );
-                    })}
-                  </h1>
+                  {isPizzaBrand && pizzaBrandParts ? (
+                    <div>
+                      <div
+                        className="text-6xl lg:text-7xl font-medium tracking-[0.12em] uppercase leading-tight"
+                        style={{
+                          fontFamily: 'system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif',
+                          letterSpacing: '0.12em',
+                          color: '#E8E6E1', // Soft ivory, elegant and refined
+                          fontWeight: 500,
+                        }}
+                      >
+                        {pizzaBrandParts.hero}
+                      </div>
+                      <div
+                        className="text-2xl lg:text-3xl font-light tracking-[0.2em] uppercase mt-1"
+                        style={{
+                          fontFamily: 'system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif',
+                          letterSpacing: '0.2em',
+                          color: '#A67C52', // Warm terracotta, elegant and appetizing
+                          fontWeight: 300,
+                        }}
+                      >
+                        {pizzaBrandParts.subBrand}
+                      </div>
+                    </div>
+                  ) : (
+                    <h1
+                      className="text-5xl lg:text-6xl font-light tracking-[0.15em] uppercase"
+                      style={{
+                        fontFamily: 'system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif',
+                        letterSpacing: '0.15em',
+                        color: isBarClassic ? '#FAF8F3' : '#FFFFFF',
+                        fontWeight: 300,
+                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                      }}
+                    >
+                      {displayBusinessName.split('').map((char, index) => {
+                        const isFirstLetter = index === 0;
+                        const accentColor = isBarClassic ? '#D4AF37' : '#F5D76E';
+                        
+                        return (
+                          <span
+                            key={index}
+                            style={{
+                              color: isFirstLetter ? accentColor : 'inherit',
+                              fontWeight: isFirstLetter ? 400 : 300,
+                            }}
+                          >
+                            {char === ' ' ? '\u00A0' : char}
+                          </span>
+                        );
+                      })}
+                    </h1>
+                  )}
                 </div>
               </motion.div>
             ) : (
@@ -874,7 +936,7 @@ const orderedCategories = useMemo(() => {
                 }}
                 className="mb-6 relative"
               >
-                {/* Subtle premium glow - very minimal */}
+                {/* Subtle premium glow - very minimal and elegant */}
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -882,51 +944,105 @@ const orderedCategories = useMemo(() => {
                     duration: 0.6,
                     delay: 0.2
                   }}
-                  className="absolute inset-0 blur-xl bg-gradient-to-r from-transparent via-white/5 to-transparent -z-10"
+                  className="absolute inset-0 blur-2xl bg-gradient-to-r from-transparent via-white/[0.02] to-transparent -z-10"
                 />
                 
-                <motion.h1
-                  initial={{ opacity: 0, filter: 'blur(8px)' }}
-                  animate={{ opacity: 1, filter: 'blur(0px)' }}
-                  transition={{ 
-                    duration: 0.5,
-                    ease: [0.25, 0.1, 0.25, 1]
-                  }}
-                  className="text-5xl lg:text-6xl font-light tracking-[0.15em] uppercase relative z-10"
-                  style={{
-                    fontFamily: 'system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif',
-                    letterSpacing: '0.15em',
-                    color: isBarClassic ? '#FAF8F3' : '#FFFFFF',
-                    fontWeight: 300,
-                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-                  }}
-                >
-                  {displayBusinessName.split('').map((char, index) => {
-                    // Add subtle gold accent to first letter for premium feel
-                    const isFirstLetter = index === 0;
-                    const accentColor = isBarClassic ? '#D4AF37' : '#F5D76E';
+                {isPizzaBrand && pizzaBrandParts ? (
+                  // Premium pizza brand treatment: Hero + Sub-branding
+                  <motion.div
+                    initial={{ opacity: 0, filter: 'blur(8px)' }}
+                    animate={{ opacity: 1, filter: 'blur(0px)' }}
+                    transition={{ 
+                      duration: 0.5,
+                      ease: [0.25, 0.1, 0.25, 1]
+                    }}
+                    className="relative z-10"
+                  >
+                    {/* Hero: "CLASSIC" */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ 
+                        duration: 0.4,
+                        delay: 0.1,
+                        ease: [0.25, 0.1, 0.25, 1]
+                      }}
+                      className="text-6xl lg:text-7xl font-medium tracking-[0.12em] uppercase leading-tight"
+                      style={{
+                        fontFamily: 'system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif',
+                        letterSpacing: '0.12em',
+                        color: '#E8E6E1', // Soft ivory, elegant and refined
+                        fontWeight: 500,
+                      }}
+                    >
+                      {pizzaBrandParts.hero}
+                    </motion.div>
                     
-                    return (
-                      <motion.span
-                        key={index}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{
-                          duration: 0.3,
-                          delay: 0.1 + (index * 0.02),
-                          ease: [0.25, 0.1, 0.25, 1]
-                        }}
-                        className="inline-block"
-                        style={{
-                          color: isFirstLetter ? accentColor : 'inherit',
-                          fontWeight: isFirstLetter ? 400 : 300,
-                        }}
-                      >
-                        {char === ' ' ? '\u00A0' : char}
-                      </motion.span>
-                    );
-                  })}
-                </motion.h1>
+                    {/* Sub-branding: "PIZZA CO." */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ 
+                        duration: 0.4,
+                        delay: 0.25,
+                        ease: [0.25, 0.1, 0.25, 1]
+                      }}
+                      className="text-2xl lg:text-3xl font-light tracking-[0.2em] uppercase mt-1"
+                      style={{
+                        fontFamily: 'system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif',
+                        letterSpacing: '0.2em',
+                        color: '#A67C52', // Warm terracotta, elegant and appetizing
+                        fontWeight: 300,
+                      }}
+                    >
+                      {pizzaBrandParts.subBrand}
+                    </motion.div>
+                  </motion.div>
+                ) : (
+                  // Standard premium treatment for non-pizza brands
+                  <motion.h1
+                    initial={{ opacity: 0, filter: 'blur(8px)' }}
+                    animate={{ opacity: 1, filter: 'blur(0px)' }}
+                    transition={{ 
+                      duration: 0.5,
+                      ease: [0.25, 0.1, 0.25, 1]
+                    }}
+                    className="text-5xl lg:text-6xl font-light tracking-[0.15em] uppercase relative z-10"
+                    style={{
+                      fontFamily: 'system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif',
+                      letterSpacing: '0.15em',
+                      color: isBarClassic ? '#FAF8F3' : '#FFFFFF',
+                      fontWeight: 300,
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                    }}
+                  >
+                    {displayBusinessName.split('').map((char, index) => {
+                      // Add subtle gold accent to first letter for premium feel
+                      const isFirstLetter = index === 0;
+                      const accentColor = isBarClassic ? '#D4AF37' : '#F5D76E';
+                      
+                      return (
+                        <motion.span
+                          key={index}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{
+                            duration: 0.3,
+                            delay: 0.1 + (index * 0.02),
+                            ease: [0.25, 0.1, 0.25, 1]
+                          }}
+                          className="inline-block"
+                          style={{
+                            color: isFirstLetter ? accentColor : 'inherit',
+                            fontWeight: isFirstLetter ? 400 : 300,
+                          }}
+                        >
+                          {char === ' ' ? '\u00A0' : char}
+                        </motion.span>
+                      );
+                    })}
+                  </motion.h1>
+                )}
               </motion.div>
             )}
 
@@ -955,7 +1071,7 @@ const orderedCategories = useMemo(() => {
                       : 'bg-white text-black border-white'
                     : isBarClassic
                       ? 'bg-white/5 text-[#FAF8F3]/70 border-white/8'
-                      : 'bg-white/5 text-white/70 border-white/20'
+                    : 'bg-white/5 text-white/70 border-white/20'
                 }`}
               >
                 עברית
@@ -970,7 +1086,7 @@ const orderedCategories = useMemo(() => {
                       : 'bg-white text-black border-white'
                     : isBarClassic
                       ? 'bg-white/5 text-[#FAF8F3]/70 border-white/8'
-                      : 'bg-white/5 text-white/70 border-white/20'
+                    : 'bg-white/5 text-white/70 border-white/20'
                 }`}
               >
                 English
@@ -1087,7 +1203,7 @@ const orderedCategories = useMemo(() => {
                           : 'text-black z-10'
                         : isBarClassic
                           ? 'text-[#FAF8F3]/70 bg-white/5 border border-white/8'
-                          : 'text-white/60 bg-white/5 border border-white/10'
+                        : 'text-white/60 bg-white/5 border border-white/10'
                     }`}
                   >
                     {language === 'en' ? 'Home' : 'עמוד הבית'}
@@ -1135,7 +1251,7 @@ const orderedCategories = useMemo(() => {
                               : 'text-black z-10'
                             : isBarClassic
                               ? 'text-[#FAF8F3]/70 bg-white/5 border border-white/8'
-                              : 'text-white/60 bg-white/5 border border-white/10'
+                            : 'text-white/60 bg-white/5 border border-white/10'
                         }`}
                       >
                         <span className="line-clamp-1">{displayCategory}</span>

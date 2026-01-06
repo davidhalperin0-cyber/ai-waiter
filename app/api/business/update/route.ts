@@ -63,10 +63,101 @@ export async function PUT(req: NextRequest) {
     }
     if (aiInstructions !== undefined) updateData.aiInstructions = aiInstructions;
     
-    // Handle businessHours separately - if column doesn't exist, skip it
+    // Store template, aiInstructions, and businessHours from RPC results to return in response
+    let savedTemplate: string | undefined = undefined;
+    let savedAiInstructions: string | undefined = undefined;
+    let savedBusinessHours: { start: string; end: string } | null | undefined = undefined;
+    
+    // Handle businessHours separately - will be updated via RPC
     let optionalFieldsUpdate: any = {};
+    
+    // CRITICAL: businessHours MUST have ONE writer only: update_business_hours RPC
+    // Use RPC function to ensure the update is actually saved in the database
+    // The RPC function performs the update directly in PostgreSQL, bypassing Supabase client issues
     if (businessHours !== undefined) {
-      optionalFieldsUpdate.businessHours = businessHours || null;
+      const businessHoursValue = businessHours || null;
+      console.log('💾 Saving businessHours via RPC function:', JSON.stringify(businessHoursValue));
+      console.log('💾 businessHours type:', typeof businessHoursValue);
+      console.log('💾 businessHours is null?', businessHoursValue === null);
+      
+      try {
+        // CRITICAL: Convert null to JSONB null for PostgreSQL
+        // If businessHoursValue is null, send it as JSONB null, not JavaScript null
+        const rpcParam = businessHoursValue === null ? null : businessHoursValue;
+        
+        const rpcResult = await supabaseAdmin.rpc('update_business_hours', {
+          p_business_id: businessId,
+          p_business_hours: rpcParam,
+        });
+        
+        if (rpcResult.error) {
+          // Check if RPC function doesn't exist (various error messages possible)
+          const errorMsg = rpcResult.error.message || '';
+          const isFunctionNotFound = 
+            errorMsg.includes('function') && 
+            (errorMsg.includes('does not exist') || 
+             errorMsg.includes('not found') ||
+             errorMsg.includes('42883')); // PostgreSQL error code for undefined function
+          
+          if (isFunctionNotFound) {
+            console.warn('⚠️ RPC function update_business_hours does not exist, falling back to regular update');
+            console.warn('⚠️ Error message:', errorMsg);
+            // Add to optionalFieldsUpdate for regular update
+            optionalFieldsUpdate.businessHours = businessHoursValue;
+          } else {
+            console.error('❌ RPC function error:', rpcResult.error);
+            console.error('❌ Error code:', rpcResult.error.code);
+            console.error('❌ Error message:', rpcResult.error.message);
+            // For now, fall back to regular update instead of failing
+            console.warn('⚠️ Falling back to regular update due to RPC error');
+            optionalFieldsUpdate.businessHours = businessHoursValue;
+          }
+        } else if (!rpcResult.data || rpcResult.data.length === 0) {
+          console.warn('⚠️ RPC function returned no data, falling back to regular update');
+          // Add to optionalFieldsUpdate for regular update
+          optionalFieldsUpdate.businessHours = businessHoursValue;
+        } else {
+          // Store the saved businessHours from RPC result (source of truth)
+          savedBusinessHours = rpcResult.data[0]?.businessHours as { start: string; end: string } | null;
+          
+          console.log('✅ RPC function succeeded!', {
+            returnedBusinessHours: savedBusinessHours,
+          });
+          
+          // Verify the saved data matches what we sent
+          const expectedBusinessHours = businessHoursValue;
+          
+          if (JSON.stringify(savedBusinessHours) !== JSON.stringify(expectedBusinessHours)) {
+            console.warn('⚠️ WARNING: RPC saved businessHours does not match expected!', {
+              expected: expectedBusinessHours,
+              saved: savedBusinessHours,
+            });
+          }
+          
+          console.log('✅ businessHours updated via RPC, continuing with other fields...');
+        }
+      } catch (rpcErr: any) {
+        // If RPC function doesn't exist, fall back to regular update
+        const errorMsg = rpcErr?.message || '';
+        const isFunctionNotFound = 
+          errorMsg.includes('function') && 
+          (errorMsg.includes('does not exist') || 
+           errorMsg.includes('not found') ||
+           errorMsg.includes('42883'));
+        
+        if (isFunctionNotFound) {
+          console.warn('⚠️ RPC function update_business_hours does not exist (exception), falling back to regular update');
+          console.warn('⚠️ Error message:', errorMsg);
+          // Add to optionalFieldsUpdate for regular update
+          optionalFieldsUpdate.businessHours = businessHoursValue;
+        } else {
+          console.error('❌ RPC function exception:', rpcErr);
+          console.error('❌ Exception message:', rpcErr?.message);
+          // For now, fall back to regular update instead of failing
+          console.warn('⚠️ Falling back to regular update due to RPC exception');
+          optionalFieldsUpdate.businessHours = businessHoursValue;
+        }
+      }
     }
     
     // Handle customContent separately (like subscription) to ensure it's saved correctly
@@ -186,8 +277,66 @@ export async function PUT(req: NextRequest) {
       }
     }
     
-    // Store template from RPC result to return in response
-    let savedTemplate: string | undefined = undefined;
+    // CRITICAL: aiInstructions MUST have ONE writer only: update_business_ai_instructions RPC
+    // Use RPC function to ensure the update is actually saved in the database
+    // The RPC function performs the update directly in PostgreSQL, bypassing Supabase client issues
+    if (aiInstructions !== undefined && updateData.aiInstructions !== undefined) {
+      console.log('💾 Saving aiInstructions via RPC function:', {
+        hasInstructions: !!updateData.aiInstructions,
+        length: updateData.aiInstructions?.length || 0,
+      });
+      
+      try {
+        const rpcResult = await supabaseAdmin.rpc('update_business_ai_instructions', {
+          p_business_id: businessId,
+          p_ai_instructions: updateData.aiInstructions || '',
+        });
+        
+        if (rpcResult.error) {
+          console.error('❌ RPC function error:', rpcResult.error);
+          return NextResponse.json({ 
+            message: 'Failed to update aiInstructions', 
+            details: rpcResult.error.message 
+          }, { status: 500 });
+        }
+        
+        if (!rpcResult.data || rpcResult.data.length === 0) {
+          console.error('❌ RPC function returned no data');
+          return NextResponse.json({ 
+            message: 'Failed to update aiInstructions - no data returned' 
+          }, { status: 500 });
+        }
+        
+        // Store the saved aiInstructions from RPC result (source of truth)
+        savedAiInstructions = rpcResult.data[0]?.aiInstructions || '';
+        
+        console.log('✅ RPC function succeeded!', {
+          returnedAiInstructions: savedAiInstructions,
+          length: savedAiInstructions?.length || 0,
+        });
+        
+        // Verify the saved data matches what we sent
+        const expectedAiInstructions = updateData.aiInstructions || '';
+        
+        if (savedAiInstructions !== expectedAiInstructions) {
+          console.warn('⚠️ WARNING: RPC saved aiInstructions does not match expected!', {
+            expectedLength: expectedAiInstructions.length,
+            savedLength: savedAiInstructions.length,
+          });
+        }
+        
+        // Remove aiInstructions from updateData since it's already updated via RPC
+        delete updateData.aiInstructions;
+        
+        console.log('✅ aiInstructions updated via RPC, continuing with other fields...');
+      } catch (rpcErr: any) {
+        console.error('❌ RPC function exception:', rpcErr);
+        return NextResponse.json({ 
+          message: 'Failed to update aiInstructions', 
+          details: rpcErr?.message || 'RPC function error' 
+        }, { status: 500 });
+      }
+    }
     
     // CRITICAL: template MUST have ONE writer only: update_business_template RPC
     // Use RPC function to ensure the update is actually saved in the database
@@ -339,6 +488,8 @@ export async function PUT(req: NextRequest) {
       };
       console.log('🔍 DEBUG: Updating other fields with debug_last_writer:', updateWithDebug.debug_last_writer);
       console.log('🔍 DEBUG: Update payload keys:', Object.keys(updateWithDebug));
+      console.log('🔍 DEBUG: Update payload businessHours:', updateWithDebug.businessHours);
+      console.log('🔍 DEBUG: Update payload businessHours type:', typeof updateWithDebug.businessHours);
       let { error, data } = await supabaseAdmin
         .from('businesses')
         .update(updateWithDebug)
@@ -348,6 +499,9 @@ export async function PUT(req: NextRequest) {
       if (error) {
         console.error('❌ Error updating business:', error);
         console.error('❌ Error details:', JSON.stringify(error, null, 2));
+        console.error('❌ Error code:', error.code);
+        console.error('❌ Error message:', error.message);
+        console.error('❌ Update payload that failed:', JSON.stringify(updateWithDebug, null, 2));
       } else {
         // Fix: Be defensive about the structure/type of 'data'
         let affectedRows: number | string = 'unknown';
@@ -357,6 +511,7 @@ export async function PUT(req: NextRequest) {
           affectedRows = (data as any).length;
         }
         console.log('✅ Update successful, affected rows:', affectedRows);
+        console.log('✅ Updated businessHours in DB:', updateWithDebug.businessHours);
       }
       
       // If error suggests column doesn't exist, try without optional fields
@@ -366,12 +521,17 @@ export async function PUT(req: NextRequest) {
         
         if (isColumnError) {
           // Try updating without optional fields (like menu items do)
+          // BUT: Keep businessHours if it was in optionalFieldsUpdate (it's a valid column)
           const requiredFieldsOnly: any = {};
           if (updateData.name !== undefined) requiredFieldsOnly.name = updateData.name;
           if (updateData.logoUrl !== undefined) requiredFieldsOnly.logoUrl = updateData.logoUrl;
           if (updateData.type !== undefined) requiredFieldsOnly.type = updateData.type;
           if (updateData.template !== undefined) requiredFieldsOnly.template = updateData.template;
           if (updateData.aiInstructions !== undefined) requiredFieldsOnly.aiInstructions = updateData.aiInstructions;
+          // Keep businessHours if it was in optionalFieldsUpdate
+          if (optionalFieldsUpdate.businessHours !== undefined) {
+            requiredFieldsOnly.businessHours = optionalFieldsUpdate.businessHours;
+          }
           
           if (Object.keys(requiredFieldsOnly).length > 0) {
             // DEBUG: Set debug_last_writer to track who wrote last
@@ -403,7 +563,7 @@ export async function PUT(req: NextRequest) {
       }
     }
     
-    // Return the updated template if it was updated
+    // Return the updated template and aiInstructions if they were updated
     const response: any = { message: 'Business updated successfully' };
     if (savedTemplate !== undefined) {
       // Use template from RPC result (source of truth)
@@ -420,6 +580,62 @@ export async function PUT(req: NextRequest) {
       if (templateData?.template) {
         response.template = templateData.template;
         console.log('✅ Returning updated template from DB:', response.template);
+      }
+    }
+
+    // Return updated aiInstructions if it was updated
+    if (savedAiInstructions !== undefined) {
+      // Use aiInstructions from RPC result (source of truth)
+      response.aiInstructions = savedAiInstructions;
+      console.log('✅ Returning updated aiInstructions from RPC:', {
+        hasInstructions: !!response.aiInstructions,
+        length: response.aiInstructions?.length || 0,
+      });
+    } else if (aiInstructions !== undefined) {
+      // Fallback: Fetch the updated aiInstructions from DB if RPC wasn't used
+      const { data: aiInstructionsData } = await supabaseAdmin
+        .from('businesses')
+        .select('aiInstructions')
+        .eq('businessId', businessId)
+        .maybeSingle();
+      
+      if (aiInstructionsData) {
+        response.aiInstructions = aiInstructionsData.aiInstructions || '';
+        console.log('✅ Returning updated aiInstructions from DB:', {
+          hasInstructions: !!response.aiInstructions,
+          length: response.aiInstructions?.length || 0,
+        });
+      }
+    }
+
+    // Return updated businessHours if it was updated
+    if (savedBusinessHours !== undefined) {
+      // Use businessHours from RPC result (source of truth)
+      response.businessHours = savedBusinessHours;
+      console.log('✅ Returning updated businessHours from RPC:', response.businessHours);
+    } else if (businessHours !== undefined) {
+      // Fallback: Fetch the updated businessHours from DB if RPC wasn't used
+      // Use the value we just saved (from optionalFieldsUpdate) as source of truth
+      // This bypasses read replica lag
+      if (optionalFieldsUpdate.businessHours !== undefined) {
+        response.businessHours = optionalFieldsUpdate.businessHours;
+        console.log('✅ Returning updated businessHours from update payload (source of truth):', response.businessHours);
+      } else {
+        // If not in update payload, try to fetch from DB (may be stale due to read replica lag)
+        const { data: businessHoursData } = await supabaseAdmin
+          .from('businesses')
+          .select('businessHours')
+          .eq('businessId', businessId)
+          .maybeSingle();
+        
+        if (businessHoursData) {
+          response.businessHours = businessHoursData.businessHours || null;
+          console.log('✅ Returning updated businessHours from DB:', response.businessHours);
+        } else {
+          // Use the value we sent as fallback
+          response.businessHours = businessHours || null;
+          console.log('✅ Returning updated businessHours from request (fallback):', response.businessHours);
+        }
       }
     }
     

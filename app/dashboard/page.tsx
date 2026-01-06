@@ -269,6 +269,51 @@ export default function DashboardPage() {
           console.warn('⚠️ Failed to parse cached template:', e);
         }
       }
+
+      // CRITICAL: Check localStorage for cached aiInstructions that was saved after update
+      // This bypasses read replica lag by using the data we know was saved
+      const aiInstructionsKey = `business_${businessId}_aiInstructions`;
+      const cachedAiInstructionsData = typeof window !== 'undefined' ? localStorage.getItem(aiInstructionsKey) : null;
+      let cachedAiInstructions: string | null = null;
+      let cachedAiInstructionsTimestamp = 0;
+      
+      if (cachedAiInstructionsData) {
+        try {
+          const parsed = JSON.parse(cachedAiInstructionsData);
+          cachedAiInstructions = parsed.aiInstructions;
+          cachedAiInstructionsTimestamp = parsed.timestamp || 0;
+          console.log('💾 Found cached aiInstructions in localStorage:', {
+            timestamp: cachedAiInstructionsTimestamp,
+            age: Date.now() - cachedAiInstructionsTimestamp,
+            hasInstructions: !!cachedAiInstructions,
+            length: cachedAiInstructions?.length || 0,
+          });
+        } catch (e) {
+          console.warn('⚠️ Failed to parse cached aiInstructions:', e);
+        }
+      }
+
+      // CRITICAL: Check localStorage for cached businessHours that was saved after update
+      // This bypasses read replica lag by using the data we know was saved
+      const businessHoursKey = `business_${businessId}_businessHours`;
+      const cachedBusinessHoursData = typeof window !== 'undefined' ? localStorage.getItem(businessHoursKey) : null;
+      let cachedBusinessHours: { start: string; end: string } | null | null = null;
+      let cachedBusinessHoursTimestamp = 0;
+      
+      if (cachedBusinessHoursData) {
+        try {
+          const parsed = JSON.parse(cachedBusinessHoursData);
+          cachedBusinessHours = parsed.businessHours;
+          cachedBusinessHoursTimestamp = parsed.timestamp || 0;
+          console.log('💾 Found cached businessHours in localStorage:', {
+            timestamp: cachedBusinessHoursTimestamp,
+            age: Date.now() - cachedBusinessHoursTimestamp,
+            businessHours: cachedBusinessHours,
+          });
+        } catch (e) {
+          console.warn('⚠️ Failed to parse cached businessHours:', e);
+        }
+      }
       
       // Add cache busting to ensure fresh data
       const res = await fetch(`/api/business/info?businessId=${encodeURIComponent(businessId)}&_t=${Date.now()}`, {
@@ -347,6 +392,31 @@ export default function DashboardPage() {
             cachedAge: Date.now() - cachedTemplateTimestamp,
           });
         }
+
+        // CRITICAL: Use cached aiInstructions if it's newer than 5 minutes old
+        // This ensures we use the data we know was saved, not stale read replica data
+        let finalAiInstructions = data.business.aiInstructions || '';
+        if (cachedAiInstructions !== null && cachedAiInstructionsTimestamp > Date.now() - 5 * 60 * 1000) {
+          // Cached data is recent (less than 5 minutes old), use it instead of API data
+          finalAiInstructions = cachedAiInstructions;
+          console.log('✅ Using cached aiInstructions from localStorage (source of truth):', {
+            hasInstructions: !!finalAiInstructions,
+            length: finalAiInstructions?.length || 0,
+            cachedAge: Date.now() - cachedAiInstructionsTimestamp,
+          });
+        }
+
+        // CRITICAL: Use cached businessHours if it's newer than 5 minutes old
+        // This ensures we use the data we know was saved, not stale read replica data
+        let finalBusinessHours = data.business.businessHours || null;
+        if (cachedBusinessHours !== null && cachedBusinessHoursTimestamp > Date.now() - 5 * 60 * 1000) {
+          // Cached data is recent (less than 5 minutes old), use it instead of API data
+          finalBusinessHours = cachedBusinessHours;
+          console.log('✅ Using cached businessHours from localStorage (source of truth):', {
+            businessHours: finalBusinessHours,
+            cachedAge: Date.now() - cachedBusinessHoursTimestamp,
+          });
+        }
         
         // Only update if values actually changed to prevent infinite re-renders
         setBusinessInfo((prev) => {
@@ -356,8 +426,8 @@ export default function DashboardPage() {
             logoUrl: data.business.logoUrl || '',
             type: data.business.type,
             template: finalTemplate, // Use cached or API data
-            aiInstructions: data.business.aiInstructions || '',
-            businessHours: data.business.businessHours || null,
+            aiInstructions: finalAiInstructions, // Use cached or API data
+            businessHours: finalBusinessHours, // Use cached or API data
             subscription: data.business.subscription,
             customContent: finalCustomContent, // Use cached or API data
             printerConfig: finalPrinterConfig, // Use cached or API data
@@ -2153,7 +2223,7 @@ export default function DashboardPage() {
                 const businessHoursEnd = formData.get('businessHoursEnd') as string;
                 const businessHoursEnabled = formData.get('businessHoursEnabled') === 'on';
 
-                // Build businessHours object
+                // Build businessHours object - always send it (even if null) to clear previous value
                 let businessHours: { start: string; end: string } | null = null;
                 if (businessHoursEnabled && businessHoursStart && businessHoursEnd) {
                   businessHours = {
@@ -2161,6 +2231,7 @@ export default function DashboardPage() {
                     end: businessHoursEnd,
                   };
                 }
+                // If businessHoursEnabled is false, businessHours will be null (to clear previous value)
 
                 try {
                   setLoading(true);
@@ -2176,7 +2247,7 @@ export default function DashboardPage() {
                       type,
                       template,
                       aiInstructions: aiInstructions || undefined,
-                      businessHours: businessHours || null,
+                      businessHours: businessHours, // Always send, even if null
                       menuOnlyMessage: businessInfo.subscription?.planType === 'menu_only'
                         ? (menuOnlyMessage?.trim() || null)
                         : undefined,
@@ -2196,6 +2267,23 @@ export default function DashboardPage() {
 
                   // Use template from API response if available (source of truth), otherwise use form value
                   const finalTemplate = data.template || template;
+                  
+                  // Use aiInstructions from API response if available (source of truth), otherwise use form value
+                  const finalAiInstructions = data.aiInstructions !== undefined ? data.aiInstructions : (aiInstructions || '');
+                  
+                  // Use businessHours from API response if available (source of truth), otherwise use form value
+                  // CRITICAL: If API returns null but we sent a value, use the value we sent (bypass read replica lag)
+                  let finalBusinessHours: { start: string; end: string } | null = null;
+                  if (data.businessHours !== undefined) {
+                    // API returned a value (even if null), use it
+                    finalBusinessHours = data.businessHours;
+                  } else if (businessHours !== undefined) {
+                    // API didn't return businessHours, use the value we sent
+                    finalBusinessHours = businessHours;
+                  } else {
+                    // No value was sent, use null
+                    finalBusinessHours = null;
+                  }
 
                   setBusinessInfo({ 
                     name,
@@ -2203,8 +2291,8 @@ export default function DashboardPage() {
                     logoUrl: logoUrl || undefined,
                     type, 
                     template: finalTemplate, // Use API response as source of truth
-                    aiInstructions: aiInstructions || '',
-                    businessHours: businessHours,
+                    aiInstructions: finalAiInstructions, // Use API response as source of truth
+                    businessHours: finalBusinessHours, // Use API response as source of truth
                     subscription: updatedSubscription,
                     printerConfig: businessInfo.printerConfig,
                     customContent: businessInfo.customContent,
@@ -2218,6 +2306,31 @@ export default function DashboardPage() {
                       timestamp: Date.now(),
                     }));
                     console.log('💾 Saved template to localStorage:', finalTemplate);
+                  }
+
+                  // CRITICAL: Save aiInstructions to localStorage to bypass read replica lag
+                  if (typeof window !== 'undefined') {
+                    const aiInstructionsKey = `business_${businessId}_aiInstructions`;
+                    localStorage.setItem(aiInstructionsKey, JSON.stringify({
+                      aiInstructions: finalAiInstructions || '',
+                      timestamp: Date.now(),
+                    }));
+                    console.log('💾 Saved aiInstructions to localStorage:', {
+                      hasInstructions: !!finalAiInstructions,
+                      length: finalAiInstructions?.length || 0,
+                    });
+                  }
+
+                  // CRITICAL: Save businessHours to localStorage to bypass read replica lag
+                  if (typeof window !== 'undefined') {
+                    const businessHoursKey = `business_${businessId}_businessHours`;
+                    localStorage.setItem(businessHoursKey, JSON.stringify({
+                      businessHours: finalBusinessHours,
+                      timestamp: Date.now(),
+                    }));
+                    console.log('💾 Saved businessHours to localStorage:', {
+                      businessHours: finalBusinessHours,
+                    });
                   }
                   
                   toast.success('פרטי העסק עודכנו בהצלחה!');
