@@ -251,7 +251,8 @@ export async function POST(req: NextRequest) {
         message.includes('name_en') ||
         message.includes('ingredients_en') ||
         message.includes('allergens_en') ||
-        message.includes('sortOrder');
+        message.includes('sortOrder') ||
+        message.includes('priceData');
 
       if (relatesToOptionalColumn) {
         console.warn('Optional menuItems columns may not exist yet, retrying without them:', message);
