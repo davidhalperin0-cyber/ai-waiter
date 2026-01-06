@@ -129,9 +129,6 @@ export default function DashboardPage() {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [searchingImages, setSearchingImages] = useState(false);
-  const [imageSearchResults, setImageSearchResults] = useState<Array<{ id: string; url: string; thumbnail: string }>>([]);
-  const [imageSearchQuery, setImageSearchQuery] = useState('');
 
   const fileInputGalleryRef = useRef<HTMLInputElement | null>(null);
   const fileInputCameraRef = useRef<HTMLInputElement | null>(null);
@@ -185,20 +182,6 @@ export default function DashboardPage() {
     }
   }, [businessId]);
 
-  // Debounce image search
-  useEffect(() => {
-    if (!imageSearchQuery.trim()) {
-      setImageSearchResults([]);
-      return;
-    }
-
-    const timeout = setTimeout(() => {
-      searchImages(imageSearchQuery);
-    }, 500);
-
-    return () => clearTimeout(timeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageSearchQuery]);
 
   useEffect(() => {
     if (businessId && activeTab === 'content') {
@@ -1208,37 +1191,6 @@ export default function DashboardPage() {
     }
   }
 
-  async function searchImages(query: string) {
-    if (!query.trim()) {
-      setImageSearchResults([]);
-      return;
-    }
-
-    try {
-      setSearchingImages(true);
-      
-      // Call our API endpoint for image search
-      const res = await fetch(`/api/images/search?query=${encodeURIComponent(query.trim())}`);
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.message || 'נכשל בחיפוש תמונות');
-      }
-
-      if (data.images && data.images.length > 0) {
-        setImageSearchResults(data.images);
-      } else {
-        toast.error('לא נמצאו תמונות');
-        setImageSearchResults([]);
-      }
-    } catch (err: any) {
-      console.error('Error searching images', err);
-      toast.error(err.message || 'נכשל בחיפוש תמונות');
-      setImageSearchResults([]);
-    } finally {
-      setSearchingImages(false);
-    }
-  }
 
   async function handleAutoTranslate(
     source: 'category' | 'name' | 'ingredients' | 'allergens',
@@ -1854,78 +1806,6 @@ export default function DashboardPage() {
                     }
                   }}
                 />
-                <div className="mt-3 space-y-2">
-                  <p className="text-xs text-neutral-400 mb-1">
-                    🔍 חפש תמונות באינטרנט:
-                  </p>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={imageSearchQuery}
-                      onChange={(e) => {
-                        setImageSearchQuery(e.target.value);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && imageSearchQuery.trim()) {
-                          e.preventDefault();
-                          void searchImages(imageSearchQuery);
-                        }
-                      }}
-                      className="flex-1 rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
-                      placeholder="למשל: פיצה מרגריטה, סלט, המבורגר..."
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (imageSearchQuery.trim()) {
-                          void searchImages(imageSearchQuery);
-                        } else if (newItem.name.trim()) {
-                          // Auto-search by item name
-                          setImageSearchQuery(newItem.name);
-                          void searchImages(newItem.name);
-                        }
-                      }}
-                      disabled={searchingImages}
-                      className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-500 disabled:opacity-60 transition-all"
-                    >
-                      {searchingImages ? '🔍...' : '🔍 חפש'}
-                    </button>
-                  </div>
-                  
-                  {imageSearchResults.length > 0 && (
-                    <div className="mt-3">
-                      <p className="text-xs text-neutral-400 mb-2">תוצאות חיפוש:</p>
-                      <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
-                        {imageSearchResults.map((img) => (
-                          <button
-                            key={img.id}
-                            type="button"
-                            onClick={() => {
-                              setNewItem((v) => ({ ...v, imageUrl: img.url }));
-                              setImageSearchResults([]);
-                              setImageSearchQuery('');
-                              toast.success('תמונה נבחרה!');
-                            }}
-                            className="relative aspect-square rounded-lg overflow-hidden border-2 border-neutral-700/50 hover:border-blue-500/50 transition-all group"
-                          >
-                            <img
-                              src={img.thumbnail}
-                              alt="תמונה"
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = 'none';
-                              }}
-                            />
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
-                              <span className="text-white text-xs opacity-0 group-hover:opacity-100">✓</span>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                
                 <p className="text-xs text-neutral-400 mt-3 mb-1">
                   או הדביקו URL קיים:
                 </p>
