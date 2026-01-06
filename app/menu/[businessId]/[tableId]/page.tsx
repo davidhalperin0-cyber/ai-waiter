@@ -230,6 +230,34 @@ function CustomerMenuPageContent({
           }
         }
 
+        // CRITICAL: Check localStorage for cached name, nameEn, and logoUrl that were saved after update
+        // This bypasses read replica lag by using the data we know was saved
+        const basicInfoKey = `business_${businessId}_basicInfo`;
+        const cachedBasicInfoData = typeof window !== 'undefined' ? localStorage.getItem(basicInfoKey) : null;
+        let cachedName: string | null = null;
+        let cachedNameEn: string | undefined = undefined;
+        let cachedLogoUrl: string | undefined = undefined;
+        let cachedBasicInfoTimestamp = 0;
+        
+        if (cachedBasicInfoData) {
+          try {
+            const parsed = JSON.parse(cachedBasicInfoData);
+            cachedName = parsed.name;
+            cachedNameEn = parsed.nameEn;
+            cachedLogoUrl = parsed.logoUrl;
+            cachedBasicInfoTimestamp = parsed.timestamp || 0;
+            console.log('💾 Found cached basicInfo in localStorage:', {
+              timestamp: cachedBasicInfoTimestamp,
+              age: Date.now() - cachedBasicInfoTimestamp,
+              name: cachedName,
+              nameEn: cachedNameEn,
+              logoUrl: cachedLogoUrl,
+            });
+          } catch (e) {
+            console.warn('⚠️ Failed to parse cached basicInfo:', e);
+          }
+        }
+
         // CRITICAL: Use cached template if it's newer than 5 minutes old
         // This ensures we use the data we know was saved, not stale read replica data
         let finalTemplate = (infoData.template || 'generic') as 'bar-modern' | 'bar-classic' | 'bar-mid' | 'pizza-modern' | 'pizza-classic' | 'pizza-mid' | 'sushi' | 'generic' | 'gold';
@@ -242,10 +270,29 @@ function CustomerMenuPageContent({
           });
         }
 
+        // CRITICAL: Use cached name, nameEn, and logoUrl if they're newer than 5 minutes old
+        // This ensures we use the data we know was saved, not stale read replica data
+        let finalName = infoData.name || 'העסק';
+        let finalNameEn = infoData.nameEn || undefined;
+        let finalLogoUrl = infoData.logoUrl;
+        
+        if (cachedBasicInfoTimestamp > Date.now() - 5 * 60 * 1000) {
+          // Cached data is recent (less than 5 minutes old), use it instead of API data
+          if (cachedName !== null) finalName = cachedName;
+          if (cachedNameEn !== undefined) finalNameEn = cachedNameEn;
+          if (cachedLogoUrl !== undefined) finalLogoUrl = cachedLogoUrl;
+          console.log('✅ Using cached basicInfo from localStorage (source of truth):', {
+            name: finalName,
+            nameEn: finalNameEn,
+            logoUrl: finalLogoUrl,
+            cachedAge: Date.now() - cachedBasicInfoTimestamp,
+          });
+        }
+
         const newBusinessInfo = {
-          name: infoData.name || 'העסק',
-          nameEn: infoData.nameEn || undefined, // Optional English translation
-          logoUrl: infoData.logoUrl,
+          name: finalName, // Use cached or API data
+          nameEn: finalNameEn, // Use cached or API data
+          logoUrl: finalLogoUrl, // Use cached or API data
           template: finalTemplate, // Use cached or API data
           subscriptionStatus: infoData.subscriptionStatus || 'active',
           planType: (infoData.planType || 'full') as 'full' | 'menu_only',

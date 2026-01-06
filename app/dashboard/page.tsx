@@ -314,6 +314,34 @@ export default function DashboardPage() {
           console.warn('⚠️ Failed to parse cached businessHours:', e);
         }
       }
+
+      // CRITICAL: Check localStorage for cached name, nameEn, and logoUrl that were saved after update
+      // This bypasses read replica lag by using the data we know was saved
+      const businessBasicInfoKey = `business_${businessId}_basicInfo`;
+      const cachedBasicInfoData = typeof window !== 'undefined' ? localStorage.getItem(businessBasicInfoKey) : null;
+      let cachedName: string | null = null;
+      let cachedNameEn: string | undefined = undefined;
+      let cachedLogoUrl: string | undefined = undefined;
+      let cachedBasicInfoTimestamp = 0;
+      
+      if (cachedBasicInfoData) {
+        try {
+          const parsed = JSON.parse(cachedBasicInfoData);
+          cachedName = parsed.name;
+          cachedNameEn = parsed.nameEn;
+          cachedLogoUrl = parsed.logoUrl;
+          cachedBasicInfoTimestamp = parsed.timestamp || 0;
+          console.log('💾 Found cached basicInfo in localStorage:', {
+            timestamp: cachedBasicInfoTimestamp,
+            age: Date.now() - cachedBasicInfoTimestamp,
+            name: cachedName,
+            nameEn: cachedNameEn,
+            logoUrl: cachedLogoUrl,
+          });
+        } catch (e) {
+          console.warn('⚠️ Failed to parse cached basicInfo:', e);
+        }
+      }
       
       // Add cache busting to ensure fresh data
       const res = await fetch(`/api/business/info?businessId=${encodeURIComponent(businessId)}&_t=${Date.now()}`, {
@@ -417,13 +445,32 @@ export default function DashboardPage() {
             cachedAge: Date.now() - cachedBusinessHoursTimestamp,
           });
         }
+
+        // CRITICAL: Use cached name, nameEn, and logoUrl if they're newer than 5 minutes old
+        // This ensures we use the data we know was saved, not stale read replica data
+        let finalName = data.business.name;
+        let finalNameEn = data.business.nameEn || undefined;
+        let finalLogoUrl = data.business.logoUrl || '';
+        
+        if (cachedBasicInfoTimestamp > Date.now() - 5 * 60 * 1000) {
+          // Cached data is recent (less than 5 minutes old), use it instead of API data
+          if (cachedName !== null) finalName = cachedName;
+          if (cachedNameEn !== undefined) finalNameEn = cachedNameEn;
+          if (cachedLogoUrl !== undefined) finalLogoUrl = cachedLogoUrl || '';
+          console.log('✅ Using cached basicInfo from localStorage (source of truth):', {
+            name: finalName,
+            nameEn: finalNameEn,
+            logoUrl: finalLogoUrl,
+            cachedAge: Date.now() - cachedBasicInfoTimestamp,
+          });
+        }
         
         // Only update if values actually changed to prevent infinite re-renders
         setBusinessInfo((prev) => {
           const newBusinessInfo = {
-            name: data.business.name,
-            nameEn: data.business.nameEn || undefined,
-            logoUrl: data.business.logoUrl || '',
+            name: finalName, // Use cached or API data
+            nameEn: finalNameEn, // Use cached or API data
+            logoUrl: finalLogoUrl, // Use cached or API data
             type: data.business.type,
             template: finalTemplate, // Use cached or API data
             aiInstructions: finalAiInstructions, // Use cached or API data
@@ -2285,10 +2332,16 @@ export default function DashboardPage() {
                     finalBusinessHours = null;
                   }
 
+                  // Use name, nameEn, and logoUrl from API response if available (source of truth), otherwise use form values
+                  // CRITICAL: If API doesn't return these values, use the values we sent (bypass read replica lag)
+                  const finalName = data.name !== undefined ? data.name : name;
+                  const finalNameEn = data.nameEn !== undefined ? data.nameEn : (nameEn?.trim() || undefined);
+                  const finalLogoUrl = data.logoUrl !== undefined ? data.logoUrl : (logoUrl || undefined);
+
                   setBusinessInfo({ 
-                    name,
-                    nameEn: nameEn?.trim() || undefined,
-                    logoUrl: logoUrl || undefined,
+                    name: finalName, // Use API response or form value
+                    nameEn: finalNameEn, // Use API response or form value
+                    logoUrl: finalLogoUrl, // Use API response or form value
                     type, 
                     template: finalTemplate, // Use API response as source of truth
                     aiInstructions: finalAiInstructions, // Use API response as source of truth
@@ -2330,6 +2383,22 @@ export default function DashboardPage() {
                     }));
                     console.log('💾 Saved businessHours to localStorage:', {
                       businessHours: finalBusinessHours,
+                    });
+                  }
+
+                  // CRITICAL: Save name, nameEn, and logoUrl to localStorage to bypass read replica lag
+                  if (typeof window !== 'undefined') {
+                    const basicInfoKey = `business_${businessId}_basicInfo`;
+                    localStorage.setItem(basicInfoKey, JSON.stringify({
+                      name: finalName,
+                      nameEn: finalNameEn,
+                      logoUrl: finalLogoUrl,
+                      timestamp: Date.now(),
+                    }));
+                    console.log('💾 Saved basicInfo to localStorage:', {
+                      name: finalName,
+                      nameEn: finalNameEn,
+                      logoUrl: finalLogoUrl,
                     });
                   }
                   

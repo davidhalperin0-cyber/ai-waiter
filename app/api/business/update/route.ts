@@ -638,6 +638,24 @@ export async function PUT(req: NextRequest) {
         }
       }
     }
+
+    // Return updated name, nameEn, and logoUrl if they were updated
+    // Use the values from updatePayload (source of truth) to bypass read replica lag
+    if (name !== undefined) {
+      // Use the value from updatePayload if it exists, otherwise use the value we sent
+      response.name = updatePayload.name !== undefined ? updatePayload.name : name;
+      console.log('✅ Returning updated name from update payload (source of truth):', response.name);
+    }
+    if (nameEn !== undefined) {
+      // nameEn is updated separately via nameEnUpdate, so use the value we sent (trimmed)
+      response.nameEn = nameEn?.trim() || null;
+      console.log('✅ Returning updated nameEn from request (source of truth):', response.nameEn);
+    }
+    if (logoUrl !== undefined) {
+      // Use the value from updatePayload if it exists, otherwise use the value we sent
+      response.logoUrl = updatePayload.logoUrl !== undefined ? updatePayload.logoUrl : (logoUrl || null);
+      console.log('✅ Returning updated logoUrl from update payload (source of truth):', response.logoUrl);
+    }
     
     return NextResponse.json(response, { status: 200 });
   } catch (error: any) {
