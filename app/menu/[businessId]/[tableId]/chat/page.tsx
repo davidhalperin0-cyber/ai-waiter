@@ -369,7 +369,7 @@ function ChatPageContent({
             isPregnancySafe: item.isPregnancySafe,
           }));
           // Clean ingredients and allergens arrays from trailing 0s
-          const cleanedFullMapped = fullMapped.map(item => ({
+          const cleanedFullMapped = fullMapped.map((item: MenuItemLite) => ({
             ...item,
             ingredients: item.ingredients ? cleanArrayField(item.ingredients) : undefined,
             allergens: item.allergens ? cleanArrayField(item.allergens) : undefined,
