@@ -134,9 +134,15 @@ export async function GET(req: NextRequest) {
     }) || [];
 
     return NextResponse.json({ items: mappedItems }, { status: 200 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching menu items', error);
-    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
+    console.error('Error stack:', error?.stack);
+    console.error('Error message:', error?.message);
+    return NextResponse.json({ 
+      message: 'Internal server error',
+      error: error?.message || 'Unknown error',
+      stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
+    }, { status: 500 });
   }
 }
 
