@@ -14,20 +14,19 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'businessId is required' }, { status: 400 });
     }
 
-    // Try to select all columns including isBusiness
-    // Try with sortOrder first, but fallback if column doesn't exist
-    // Explicitly select columns to avoid issues with missing columns
+    // Try to select all columns using select('*')
+    // This will work even if some optional columns don't exist
     let { data: items, error } = await supabaseAdmin
       .from('menuItems')
-      .select('id, businessId, category, category_en, name, name_en, imageUrl, price, priceData, priceMax, ingredients, ingredients_en, allergens, allergens_en, customizationOptions, is_featured, is_pregnancy_safe, isBusiness, isHidden, sortOrder, createdAt')
+      .select('*')
       .eq('businessId', businessId)
       .order('sortOrder', { ascending: true, nullsFirst: false })
       .order('is_featured', { ascending: false })
       .order('name', { ascending: true });
 
     // If error suggests missing sortOrder column, retry without it
-    if (error && error.message?.toLowerCase().includes('sortorder')) {
-      console.warn('sortOrder column may not exist, retrying without it:', error.message);
+    if (error && (error.message?.toLowerCase().includes('sortorder') || error.message?.toLowerCase().includes('column') && error.message?.toLowerCase().includes('does not exist'))) {
+      console.warn('sortOrder or other column may not exist, retrying without sortOrder:', error.message);
       const retry = await supabaseAdmin
         .from('menuItems')
         .select('*')
