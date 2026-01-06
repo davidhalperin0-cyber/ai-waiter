@@ -718,7 +718,7 @@ const orderedCategories = useMemo(() => {
     addItem({
       menuItemId: `${item.businessId}-${item.name}`,
       name: displayName,
-      price: item.price,
+      price: getPriceValue(item.price), // Use min value for price ranges
     });
     toast.success(
       language === 'en'
