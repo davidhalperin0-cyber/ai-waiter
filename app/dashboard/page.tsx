@@ -1910,16 +1910,16 @@ export default function DashboardPage() {
                     value={newItem.ingredients}
                     onChange={(e) => {
                       let value = e.target.value;
-                      // Remove trailing 0
-                      if (value.endsWith('0') && value.length > 1) {
-                        value = value.slice(0, -1);
-                      }
+                      // Remove trailing 0 immediately (even if followed by spaces or commas)
+                      value = value.replace(/[\s,]*0+$/, '');
                       setNewItem((v) => ({ ...v, ingredients: value }));
                     }}
                     onBlur={(e) => {
                       let value = e.target.value.trim();
-                      // Remove trailing 0 and clean up
-                      value = value.replace(/0+$/, '').trim();
+                      // Remove all trailing zeros, spaces, and commas
+                      value = value.replace(/[\s,]*0+[\s,]*$/, '').trim();
+                      // Clean up multiple commas
+                      value = value.replace(/,\s*,/g, ',').replace(/^,|,$/g, '');
                       setNewItem((v) => ({ ...v, ingredients: value }));
                     }}
                     className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
@@ -1932,16 +1932,16 @@ export default function DashboardPage() {
                     value={newItem.allergens}
                     onChange={(e) => {
                       let value = e.target.value;
-                      // Remove trailing 0
-                      if (value.endsWith('0') && value.length > 1) {
-                        value = value.slice(0, -1);
-                      }
+                      // Remove trailing 0 immediately (even if followed by spaces or commas)
+                      value = value.replace(/[\s,]*0+$/, '');
                       setNewItem((v) => ({ ...v, allergens: value }));
                     }}
                     onBlur={(e) => {
                       let value = e.target.value.trim();
-                      // Remove trailing 0 and clean up
-                      value = value.replace(/0+$/, '').trim();
+                      // Remove all trailing zeros, spaces, and commas
+                      value = value.replace(/[\s,]*0+[\s,]*$/, '').trim();
+                      // Clean up multiple commas
+                      value = value.replace(/,\s*,/g, ',').replace(/^,|,$/g, '');
                       setNewItem((v) => ({ ...v, allergens: value }));
                     }}
                     className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
@@ -1965,16 +1965,16 @@ export default function DashboardPage() {
                     value={newItem.ingredientsEn}
                     onChange={(e) => {
                       let value = e.target.value;
-                      // Remove trailing 0
-                      if (value.endsWith('0') && value.length > 1) {
-                        value = value.slice(0, -1);
-                      }
+                      // Remove trailing 0 immediately (even if followed by spaces or commas)
+                      value = value.replace(/[\s,]*0+$/, '');
                       setNewItem((v) => ({ ...v, ingredientsEn: value }));
                     }}
                     onBlur={(e) => {
                       let value = e.target.value.trim();
-                      // Remove trailing 0 and clean up
-                      value = value.replace(/0+$/, '').trim();
+                      // Remove all trailing zeros, spaces, and commas
+                      value = value.replace(/[\s,]*0+[\s,]*$/, '').trim();
+                      // Clean up multiple commas
+                      value = value.replace(/,\s*,/g, ',').replace(/^,|,$/g, '');
                       setNewItem((v) => ({ ...v, ingredientsEn: value }));
                     }}
                     className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
@@ -1998,16 +1998,16 @@ export default function DashboardPage() {
                     value={newItem.allergensEn}
                     onChange={(e) => {
                       let value = e.target.value;
-                      // Remove trailing 0
-                      if (value.endsWith('0') && value.length > 1) {
-                        value = value.slice(0, -1);
-                      }
+                      // Remove trailing 0 immediately (even if followed by spaces or commas)
+                      value = value.replace(/[\s,]*0+$/, '');
                       setNewItem((v) => ({ ...v, allergensEn: value }));
                     }}
                     onBlur={(e) => {
                       let value = e.target.value.trim();
-                      // Remove trailing 0 and clean up
-                      value = value.replace(/0+$/, '').trim();
+                      // Remove all trailing zeros, spaces, and commas
+                      value = value.replace(/[\s,]*0+[\s,]*$/, '').trim();
+                      // Clean up multiple commas
+                      value = value.replace(/,\s*,/g, ',').replace(/^,|,$/g, '');
                       setNewItem((v) => ({ ...v, allergensEn: value }));
                     }}
                     className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
