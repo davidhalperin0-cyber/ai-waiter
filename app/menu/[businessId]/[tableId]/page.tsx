@@ -166,11 +166,45 @@ function CustomerMenuPageContent({
   );
 
   // Check session validity on page load and periodically
+  // CRITICAL: Check session directly from localStorage on page load to catch expiration
+  // even if the phone was closed and reopened after 1 hour
   useEffect(() => {
-    if (!session) return;
+    // Check session from localStorage immediately on page load
+    const checkSessionFromStorage = () => {
+      if (typeof window === 'undefined') return false;
+      
+      const storageKey = `session_${businessId}_${tableId}`;
+      const stored = localStorage.getItem(storageKey);
+      
+      if (!stored) return false;
+      
+      try {
+        const parsed = JSON.parse(stored);
+        const now = Date.now();
+        const sessionAge = now - parsed.sessionStart;
+        const maxAge = 60 * 60 * 1000; // 1 hour
+        
+        if (sessionAge >= maxAge) {
+          // Session expired - remove it and return true (expired)
+          localStorage.removeItem(storageKey);
+          return true;
+        }
+        
+        return false; // Session is valid
+      } catch (e) {
+        return false;
+      }
+    };
     
-    // Check immediately
-    if (isSessionValid && !isSessionValid()) {
+    // Check immediately on page load
+    if (checkSessionFromStorage()) {
+      setSessionExpired(true);
+      toast.error('הקישור פג תוקף. אנא סרוק את קוד ה-QR מחדש כדי להזמין.');
+      return;
+    }
+    
+    // Also check using the session from state if available
+    if (session && isSessionValid && !isSessionValid()) {
       setSessionExpired(true);
       toast.error('הקישור פג תוקף. אנא סרוק את קוד ה-QR מחדש כדי להזמין.');
       return;
@@ -178,14 +212,22 @@ function CustomerMenuPageContent({
     
     // Check every 10 seconds to catch expiration
     const interval = setInterval(() => {
-      if (isSessionValid && !isSessionValid()) {
+      // Check from localStorage first (more reliable)
+      if (checkSessionFromStorage()) {
+        setSessionExpired(true);
+        toast.error('הקישור פג תוקף. אנא סרוק את קוד ה-QR מחדש כדי להזמין.');
+        return;
+      }
+      
+      // Also check using the session from state if available
+      if (session && isSessionValid && !isSessionValid()) {
         setSessionExpired(true);
         toast.error('הקישור פג תוקף. אנא סרוק את קוד ה-QR מחדש כדי להזמין.');
       }
     }, 10000); // Check every 10 seconds
     
     return () => clearInterval(interval);
-  }, [session, isSessionValid]);
+  }, [session, isSessionValid, businessId, tableId]);
 
   useEffect(() => {
     async function loadData(showLoading = true) {

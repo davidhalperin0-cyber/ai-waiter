@@ -164,6 +164,51 @@ function ChatPageContent({
   const [fullMenuItems, setFullMenuItems] = useState<MenuItemLite[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Check session validity on page load
+  // CRITICAL: Check session directly from localStorage on page load to catch expiration
+  // even if the phone was closed and reopened after 1 hour
+  useEffect(() => {
+    // Check session from localStorage immediately on page load
+    const checkSessionFromStorage = () => {
+      if (typeof window === 'undefined') return false;
+      
+      const storageKey = `session_${businessId}_${tableId}`;
+      const stored = localStorage.getItem(storageKey);
+      
+      if (!stored) return false;
+      
+      try {
+        const parsed = JSON.parse(stored);
+        const now = Date.now();
+        const sessionAge = now - parsed.sessionStart;
+        const maxAge = 60 * 60 * 1000; // 1 hour
+        
+        if (sessionAge >= maxAge) {
+          // Session expired - remove it and return true (expired)
+          localStorage.removeItem(storageKey);
+          return true;
+        }
+        
+        return false; // Session is valid
+      } catch (e) {
+        return false;
+      }
+    };
+    
+    // Check immediately on page load
+    if (checkSessionFromStorage()) {
+      setSessionExpired(true);
+      toast.error('הקישור פג תוקף. אנא סרוק את קוד ה-QR מחדש כדי להזמין.');
+      return;
+    }
+    
+    // Also check using the session from state if available
+    if (session && isSessionValid && !isSessionValid()) {
+      setSessionExpired(true);
+      toast.error('הקישור פג תוקף. אנא סרוק את קוד ה-QR מחדש כדי להזמין.');
+    }
+  }, [session, isSessionValid, businessId, tableId]);
+
   useEffect(() => {
     async function loadData() {
       try {
@@ -473,7 +518,41 @@ function ChatPageContent({
   async function sendMessageWithText(messageText: string) {
     if (!messageText.trim() || loading) return;
 
-    // Check if session is still valid
+    // Check if session is still valid - check from localStorage first (more reliable)
+    const checkSessionFromStorage = () => {
+      if (typeof window === 'undefined') return false;
+      
+      const storageKey = `session_${businessId}_${tableId}`;
+      const stored = localStorage.getItem(storageKey);
+      
+      if (!stored) return false;
+      
+      try {
+        const parsed = JSON.parse(stored);
+        const now = Date.now();
+        const sessionAge = now - parsed.sessionStart;
+        const maxAge = 60 * 60 * 1000; // 1 hour
+        
+        if (sessionAge >= maxAge) {
+          // Session expired - remove it and return true (expired)
+          localStorage.removeItem(storageKey);
+          return true;
+        }
+        
+        return false; // Session is valid
+      } catch (e) {
+        return false;
+      }
+    };
+    
+    // Check from localStorage first
+    if (checkSessionFromStorage()) {
+      toast.error('הקישור פג תוקף. אנא סרוק את קוד ה-QR מחדש כדי להזמין.');
+      setSessionExpired(true);
+      return;
+    }
+    
+    // Also check using the session from state if available
     if (!isSessionValid || !isSessionValid()) {
       toast.error('הקישור פג תוקף. אנא סרוק את קוד ה-QR מחדש כדי להזמין.');
       setSessionExpired(true);
