@@ -711,14 +711,26 @@ export default function DashboardPage() {
   // Helper function to clean trailing 0s from text fields
   function cleanTextField(value: string): string {
     if (!value) return '';
-    // Remove trailing 0s after letters/words (like "מורנו0" -> "מורנו")
-    // Remove trailing spaces, commas, and 0s
-    return value
-      .replace(/([^\d\s,])0+([\s,]*$)/g, '$1$2')
-      .replace(/[\s,]*0+[\s,]*$/g, '')
-      .replace(/\s*,\s*,/g, ',') // Remove multiple commas
-      .replace(/\s+/g, ' ') // Normalize spaces
-      .trim();
+    // More aggressive cleaning: remove 0 that appears after any non-digit character
+    // This handles cases like "מלח0", "פול, לימון, מלח0", etc.
+    let cleaned = value;
+    
+    // First, split by comma to clean each item separately
+    const parts = cleaned.split(',').map(part => {
+      // Remove trailing 0s from each part (even if attached to a word)
+      return part.replace(/([^\d])0+$/g, '$1').trim();
+    });
+    
+    // Join back and clean up
+    cleaned = parts.join(', ');
+    
+    // Remove any remaining trailing 0s, spaces, or commas
+    cleaned = cleaned.replace(/[\s,]*0+[\s,]*$/g, '');
+    cleaned = cleaned.replace(/\s*,\s*,/g, ','); // Remove multiple commas
+    cleaned = cleaned.replace(/\s+/g, ' '); // Normalize spaces
+    cleaned = cleaned.replace(/^,|,$/g, ''); // Remove leading/trailing commas
+    
+    return cleaned.trim();
   }
 
   async function handleAddItem(e: React.FormEvent) {
@@ -1824,10 +1836,12 @@ export default function DashboardPage() {
                     value={newItem.ingredients}
                     onChange={(e) => {
                       let value = e.target.value;
-                      // Remove any 0 at the end, even if it's attached to a word (like "word0" -> "word")
-                      // This regex matches: any character that's not a digit, followed by one or more zeros at the end
-                      value = value.replace(/([^\d\s,])0+([\s,]*$)/g, '$1$2');
-                      // Also remove standalone 0 at the end (with optional spaces/commas before it)
+                      // Clean each part separately (split by comma)
+                      const parts = value.split(',').map(part => {
+                        return part.replace(/([^\d])0+$/g, '$1').trim();
+                      });
+                      value = parts.join(', ');
+                      // Remove any remaining trailing 0s
                       value = value.replace(/[\s,]*0+[\s,]*$/g, '');
                       setNewItem((v) => ({ ...v, ingredients: value }));
                     }}
@@ -1854,10 +1868,12 @@ export default function DashboardPage() {
                     value={newItem.allergens}
                     onChange={(e) => {
                       let value = e.target.value;
-                      // Remove any 0 at the end, even if it's attached to a word (like "word0" -> "word")
-                      // This regex matches: any character that's not a digit, followed by one or more zeros at the end
-                      value = value.replace(/([^\d\s,])0+([\s,]*$)/g, '$1$2');
-                      // Also remove standalone 0 at the end (with optional spaces/commas before it)
+                      // Clean each part separately (split by comma)
+                      const parts = value.split(',').map(part => {
+                        return part.replace(/([^\d])0+$/g, '$1').trim();
+                      });
+                      value = parts.join(', ');
+                      // Remove any remaining trailing 0s
                       value = value.replace(/[\s,]*0+[\s,]*$/g, '');
                       setNewItem((v) => ({ ...v, allergens: value }));
                     }}
@@ -1895,10 +1911,12 @@ export default function DashboardPage() {
                     value={newItem.ingredientsEn}
                     onChange={(e) => {
                       let value = e.target.value;
-                      // Remove any 0 at the end, even if it's attached to a word (like "word0" -> "word")
-                      // This regex matches: any character that's not a digit, followed by one or more zeros at the end
-                      value = value.replace(/([^\d\s,])0+([\s,]*$)/g, '$1$2');
-                      // Also remove standalone 0 at the end (with optional spaces/commas before it)
+                      // Clean each part separately (split by comma)
+                      const parts = value.split(',').map(part => {
+                        return part.replace(/([^\d])0+$/g, '$1').trim();
+                      });
+                      value = parts.join(', ');
+                      // Remove any remaining trailing 0s
                       value = value.replace(/[\s,]*0+[\s,]*$/g, '');
                       setNewItem((v) => ({ ...v, ingredientsEn: value }));
                     }}
@@ -1936,10 +1954,12 @@ export default function DashboardPage() {
                     value={newItem.allergensEn}
                     onChange={(e) => {
                       let value = e.target.value;
-                      // Remove any 0 at the end, even if it's attached to a word (like "word0" -> "word")
-                      // This regex matches: any character that's not a digit, followed by one or more zeros at the end
-                      value = value.replace(/([^\d\s,])0+([\s,]*$)/g, '$1$2');
-                      // Also remove standalone 0 at the end (with optional spaces/commas before it)
+                      // Clean each part separately (split by comma)
+                      const parts = value.split(',').map(part => {
+                        return part.replace(/([^\d])0+$/g, '$1').trim();
+                      });
+                      value = parts.join(', ');
+                      // Remove any remaining trailing 0s
                       value = value.replace(/[\s,]*0+[\s,]*$/g, '');
                       setNewItem((v) => ({ ...v, allergensEn: value }));
                     }}
