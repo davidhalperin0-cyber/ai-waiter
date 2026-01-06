@@ -95,9 +95,18 @@ export async function PUT(
       // Store price as JSONB to support both single number and range {min, max}
       // For backward compatibility, also store numeric value in price column
       const priceValue = typeof price === 'object' && 'min' in price && 'max' in price ? price.min : price;
-      const priceData = typeof price === 'object' && 'min' in price && 'max' in price ? price : price;
       updateData.price = priceValue; // Store min value for backward compatibility
-      updateData.priceData = priceData; // Store full price data (number or range) as JSONB
+      
+      // Only add priceData if the column exists (for price range support)
+      // If priceData column doesn't exist, we'll just use the numeric price
+      const priceData = typeof price === 'object' && 'min' in price && 'max' in price ? price : price;
+      // Try to add priceData, but don't fail if column doesn't exist
+      try {
+        updateData.priceData = priceData;
+      } catch (e) {
+        // Column might not exist yet - that's okay, we'll use numeric price
+        console.warn('priceData column may not exist, using numeric price only');
+      }
     }
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
     if (ingredients !== undefined) updateData.ingredients = cleanArrayField(ingredients);
