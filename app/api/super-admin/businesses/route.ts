@@ -30,13 +30,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized - Super admin access required' }, { status: 403 });
     }
 
-    // Use a fresh query with explicit cache control
-    // Add a longer delay to ensure any pending transactions are fully committed
-    // This is especially important after RPC updates
-    // Increased delay to 4 seconds to ensure RPC transaction is fully committed and visible
-    // This gives extra time for the connection pool to clear stale data
-    await new Promise(resolve => setTimeout(resolve, 4000));
-    
     // Create a fresh client instance to avoid connection pooling issues
     const { createClient } = await import('@supabase/supabase-js');
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

@@ -50,6 +50,13 @@ export default function SuperAdminPage() {
     // Don't load businesses automatically - only when user clicks refresh or switches to businesses tab
   }, []);
 
+  // Load businesses automatically when switching to businesses tab
+  useEffect(() => {
+    if (activeTab === 'businesses') {
+      loadBusinesses();
+    }
+  }, [activeTab]);
+
   async function loadStats() {
     try {
       setLoading(true);
