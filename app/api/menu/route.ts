@@ -46,6 +46,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'Database error', details: error.message }, { status: 500 });
     }
 
+    // Helper function to clean trailing 0s from array fields
+    const cleanArrayField = (arr: string[] | undefined): string[] | undefined => {
+      if (!arr || !Array.isArray(arr)) return arr;
+      return arr.map(str => {
+        // Clean each string in the array
+        const parts = str.split(',').map(part => {
+          return part.replace(/([^\d])0+$/g, '$1').trim();
+        });
+        let cleaned = parts.join(', ');
+        cleaned = cleaned.replace(/[\s,]*0+[\s,]*$/g, '');
+        cleaned = cleaned.replace(/\s*,\s*,/g, ',').replace(/\s+/g, ' ').trim();
+        cleaned = cleaned.replace(/^,|,$/g, '');
+        return cleaned;
+      }).filter(Boolean);
+    };
+
     // Map DB columns to frontend fields
     const mappedItems = items?.map((item: any) => ({
       ...item,
@@ -61,8 +77,11 @@ export async function GET(req: NextRequest) {
       // English fields (may be null / missing)
       categoryEn: item.category_en || undefined,
       nameEn: item.name_en || undefined,
-      ingredientsEn: item.ingredients_en || undefined,
-      allergensEn: item.allergens_en || undefined,
+      // Clean ingredients and allergens arrays from trailing 0s
+      ingredients: cleanArrayField(item.ingredients),
+      allergens: cleanArrayField(item.allergens),
+      ingredientsEn: cleanArrayField(item.ingredients_en),
+      allergensEn: cleanArrayField(item.allergens_en),
     })) || [];
 
     return NextResponse.json({ items: mappedItems }, { status: 200 });
@@ -99,14 +118,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
     }
 
+    // Helper function to clean trailing 0s from array fields
+    const cleanArrayField = (arr: string[] | undefined): string[] | undefined => {
+      if (!arr || !Array.isArray(arr)) return arr;
+      return arr.map(str => {
+        // Clean each string in the array
+        const parts = str.split(',').map(part => {
+          return part.replace(/([^\d])0+$/g, '$1').trim();
+        });
+        let cleaned = parts.join(', ');
+        cleaned = cleaned.replace(/[\s,]*0+[\s,]*$/g, '');
+        cleaned = cleaned.replace(/\s*,\s*,/g, ',').replace(/\s+/g, ' ').trim();
+        cleaned = cleaned.replace(/^,|,$/g, '');
+        return cleaned;
+      }).filter(Boolean);
+    };
+
     const item: any = {
       businessId,
       category,
       name,
       price,
       imageUrl,
-      ingredients,
-      allergens,
+      ingredients: cleanArrayField(ingredients),
+      allergens: cleanArrayField(allergens),
       customizationOptions,
       is_featured: isFeatured || false,
       is_pregnancy_safe: isPregnancySafe || false,
@@ -117,10 +152,10 @@ export async function POST(req: NextRequest) {
       item.name_en = nameEn.trim();
     }
     if (ingredientsEn && Array.isArray(ingredientsEn) && ingredientsEn.length > 0) {
-      item.ingredients_en = ingredientsEn;
+      item.ingredients_en = cleanArrayField(ingredientsEn);
     }
     if (allergensEn && Array.isArray(allergensEn) && allergensEn.length > 0) {
-      item.allergens_en = allergensEn;
+      item.allergens_en = cleanArrayField(allergensEn);
     }
     if (categoryEn && categoryEn.trim()) {
       item.category_en = categoryEn.trim();

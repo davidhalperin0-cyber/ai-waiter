@@ -59,15 +59,31 @@ export async function PUT(
         (updateData as any).name_en = nameEn;
       }
     }
+    // Helper function to clean trailing 0s from array fields
+    const cleanArrayField = (arr: string[] | undefined): string[] | undefined => {
+      if (!arr || !Array.isArray(arr)) return arr;
+      return arr.map(str => {
+        // Clean each string in the array
+        const parts = str.split(',').map(part => {
+          return part.replace(/([^\d])0+$/g, '$1').trim();
+        });
+        let cleaned = parts.join(', ');
+        cleaned = cleaned.replace(/[\s,]*0+[\s,]*$/g, '');
+        cleaned = cleaned.replace(/\s*,\s*,/g, ',').replace(/\s+/g, ' ').trim();
+        cleaned = cleaned.replace(/^,|,$/g, '');
+        return cleaned;
+      }).filter(Boolean);
+    };
+
     if (price !== undefined) updateData.price = price;
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
-    if (ingredients !== undefined) updateData.ingredients = ingredients;
+    if (ingredients !== undefined) updateData.ingredients = cleanArrayField(ingredients);
     if (ingredientsEn !== undefined) {
-      (updateData as any).ingredients_en = ingredientsEn;
+      (updateData as any).ingredients_en = cleanArrayField(ingredientsEn);
     }
-    if (allergens !== undefined) updateData.allergens = allergens;
+    if (allergens !== undefined) updateData.allergens = cleanArrayField(allergens);
     if (allergensEn !== undefined) {
-      (updateData as any).allergens_en = allergensEn;
+      (updateData as any).allergens_en = cleanArrayField(allergensEn);
     }
     if (customizationOptions !== undefined) updateData.customizationOptions = customizationOptions;
     if (isFeatured !== undefined) updateData.is_featured = isFeatured;
