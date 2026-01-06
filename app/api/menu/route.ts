@@ -69,20 +69,25 @@ export async function GET(req: NextRequest) {
     // Map DB columns to frontend fields
     const mappedItems = items?.map((item: any) => {
       // Parse price - can be from priceData (JSONB) or price (numeric)
-      let price: number | { min: number; max: number } = item.price;
+      let price: number | { min: number; max: number } = item.price || 0;
       if (item.priceData) {
         // If priceData exists, use it (supports both number and range)
         try {
           const parsed = typeof item.priceData === 'string' ? JSON.parse(item.priceData) : item.priceData;
-          if (typeof parsed === 'object' && 'min' in parsed && 'max' in parsed) {
+          if (typeof parsed === 'object' && parsed !== null && 'min' in parsed && 'max' in parsed) {
             price = { min: parsed.min, max: parsed.max };
           } else if (typeof parsed === 'number') {
             price = parsed;
           }
         } catch (e) {
           // If parsing fails, fall back to numeric price
-          price = item.price;
+          console.warn('Failed to parse priceData, using numeric price:', e);
+          price = item.price || 0;
         }
+      } else if (item.priceMax !== undefined && item.priceMax !== null && item.priceMax > (item.price || 0)) {
+        // Fallback: if priceMax exists and is greater than price, it's a range
+        // This is a temporary solution until priceData column is added
+        price = { min: item.price || 0, max: item.priceMax };
       }
       
       return {
