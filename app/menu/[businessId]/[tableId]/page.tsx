@@ -1722,7 +1722,7 @@ const orderedCategories = useMemo(() => {
                           {/* Details Section - Above button */}
                           <div className="px-8 lg:px-16 pb-4">
                             {/* Full Description */}
-                            {displayIngredients && displayIngredients.length > 0 && (
+                            {displayIngredients != null && displayIngredients.length > 0 && (
                               <div className="mb-4">
                                 <h3 className="text-lg font-semibold text-white mb-2">
                                   {language === 'en' ? 'Ingredients:' : 'מרכיבים:'}
@@ -1734,7 +1734,7 @@ const orderedCategories = useMemo(() => {
                             )}
 
                             {/* Allergens */}
-                            {displayAllergens && displayAllergens.length > 0 && (
+                            {displayAllergens != null && displayAllergens.length > 0 && (
                               <div className="mb-4">
                                 <h3 className="text-lg font-semibold text-white mb-2">
                                   {language === 'en' ? 'Allergens:' : 'אלרגנים:'}
@@ -1941,50 +1941,38 @@ const orderedCategories = useMemo(() => {
                       {/* Details Section - Above button */}
                       <div className="px-6 pb-4">
                         {/* Full Description */}
-                        {(
-                          language === 'en'
+                        {(() => {
+                          const ingredients = language === 'en'
                             ? expandedItem.ingredientsEn
-                            : expandedItem.ingredients
-                        ) &&
-                          (language === 'en'
-                            ? expandedItem.ingredientsEn
-                            : expandedItem.ingredients
-                          )!.length > 0 && (
+                            : expandedItem.ingredients;
+                          return ingredients != null && ingredients.length > 0 && (
                             <div className="mb-4">
                               <h3 className="text-lg font-semibold text-white mb-2">
                                 {language === 'en' ? 'Ingredients:' : 'מרכיבים:'}
                               </h3>
                               <p className="text-base text-white/80 leading-relaxed">
-                                {(language === 'en'
-                                  ? expandedItem.ingredientsEn
-                                  : expandedItem.ingredients
-                                )!.join(', ')}
+                                {ingredients.join(', ')}
                               </p>
                             </div>
-                          )}
+                          );
+                        })()}
 
                         {/* Allergens */}
-                        {(
-                          language === 'en'
+                        {(() => {
+                          const allergens = language === 'en'
                             ? expandedItem.allergensEn
-                            : expandedItem.allergens
-                        ) &&
-                          (language === 'en'
-                            ? expandedItem.allergensEn
-                            : expandedItem.allergens
-                          )!.length > 0 && (
+                            : expandedItem.allergens;
+                          return allergens != null && allergens.length > 0 && (
                             <div className="mb-4">
                               <h3 className="text-lg font-semibold text-white mb-2">
                                 {language === 'en' ? 'Allergens:' : 'אלרגנים:'}
                               </h3>
                               <p className="text-sm text-red-300">
-                                {(language === 'en'
-                                  ? expandedItem.allergensEn
-                                  : expandedItem.allergens
-                                )!.join(', ')}
+                                {allergens.join(', ')}
                               </p>
                             </div>
-                          )}
+                          );
+                        })()}
 
                         {/* Pregnancy Safe Badge */}
                         {expandedItem.isPregnancySafe && (

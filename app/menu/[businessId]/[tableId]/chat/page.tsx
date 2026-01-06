@@ -1037,14 +1037,14 @@ function ChatPageContent({
                         </div>
                         
                         {/* Ingredients */}
-                        {m.mentionedItem.ingredients && m.mentionedItem.ingredients.length > 0 && (
+                        {m.mentionedItem.ingredients != null && m.mentionedItem.ingredients.length > 0 && (
                           <p className={menuStyle.typography.itemDescription}>
                             {m.mentionedItem.ingredients.join(', ')}
                           </p>
                         )}
                         
                         {/* Status Badges */}
-                        {(m.mentionedItem.allergens?.length || m.mentionedItem.isPregnancySafe) && (
+                        {((m.mentionedItem.allergens != null && m.mentionedItem.allergens.length > 0) || m.mentionedItem.isPregnancySafe) && (
                           <div className="flex flex-wrap gap-2 mb-4">
                             {m.mentionedItem.allergens?.map(a => (
                               <span key={a} className="text-[9px] tracking-wider uppercase text-red-300/60 border border-red-300/10 px-2 py-0.5 rounded-full bg-red-300/5">
