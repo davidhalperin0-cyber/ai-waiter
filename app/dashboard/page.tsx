@@ -1182,18 +1182,24 @@ export default function DashboardPage() {
 
     try {
       setSearchingImages(true);
-      // Use Unsplash source URLs (no API key needed, but limited)
-      // For production, you'd want to use Unsplash API with a proper key
-      const searchTerm = encodeURIComponent(query.trim());
-      const fallbackResults = Array.from({ length: 9 }, (_, i) => ({
-        id: `unsplash-${i}`,
-        url: `https://source.unsplash.com/800x600/?${searchTerm}&sig=${i}`,
-        thumbnail: `https://source.unsplash.com/300x200/?${searchTerm}&sig=${i}`,
-      }));
-      setImageSearchResults(fallbackResults);
+      
+      // Call our API endpoint for image search
+      const res = await fetch(`/api/images/search?query=${encodeURIComponent(query.trim())}`);
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.message || 'נכשל בחיפוש תמונות');
+      }
+
+      if (data.images && data.images.length > 0) {
+        setImageSearchResults(data.images);
+      } else {
+        toast.error('לא נמצאו תמונות');
+        setImageSearchResults([]);
+      }
     } catch (err: any) {
       console.error('Error searching images', err);
-      toast.error('נכשל בחיפוש תמונות');
+      toast.error(err.message || 'נכשל בחיפוש תמונות');
       setImageSearchResults([]);
     } finally {
       setSearchingImages(false);
