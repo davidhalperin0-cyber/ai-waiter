@@ -123,6 +123,7 @@ export default function DashboardPage() {
     updated_at: string | null;
   }>>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
+  const [categories, setCategories] = useState<Array<{ category: string; categoryEn?: string }>>([]);
   const [editingItem, setEditingItem] = useState<DashboardMenuItem | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
@@ -624,6 +625,53 @@ export default function DashboardPage() {
     }
   }
 
+  async function loadCategories() {
+    if (!businessId) return;
+    try {
+      const res = await fetch(`/api/menu/categories?businessId=${encodeURIComponent(businessId)}`);
+      const data = await res.json();
+      if (!res.ok) {
+        console.error('Failed to load categories', data.message);
+        return;
+      }
+      setCategories(data.categories ?? []);
+    } catch (err: any) {
+      console.error('Failed to load categories', err);
+    }
+  }
+
+  async function saveCategory() {
+    if (!businessId || !newItem.category.trim()) {
+      toast.error('נא להזין שם קטגוריה');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/menu/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessId,
+          category: newItem.category.trim(),
+          categoryEn: newItem.categoryEn?.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.message || 'נכשל בשמירת הקטגוריה');
+        return;
+      }
+
+      toast.success('הקטגוריה נשמרה בהצלחה!');
+      // Reload categories to show the new one
+      await loadCategories();
+    } catch (err: any) {
+      console.error('Failed to save category', err);
+      toast.error('נכשל בשמירת הקטגוריה');
+    }
+  }
+
   async function loadMenu() {
     if (!businessId) return;
     try {
@@ -635,6 +683,8 @@ export default function DashboardPage() {
         throw new Error(data.message || 'נכשל בטעינת התפריט');
       }
       setItems(data.items ?? []);
+      // Load categories after menu is loaded
+      await loadCategories();
     } catch (err: any) {
       setError(err.message || 'נכשל בטעינת התפריט');
     } finally {
@@ -1423,14 +1473,82 @@ export default function DashboardPage() {
             <form onSubmit={editingItem ? handleUpdateItem : handleAddItem} className="bg-neutral-900/60 backdrop-blur-sm border border-neutral-800/50 rounded-2xl p-5 lg:p-6 space-y-4 shadow-xl">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-neutral-200">קטגוריה</label>
-                  <input
-                    value={newItem.category}
-                    onChange={(e) => setNewItem((v) => ({ ...v, category: e.target.value.trim() }))}
-                    className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
-                    placeholder="למשל: עיקריות"
-                    required
-                  />
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-neutral-200">קטגוריה</label>
+                    {newItem.category.trim() && !categories.find(c => c.category === newItem.category.trim()) && (
+                      <button
+                        type="button"
+                        onClick={saveCategory}
+                        className="text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors flex items-center gap-1"
+                        title="שמור קטגוריה זו לשימוש עתידי"
+                      >
+                        💾 שמור קטגוריה
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative flex gap-2">
+                    <div className="flex-1 relative">
+                      <input
+                        type="text"
+                        list="categories-list"
+                        value={newItem.category}
+                        onChange={(e) => setNewItem((v) => ({ ...v, category: e.target.value.trim() }))}
+                        onBlur={(e) => {
+                          // When user selects from list or types, update categoryEn if it exists
+                          const trimmedValue = e.target.value.trim();
+                          const selectedCategory = categories.find(c => c.category === trimmedValue);
+                          if (selectedCategory && selectedCategory.categoryEn) {
+                            // Update categoryEn if it's empty or if the selected category has a different categoryEn
+                            if (!newItem.categoryEn || newItem.categoryEn !== selectedCategory.categoryEn) {
+                              setNewItem((v) => ({ ...v, categoryEn: selectedCategory.categoryEn || '' }));
+                            }
+                          }
+                        }}
+                        className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                        placeholder="למשל: עיקריות (או בחר מהרשימה)"
+                        required
+                      />
+                      <datalist id="categories-list">
+                        {categories.map((cat, idx) => (
+                          <option key={idx} value={cat.category}>
+                            {cat.categoryEn ? `${cat.category} (${cat.categoryEn})` : cat.category}
+                          </option>
+                        ))}
+                      </datalist>
+                    </div>
+                    {categories.length > 0 && (
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            const selectedCategory = categories.find(c => c.category === e.target.value);
+                            if (selectedCategory) {
+                              setNewItem((v) => ({ 
+                                ...v, 
+                                category: selectedCategory.category,
+                                categoryEn: selectedCategory.categoryEn || v.categoryEn
+                              }));
+                            }
+                            e.target.value = ''; // Reset select
+                          }
+                        }}
+                        className="rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-neutral-300"
+                        title="בחר קטגוריה קיימת"
+                      >
+                        <option value="">בחר...</option>
+                        {categories.map((cat, idx) => (
+                          <option key={idx} value={cat.category}>
+                            {cat.categoryEn ? `${cat.category} (${cat.categoryEn})` : cat.category}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  {categories.length > 0 && (
+                    <p className="text-xs text-neutral-400 mt-1">
+                      {categories.length} קטגוריות קיימות - בחר מהרשימה או הקלד חדשה
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -2679,11 +2797,11 @@ export default function DashboardPage() {
                   
                   // Use the printerConfig returned from the API (source of truth)
                   const savedPrinterConfig = data.printerConfig || {
-                    enabled,
-                    type,
-                    endpoint,
-                    payloadType,
-                    port,
+                      enabled,
+                      type,
+                      endpoint,
+                      payloadType,
+                      port,
                   };
                   
                   setBusinessInfo({
