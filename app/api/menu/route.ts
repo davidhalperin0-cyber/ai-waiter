@@ -247,26 +247,12 @@ export async function POST(req: NextRequest) {
       is_pregnancy_safe: isPregnancySafe || false,
     };
     
-    // Store priceMax as fallback if priceData column doesn't exist
-    // This allows us to reconstruct the range even without priceData
+    // Store priceData if it's a price range
+    // Don't add priceMax here - we'll handle it in the insert retry logic
     if (isPriceRange) {
-      // Try to add priceData first (preferred method)
-      const priceData = price;
-      try {
-        item.priceData = priceData;
-      } catch (e) {
-        // Column might not exist yet - that's okay
-        console.warn('priceData column may not exist, using priceMax fallback');
-      }
-      
-      // Also store priceMax as fallback (in case priceData column doesn't exist)
-      // This is a temporary solution until priceData migration is run
-      try {
-        item.priceMax = price.max;
-      } catch (e) {
-        // Column might not exist - that's okay, we'll try to use priceData
-        console.warn('priceMax column may not exist');
-      }
+      // Try to add priceData (preferred method)
+      // If column doesn't exist, we'll handle it in the retry logic
+      item.priceData = price;
     }
 
     // Optional English fields
