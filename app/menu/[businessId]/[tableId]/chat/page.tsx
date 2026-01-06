@@ -364,7 +364,13 @@ function ChatPageContent({
             category: item.category,
             isPregnancySafe: item.isPregnancySafe,
           }));
-          setFullMenuItems(fullMapped);
+          // Clean ingredients and allergens arrays from trailing 0s
+          const cleanedFullMapped = fullMapped.map(item => ({
+            ...item,
+            ingredients: item.ingredients ? cleanArrayField(item.ingredients) : undefined,
+            allergens: item.allergens ? cleanArrayField(item.allergens) : undefined,
+          }));
+          setFullMenuItems(cleanedFullMapped);
         }
       } catch (err) {
         console.error('Failed to load data for chat', err);
