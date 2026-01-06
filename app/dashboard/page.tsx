@@ -684,7 +684,34 @@ export default function DashboardPage() {
       if (!res.ok) {
         throw new Error(data.message || 'נכשל בטעינת התפריט');
       }
-      setItems(data.items ?? []);
+      
+      // Clean ingredients and allergens arrays from trailing 0s
+      const cleanedItems = (data.items ?? []).map((item: DashboardMenuItem) => {
+        const cleanArray = (arr: string[] | undefined): string[] | undefined => {
+          if (!arr || !Array.isArray(arr)) return arr;
+          return arr.map(str => {
+            // Clean each string in the array
+            const parts = str.split(',').map(part => {
+              return part.replace(/([^\d])0+$/g, '$1').trim();
+            });
+            let cleaned = parts.join(', ');
+            cleaned = cleaned.replace(/[\s,]*0+[\s,]*$/g, '');
+            cleaned = cleaned.replace(/\s*,\s*,/g, ',').replace(/\s+/g, ' ').trim();
+            cleaned = cleaned.replace(/^,|,$/g, '');
+            return cleaned;
+          }).filter(Boolean);
+        };
+        
+        return {
+          ...item,
+          ingredients: cleanArray(item.ingredients),
+          allergens: cleanArray(item.allergens),
+          ingredientsEn: cleanArray(item.ingredientsEn),
+          allergensEn: cleanArray(item.allergensEn),
+        };
+      });
+      
+      setItems(cleanedItems);
       // Load categories after menu is loaded
       await loadCategories();
     } catch (err: any) {
