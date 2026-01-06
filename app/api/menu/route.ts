@@ -16,33 +16,45 @@ export async function GET(req: NextRequest) {
 
     // Try to select all columns using select('*')
     // This will work even if some optional columns don't exist
+    // First try without sortOrder to avoid errors if column doesn't exist
     let { data: items, error } = await supabaseAdmin
       .from('menuItems')
       .select('*')
       .eq('businessId', businessId)
-      .order('sortOrder', { ascending: true, nullsFirst: false })
       .order('is_featured', { ascending: false })
       .order('name', { ascending: true });
 
-    // If error suggests missing sortOrder column, retry without it
-    if (error && (error.message?.toLowerCase().includes('sortorder') || error.message?.toLowerCase().includes('column') && error.message?.toLowerCase().includes('does not exist'))) {
-      console.warn('sortOrder or other column may not exist, retrying without sortOrder:', error.message);
-      const retry = await supabaseAdmin
+    // If no error, try to add sortOrder ordering
+    if (!error && items) {
+      // Check if sortOrder column exists by trying to order by it
+      const testOrder = await supabaseAdmin
         .from('menuItems')
         .select('*')
         .eq('businessId', businessId)
+        .order('sortOrder', { ascending: true, nullsFirst: false })
         .order('is_featured', { ascending: false })
-        .order('name', { ascending: true });
+        .order('name', { ascending: true })
+        .limit(1);
       
-      if (retry.error) {
-        console.error('Error fetching menu items (retry)', retry.error);
-        return NextResponse.json({ message: 'Database error', details: retry.error.message }, { status: 500 });
+      if (!testOrder.error) {
+        // sortOrder exists, use it
+        const { data: sortedItems } = await supabaseAdmin
+          .from('menuItems')
+          .select('*')
+          .eq('businessId', businessId)
+          .order('sortOrder', { ascending: true, nullsFirst: false })
+          .order('is_featured', { ascending: false })
+          .order('name', { ascending: true });
+        
+        if (sortedItems) {
+          items = sortedItems;
+        }
       }
-      
-      items = retry.data;
-      error = null;
-    } else if (error) {
+    }
+
+    if (error) {
       console.error('Error fetching menu items', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
       return NextResponse.json({ message: 'Database error', details: error.message }, { status: 500 });
     }
 
