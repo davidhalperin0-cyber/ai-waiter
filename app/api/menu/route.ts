@@ -178,7 +178,8 @@ export async function POST(req: NextRequest) {
 
     // Store price as JSONB to support both single number and range {min, max}
     // For backward compatibility, also store numeric value in price column
-    const priceValue = typeof price === 'object' && 'min' in price && 'max' in price ? price.min : price;
+    const isPriceRange = typeof price === 'object' && 'min' in price && 'max' in price;
+    const priceValue = isPriceRange ? price.min : price;
     
     const item: any = {
       businessId,
@@ -193,15 +194,26 @@ export async function POST(req: NextRequest) {
       is_pregnancy_safe: isPregnancySafe || false,
     };
     
-    // Only add priceData if the column exists (for price range support)
-    // If priceData column doesn't exist, we'll just use the numeric price
-    const priceData = typeof price === 'object' && 'min' in price && 'max' in price ? price : price;
-    // Try to add priceData, but don't fail if column doesn't exist
-    try {
-      item.priceData = priceData;
-    } catch (e) {
-      // Column might not exist yet - that's okay, we'll use numeric price
-      console.warn('priceData column may not exist, using numeric price only');
+    // Store priceMax as fallback if priceData column doesn't exist
+    // This allows us to reconstruct the range even without priceData
+    if (isPriceRange) {
+      // Try to add priceData first (preferred method)
+      const priceData = price;
+      try {
+        item.priceData = priceData;
+      } catch (e) {
+        // Column might not exist yet - that's okay
+        console.warn('priceData column may not exist, using priceMax fallback');
+      }
+      
+      // Also store priceMax as fallback (in case priceData column doesn't exist)
+      // This is a temporary solution until priceData migration is run
+      try {
+        item.priceMax = price.max;
+      } catch (e) {
+        // Column might not exist - that's okay, we'll try to use priceData
+        console.warn('priceMax column may not exist');
+      }
     }
 
     // Optional English fields
@@ -265,6 +277,7 @@ export async function POST(req: NextRequest) {
         delete itemFallback.allergens_en;
         delete itemFallback.sortOrder;
         delete itemFallback.priceData; // Remove priceData if column doesn't exist
+        delete itemFallback.priceMax; // Remove priceMax if column doesn't exist
 
         const retry = await supabaseAdmin.from('menuItems').insert(itemFallback);
 
