@@ -46,6 +46,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'Database error', details: error.message }, { status: 500 });
     }
 
+    // Ensure items is an array
+    if (!items || !Array.isArray(items)) {
+      console.warn('No items returned from database or items is not an array');
+      return NextResponse.json({ items: [] }, { status: 200 });
+    }
+
     // Helper function to clean trailing 0s from array fields
     const cleanArrayField = (arr: string[] | undefined): string[] | undefined => {
       if (!arr || !Array.isArray(arr)) return undefined;
@@ -67,7 +73,7 @@ export async function GET(req: NextRequest) {
     };
 
     // Map DB columns to frontend fields
-    const mappedItems = items?.map((item: any) => {
+    const mappedItems = items.map((item: any) => {
       try {
         // Parse price - can be from priceData (JSONB) or price (numeric)
         let price: number | { min: number; max: number } = item.price || 0;
