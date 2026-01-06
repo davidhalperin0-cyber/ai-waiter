@@ -1824,9 +1824,11 @@ export default function DashboardPage() {
                     value={newItem.ingredients}
                     onChange={(e) => {
                       let value = e.target.value;
-                      // Remove any trailing 0 (even if it's part of a word or after spaces/commas)
-                      // Match: 0 at the end, optionally preceded by spaces or commas
-                      value = value.replace(/[\s,]*0+$/, '');
+                      // Remove any 0 at the end, even if it's attached to a word (like "word0" -> "word")
+                      // This regex matches: any character that's not a digit, followed by one or more zeros at the end
+                      value = value.replace(/([^\d\s,])0+([\s,]*$)/g, '$1$2');
+                      // Also remove standalone 0 at the end (with optional spaces/commas before it)
+                      value = value.replace(/[\s,]*0+[\s,]*$/g, '');
                       setNewItem((v) => ({ ...v, ingredients: value }));
                     }}
                     onBlur={(e) => {
@@ -1852,8 +1854,11 @@ export default function DashboardPage() {
                     value={newItem.allergens}
                     onChange={(e) => {
                       let value = e.target.value;
-                      // Remove any trailing 0 (even if it's part of a word or after spaces/commas)
-                      value = value.replace(/[\s,]*0+$/, '');
+                      // Remove any 0 at the end, even if it's attached to a word (like "word0" -> "word")
+                      // This regex matches: any character that's not a digit, followed by one or more zeros at the end
+                      value = value.replace(/([^\d\s,])0+([\s,]*$)/g, '$1$2');
+                      // Also remove standalone 0 at the end (with optional spaces/commas before it)
+                      value = value.replace(/[\s,]*0+[\s,]*$/g, '');
                       setNewItem((v) => ({ ...v, allergens: value }));
                     }}
                     onBlur={(e) => {
@@ -1890,8 +1895,11 @@ export default function DashboardPage() {
                     value={newItem.ingredientsEn}
                     onChange={(e) => {
                       let value = e.target.value;
-                      // Remove any trailing 0 (even if it's part of a word or after spaces/commas)
-                      value = value.replace(/[\s,]*0+$/, '');
+                      // Remove any 0 at the end, even if it's attached to a word (like "word0" -> "word")
+                      // This regex matches: any character that's not a digit, followed by one or more zeros at the end
+                      value = value.replace(/([^\d\s,])0+([\s,]*$)/g, '$1$2');
+                      // Also remove standalone 0 at the end (with optional spaces/commas before it)
+                      value = value.replace(/[\s,]*0+[\s,]*$/g, '');
                       setNewItem((v) => ({ ...v, ingredientsEn: value }));
                     }}
                     onBlur={(e) => {
@@ -1928,8 +1936,11 @@ export default function DashboardPage() {
                     value={newItem.allergensEn}
                     onChange={(e) => {
                       let value = e.target.value;
-                      // Remove any trailing 0 (even if it's part of a word or after spaces/commas)
-                      value = value.replace(/[\s,]*0+$/, '');
+                      // Remove any 0 at the end, even if it's attached to a word (like "word0" -> "word")
+                      // This regex matches: any character that's not a digit, followed by one or more zeros at the end
+                      value = value.replace(/([^\d\s,])0+([\s,]*$)/g, '$1$2');
+                      // Also remove standalone 0 at the end (with optional spaces/commas before it)
+                      value = value.replace(/[\s,]*0+[\s,]*$/g, '');
                       setNewItem((v) => ({ ...v, allergensEn: value }));
                     }}
                     onBlur={(e) => {
