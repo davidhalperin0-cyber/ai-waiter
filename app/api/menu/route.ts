@@ -16,9 +16,10 @@ export async function GET(req: NextRequest) {
 
     // Try to select all columns including isBusiness
     // Try with sortOrder first, but fallback if column doesn't exist
+    // Explicitly select columns to avoid issues with missing columns
     let { data: items, error } = await supabaseAdmin
       .from('menuItems')
-      .select('*')
+      .select('id, businessId, category, category_en, name, name_en, imageUrl, price, priceData, priceMax, ingredients, ingredients_en, allergens, allergens_en, customizationOptions, is_featured, is_pregnancy_safe, isBusiness, isHidden, sortOrder, createdAt')
       .eq('businessId', businessId)
       .order('sortOrder', { ascending: true, nullsFirst: false })
       .order('is_featured', { ascending: false })
