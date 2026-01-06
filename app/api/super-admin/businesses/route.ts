@@ -30,43 +30,24 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized - Super admin access required' }, { status: 403 });
     }
 
-    // Create a fresh client instance to avoid connection pooling issues
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    
-    if (!supabaseUrl || !serviceRoleKey) {
-      return NextResponse.json(
-        { message: 'Database configuration error' },
-        { status: 500 },
-      );
-    }
-    
-    const freshClient = createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        persistSession: false,
-      },
-      db: {
-        schema: 'public',
-      },
-      global: {
-        headers: {
-          'x-client-info': 'super-admin-fresh-client',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-        },
-      },
-    });
-    
-    // Don't use RPC for reading - it has the same connection pooling issues
-    // Instead, we'll rely on the delay and fresh client to get the latest data
-    // The RPC read was returning stale data even with the updated function
-    
+    // Use supabaseAdmin directly - it already uses service role key which bypasses RLS
     // Use a direct query with explicit ordering to ensure we get fresh data
-    // The 3-second delay should be enough for the RPC transaction to be fully committed
-    const { data: businesses, error } = await freshClient
+    // Order by createdAt DESC, but also include businesses without createdAt (NULLS LAST)
+    const { data: businesses, error } = await supabaseAdmin
       .from('businesses')
       .select('businessId, name, type, email, isEnabled, subscription, createdAt')
-      .order('createdAt', { ascending: false });
+      .order('createdAt', { ascending: false, nullsFirst: false });
+
+    // Log all businesses for debugging
+    console.log('🔍 GET /api/super-admin/businesses - Total businesses found:', businesses?.length || 0);
+    if (businesses && businesses.length > 0) {
+      console.log('🔍 First 3 businesses:', businesses.slice(0, 3).map((b: any) => ({
+        businessId: b.businessId,
+        name: b.name,
+        email: b.email,
+        createdAt: b.createdAt,
+      })));
+    }
 
     // Log raw data from DB
     const targetBusinessRaw = businesses?.find((b: any) => b.businessId === 'b72bca1a-7fd3-470d-998e-971785f30ab4');

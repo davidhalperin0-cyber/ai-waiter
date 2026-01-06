@@ -3,6 +3,7 @@ import { Business } from '@/lib/types';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { signAuthToken } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
@@ -64,13 +65,21 @@ export async function POST(req: NextRequest) {
       .select();
 
     if (insertError) {
-      console.error('Error inserting business', insertError);
+      console.error('❌ Error inserting business', insertError);
       console.error('Business data attempted:', JSON.stringify(business, null, 2));
       return NextResponse.json(
         { message: 'Database error', error: insertError.message },
         { status: 500 },
       );
     }
+
+    console.log('✅ Business created successfully:', {
+      businessId: insertedData?.[0]?.businessId,
+      name: insertedData?.[0]?.name,
+      email: insertedData?.[0]?.email,
+      isEnabled: insertedData?.[0]?.isEnabled,
+      createdAt: insertedData?.[0]?.createdAt,
+    });
 
     // TODO: create default tables/menu if needed
 
