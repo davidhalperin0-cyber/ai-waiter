@@ -514,26 +514,96 @@ function HomePageContent({
                             existingFallback.remove();
                           }
                           const fallback = document.createElement('h1');
-                          fallback.className = 'logo-fallback text-4xl md:text-5xl font-semibold tracking-tight text-white uppercase';
-                          fallback.style.fontFamily = 'var(--font-sans), system-ui, -apple-system, sans-serif';
-                          fallback.textContent = displayBusinessName;
+                          fallback.className = 'logo-fallback text-5xl md:text-6xl font-light tracking-[0.15em] uppercase';
+                          fallback.style.fontFamily = 'system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif';
+                          fallback.style.letterSpacing = '0.15em';
+                          fallback.style.color = '#FFFFFF';
+                          fallback.style.fontWeight = '300';
+                          fallback.style.textShadow = '0 1px 2px rgba(0, 0, 0, 0.1)';
+                          
+                          // Create spans for each character with accent on first letter
+                          displayBusinessName.split('').forEach((char, index) => {
+                            const isFirstLetter = index === 0;
+                            const accentColor = '#F5D76E';
+                            const span = document.createElement('span');
+                            span.style.color = isFirstLetter ? accentColor : 'inherit';
+                            span.style.fontWeight = isFirstLetter ? '400' : '300';
+                            span.textContent = char === ' ' ? '\u00A0' : char;
+                            fallback.appendChild(span);
+                          });
+                          
                           parent.appendChild(fallback);
                         }
                       }}
                     />
                   </motion.div>
                 ) : (
-                  <motion.h1 
+                  <motion.div
                     key={`name-${displayBusinessName}-${language}`}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2, ease: 'easeInOut' }}
-                    className="text-4xl md:text-5xl font-semibold tracking-tight text-white uppercase"
-                    style={{ fontFamily: 'var(--font-sans), system-ui, -apple-system, sans-serif' }}
+                    transition={{ 
+                      duration: 0.5, 
+                      ease: [0.25, 0.1, 0.25, 1]
+                    }}
+                    className="relative"
                   >
-                    {displayBusinessName}
-                  </motion.h1>
+                    {/* Subtle premium glow - very minimal */}
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ 
+                        duration: 0.6,
+                        delay: 0.2
+                      }}
+                      className="absolute inset-0 blur-xl bg-gradient-to-r from-transparent via-white/5 to-transparent -z-10"
+                    />
+                    
+                    <motion.h1
+                      initial={{ opacity: 0, filter: 'blur(8px)' }}
+                      animate={{ opacity: 1, filter: 'blur(0px)' }}
+                      exit={{ opacity: 0 }}
+                      transition={{ 
+                        duration: 0.5,
+                        ease: [0.25, 0.1, 0.25, 1]
+                      }}
+                      className="text-5xl md:text-6xl font-light tracking-[0.15em] uppercase relative z-10"
+                      style={{ 
+                        fontFamily: 'system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif',
+                        letterSpacing: '0.15em',
+                        color: '#FFFFFF',
+                        fontWeight: 300,
+                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                      }}
+                    >
+                      {displayBusinessName.split('').map((char, index) => {
+                        // Add subtle gold accent to first letter for premium feel
+                        const isFirstLetter = index === 0;
+                        const accentColor = '#F5D76E';
+                        
+                        return (
+                          <motion.span
+                            key={index}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{
+                              duration: 0.3,
+                              delay: 0.1 + (index * 0.02),
+                              ease: [0.25, 0.1, 0.25, 1]
+                            }}
+                            className="inline-block"
+                            style={{
+                              color: isFirstLetter ? accentColor : 'inherit',
+                              fontWeight: isFirstLetter ? 400 : 300,
+                            }}
+                          >
+                            {char === ' ' ? '\u00A0' : char}
+                          </motion.span>
+                        );
+                      })}
+                    </motion.h1>
+                  </motion.div>
                 )}
               </AnimatePresence>
             </div>

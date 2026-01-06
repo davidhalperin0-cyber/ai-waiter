@@ -695,29 +695,56 @@ const orderedCategories = useMemo(() => {
   const template = (businessInfo?.template || 'generic') as string;
   
   // Fixed menu style (removed menuStyle system)
+  // Modern premium styling for bar-classic theme
+  const isBarClassic = template === 'bar-classic';
+  
   const menuStyle = {
     card: {
-      base: 'flex flex-col rounded-[2.5rem] border border-white/10 bg-white/[0.03] backdrop-blur-xl p-5 transition-all duration-700 cursor-pointer',
-      image: 'w-full h-56 rounded-[2rem] overflow-hidden bg-white/5 border border-white/5 mb-4 shadow-2xl flex-shrink-0',
-      hover: 'hover:bg-white/[0.06] hover:border-white/20 hover:-translate-y-1',
+      base: isBarClassic 
+        ? 'flex flex-col rounded-[2.5rem] border border-white/5 bg-white/[0.02] backdrop-blur-xl p-5 transition-all duration-700 cursor-pointer'
+        : 'flex flex-col rounded-[2.5rem] border border-white/10 bg-white/[0.03] backdrop-blur-xl p-5 transition-all duration-700 cursor-pointer',
+      image: isBarClassic
+        ? 'w-full h-56 rounded-[2rem] overflow-hidden bg-white/3 border border-white/3 mb-4 shadow-2xl flex-shrink-0'
+        : 'w-full h-56 rounded-[2rem] overflow-hidden bg-white/5 border border-white/5 mb-4 shadow-2xl flex-shrink-0',
+      hover: isBarClassic
+        ? 'hover:bg-white/[0.04] hover:border-white/10 hover:-translate-y-1'
+        : 'hover:bg-white/[0.06] hover:border-white/20 hover:-translate-y-1',
       content: 'px-2',
     },
     button: {
-      primary: 'rounded-full bg-white text-black px-8 py-3 text-sm font-light tracking-widest hover:bg-neutral-200 transition-all duration-500 uppercase',
+      primary: isBarClassic
+        ? 'rounded-full bg-[#8B2635] text-[#FAF8F3] px-8 py-3 text-sm font-medium tracking-widest hover:bg-[#A02E3F] transition-all duration-500 uppercase shadow-lg'
+        : 'rounded-full bg-white text-black px-8 py-3 text-sm font-light tracking-widest hover:bg-neutral-200 transition-all duration-500 uppercase',
       category: {
-        active: 'bg-white text-black shadow-2xl scale-105',
-        inactive: 'bg-transparent border border-white/10 hover:border-white/30 text-white/60',
+        active: isBarClassic
+          ? 'bg-[#D4AF37] text-[#1a1a1a] shadow-2xl scale-105 font-medium'
+          : 'bg-white text-black shadow-2xl scale-105',
+        inactive: isBarClassic
+          ? 'bg-transparent border border-white/8 hover:border-white/15 text-[#FAF8F3]/80'
+          : 'bg-transparent border border-white/10 hover:border-white/30 text-white/60',
       },
     },
     typography: {
-      itemTitle: 'text-2xl font-light tracking-tight mb-2 text-white/95',
-      itemDescription: 'text-sm text-white/50 mb-4 leading-relaxed font-light italic',
-      price: 'text-xl font-light tracking-widest text-white/90',
-      sectionTitle: 'text-3xl font-extralight tracking-[0.2em] mb-10 text-center uppercase text-white/40',
+      itemTitle: isBarClassic
+        ? 'text-2xl font-medium tracking-tight mb-2 text-[#FAF8F3]'
+        : 'text-2xl font-light tracking-tight mb-2 text-white/95',
+      itemDescription: isBarClassic
+        ? 'text-sm text-[#FAF8F3]/60 mb-4 leading-relaxed font-light'
+        : 'text-sm text-white/50 mb-4 leading-relaxed font-light italic',
+      price: isBarClassic
+        ? 'text-xl font-medium tracking-widest text-[#D4AF37]'
+        : 'text-xl font-light tracking-widest text-white/90',
+      sectionTitle: isBarClassic
+        ? 'text-3xl font-medium tracking-[0.2em] mb-10 text-center uppercase text-[#FAF8F3]/50'
+        : 'text-3xl font-extralight tracking-[0.2em] mb-10 text-center uppercase text-white/40',
     },
     badge: {
-      featured: 'text-[10px] tracking-[0.2em] uppercase text-amber-200/80 border border-amber-200/20 px-3 py-1 rounded-full mb-2 inline-block',
-      pregnancy: 'text-[10px] tracking-[0.1em] text-emerald-200/70 border border-emerald-200/10 px-3 py-1 rounded-full inline-flex items-center gap-2',
+      featured: isBarClassic
+        ? 'text-[10px] tracking-[0.2em] uppercase text-[#D4AF37] border border-[#D4AF37]/30 px-3 py-1 rounded-full mb-2 inline-block bg-[#D4AF37]/10'
+        : 'text-[10px] tracking-[0.2em] uppercase text-amber-200/80 border border-amber-200/20 px-3 py-1 rounded-full mb-2 inline-block',
+      pregnancy: isBarClassic
+        ? 'text-[10px] tracking-[0.1em] text-emerald-300/80 border border-emerald-300/20 px-3 py-1 rounded-full inline-flex items-center gap-2 bg-emerald-300/5'
+        : 'text-[10px] tracking-[0.1em] text-emerald-200/70 border border-emerald-200/10 px-3 py-1 rounded-full inline-flex items-center gap-2',
       category: 'hidden',
     },
     spacing: {
@@ -725,10 +752,14 @@ const orderedCategories = useMemo(() => {
       sectionGap: 'mb-20',
     },
     expanded: {
-      container: 'bg-neutral-950/90 backdrop-blur-3xl border border-white/10 rounded-[3rem] overflow-hidden flex flex-col relative h-full',
+      container: isBarClassic
+        ? 'bg-[#1a1a1a]/95 backdrop-blur-3xl border border-white/5 rounded-[3rem] overflow-hidden flex flex-col relative h-full'
+        : 'bg-neutral-950/90 backdrop-blur-3xl border border-white/10 rounded-[3rem] overflow-hidden flex flex-col relative h-full',
       image: 'relative max-h-[20vh] h-[20vh] w-full grayscale-[0.2] flex-shrink-0 overflow-hidden',
       content: 'flex-1 overflow-y-auto p-10 lg:p-16 text-center min-h-0',
-      button: 'w-full rounded-full bg-white text-black py-5 text-sm font-light tracking-[0.3em] uppercase hover:tracking-[0.4em] transition-all duration-700',
+      button: isBarClassic
+        ? 'w-full rounded-full bg-[#8B2635] text-[#FAF8F3] py-5 text-sm font-medium tracking-[0.3em] uppercase hover:bg-[#A02E3F] hover:tracking-[0.4em] transition-all duration-700 shadow-lg'
+        : 'w-full rounded-full bg-white text-black py-5 text-sm font-light tracking-[0.3em] uppercase hover:tracking-[0.4em] transition-all duration-700',
     },
   };
 
@@ -803,19 +834,99 @@ const orderedCategories = useMemo(() => {
                   }}
                 />
                 {/* Fallback: show full business name if logo fails */}
-                <div className="hidden logo-fallback absolute inset-0 items-center justify-center text-2xl font-light tracking-wide">
-                  {displayBusinessName}
+                <div className="hidden logo-fallback absolute inset-0 items-center justify-center">
+                  <h1
+                    className="text-5xl lg:text-6xl font-light tracking-[0.15em] uppercase"
+                    style={{
+                      fontFamily: 'system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif',
+                      letterSpacing: '0.15em',
+                      color: isBarClassic ? '#FAF8F3' : '#FFFFFF',
+                      fontWeight: 300,
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                    }}
+                  >
+                    {displayBusinessName.split('').map((char, index) => {
+                      const isFirstLetter = index === 0;
+                      const accentColor = isBarClassic ? '#D4AF37' : '#F5D76E';
+                      
+                      return (
+                        <span
+                          key={index}
+                          style={{
+                            color: isFirstLetter ? accentColor : 'inherit',
+                            fontWeight: isFirstLetter ? 400 : 300,
+                          }}
+                        >
+                          {char === ' ' ? '\u00A0' : char}
+                        </span>
+                      );
+                    })}
+                  </h1>
                 </div>
               </motion.div>
             ) : (
               <motion.div
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-6"
+                transition={{ 
+                  duration: 0.5, 
+                  ease: [0.25, 0.1, 0.25, 1]
+                }}
+                className="mb-6 relative"
               >
-                <h1 className="text-4xl font-extralight tracking-[0.3em] uppercase opacity-90">
-                  {displayBusinessName}
-                </h1>
+                {/* Subtle premium glow - very minimal */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ 
+                    duration: 0.6,
+                    delay: 0.2
+                  }}
+                  className="absolute inset-0 blur-xl bg-gradient-to-r from-transparent via-white/5 to-transparent -z-10"
+                />
+                
+                <motion.h1
+                  initial={{ opacity: 0, filter: 'blur(8px)' }}
+                  animate={{ opacity: 1, filter: 'blur(0px)' }}
+                  transition={{ 
+                    duration: 0.5,
+                    ease: [0.25, 0.1, 0.25, 1]
+                  }}
+                  className="text-5xl lg:text-6xl font-light tracking-[0.15em] uppercase relative z-10"
+                  style={{
+                    fontFamily: 'system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif',
+                    letterSpacing: '0.15em',
+                    color: isBarClassic ? '#FAF8F3' : '#FFFFFF',
+                    fontWeight: 300,
+                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                  }}
+                >
+                  {displayBusinessName.split('').map((char, index) => {
+                    // Add subtle gold accent to first letter for premium feel
+                    const isFirstLetter = index === 0;
+                    const accentColor = isBarClassic ? '#D4AF37' : '#F5D76E';
+                    
+                    return (
+                      <motion.span
+                        key={index}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{
+                          duration: 0.3,
+                          delay: 0.1 + (index * 0.02),
+                          ease: [0.25, 0.1, 0.25, 1]
+                        }}
+                        className="inline-block"
+                        style={{
+                          color: isFirstLetter ? accentColor : 'inherit',
+                          fontWeight: isFirstLetter ? 400 : 300,
+                        }}
+                      >
+                        {char === ' ' ? '\u00A0' : char}
+                      </motion.span>
+                    );
+                  })}
+                </motion.h1>
               </motion.div>
             )}
 
@@ -826,11 +937,11 @@ const orderedCategories = useMemo(() => {
               className="space-y-1"
             >
               <div className="flex items-center justify-center gap-3">
-                <span className="h-[1px] w-8 bg-white/20" />
-                <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-medium">
+                <span className={`h-[1px] w-8 ${isBarClassic ? 'bg-[#FAF8F3]/15' : 'bg-white/20'}`} />
+                <span className={`text-[10px] uppercase tracking-[0.2em] font-medium ${isBarClassic ? 'text-[#FAF8F3]/50' : 'text-white/40'}`}>
                   {language === 'en' ? `Table ${tableId}` : `שולחן ${tableId}`}
                 </span>
-                <span className="h-[1px] w-8 bg-white/20" />
+                <span className={`h-[1px] w-8 ${isBarClassic ? 'bg-[#FAF8F3]/15' : 'bg-white/20'}`} />
               </div>
             </motion.div>
             <div className="mt-6 flex items-center justify-center gap-3">
@@ -839,8 +950,12 @@ const orderedCategories = useMemo(() => {
                 onClick={() => switchLanguage('he')}
                 className={`px-3 py-1 rounded-full text-xs font-medium border ${
                   language === 'he'
-                    ? 'bg-white text-black border-white'
-                    : 'bg-white/5 text-white/70 border-white/20'
+                    ? isBarClassic
+                      ? 'bg-[#D4AF37] text-[#1a1a1a] border-[#D4AF37]'
+                      : 'bg-white text-black border-white'
+                    : isBarClassic
+                      ? 'bg-white/5 text-[#FAF8F3]/70 border-white/8'
+                      : 'bg-white/5 text-white/70 border-white/20'
                 }`}
               >
                 עברית
@@ -850,8 +965,12 @@ const orderedCategories = useMemo(() => {
                 onClick={() => switchLanguage('en')}
                 className={`px-3 py-1 rounded-full text-xs font-medium border ${
                   language === 'en'
-                    ? 'bg-white text-black border-white'
-                    : 'bg-white/5 text-white/70 border-white/20'
+                    ? isBarClassic
+                      ? 'bg-[#D4AF37] text-[#1a1a1a] border-[#D4AF37]'
+                      : 'bg-white text-black border-white'
+                    : isBarClassic
+                      ? 'bg-white/5 text-[#FAF8F3]/70 border-white/8'
+                      : 'bg-white/5 text-white/70 border-white/20'
                 }`}
               >
                 English
@@ -963,8 +1082,12 @@ const orderedCategories = useMemo(() => {
                   <div
                     className={`px-5 py-2.5 rounded-full text-xs font-medium tracking-wider transition-all duration-500 ${
                       activeCategory === 'all'
-                        ? 'text-black z-10'
-                        : 'text-white/60 bg-white/5 border border-white/10'
+                        ? isBarClassic
+                          ? 'text-[#1a1a1a] z-10'
+                          : 'text-black z-10'
+                        : isBarClassic
+                          ? 'text-[#FAF8F3]/70 bg-white/5 border border-white/8'
+                          : 'text-white/60 bg-white/5 border border-white/10'
                     }`}
                   >
                     {language === 'en' ? 'Home' : 'עמוד הבית'}
@@ -972,7 +1095,7 @@ const orderedCategories = useMemo(() => {
                   {activeCategory === 'all' && (
                     <motion.div
                       layoutId="activeTab"
-                      className="absolute inset-0 bg-white rounded-full -z-10"
+                      className={`absolute inset-0 rounded-full -z-10 ${isBarClassic ? 'bg-[#D4AF37]' : 'bg-white'}`}
                       transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                     />
                   )}
@@ -1007,8 +1130,12 @@ const orderedCategories = useMemo(() => {
                       <div
                         className={`px-3 py-2 rounded-full text-xs font-medium tracking-wider transition-all duration-500 text-center ${
                           activeCategory === cat
-                            ? 'text-black z-10'
-                            : 'text-white/60 bg-white/5 border border-white/10'
+                            ? isBarClassic
+                              ? 'text-[#1a1a1a] z-10'
+                              : 'text-black z-10'
+                            : isBarClassic
+                              ? 'text-[#FAF8F3]/70 bg-white/5 border border-white/8'
+                              : 'text-white/60 bg-white/5 border border-white/10'
                         }`}
                       >
                         <span className="line-clamp-1">{displayCategory}</span>
@@ -1016,7 +1143,7 @@ const orderedCategories = useMemo(() => {
                       {activeCategory === cat && (
                         <motion.div
                           layoutId="activeTab"
-                          className="absolute inset-0 bg-white rounded-full -z-10"
+                          className={`absolute inset-0 rounded-full -z-10 ${isBarClassic ? 'bg-[#D4AF37]' : 'bg-white'}`}
                           transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                         />
                       )}
@@ -1030,7 +1157,11 @@ const orderedCategories = useMemo(() => {
               {orderedCategories.length > 3 && (
                 <motion.button
                   onClick={() => setCategoriesExpanded(!categoriesExpanded)}
-                  className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-full text-xs font-medium text-white/60 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                  className={`mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-full text-xs font-medium transition-colors ${
+                    isBarClassic
+                      ? 'text-[#FAF8F3]/70 bg-white/5 border border-white/8 hover:bg-white/8'
+                      : 'text-white/60 bg-white/5 border border-white/10 hover:bg-white/10'
+                  }`}
                   whileTap={{ scale: 0.95 }}
                 >
                   <span>{categoriesExpanded ? (language === 'en' ? 'Show Less' : 'הצג פחות') : (language === 'en' ? 'Show More' : 'הצג עוד')}</span>
@@ -1110,7 +1241,11 @@ const orderedCategories = useMemo(() => {
                             e.stopPropagation();
                             handleAddToCart(featuredItems[featuredIndex]);
                           }}
-                          className="rounded-full bg-white text-black px-8 py-3 text-xs font-medium uppercase tracking-[0.2em] hover:bg-neutral-200 transition-colors"
+                          className={`rounded-full px-8 py-3 text-xs font-medium uppercase tracking-[0.2em] transition-colors ${
+                            isBarClassic
+                              ? 'bg-[#8B2635] text-[#FAF8F3] hover:bg-[#A02E3F]'
+                              : 'bg-white text-black hover:bg-neutral-200'
+                          }`}
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                         >
@@ -1688,7 +1823,11 @@ const orderedCategories = useMemo(() => {
                     toast.success(`${upsellSuggestion.name} נוסף לעגלה`);
                     setUpsellSuggestion(null);
                   }}
-                  className="rounded-full bg-white text-black px-4 py-2 text-sm font-semibold hover:bg-white/90 transition flex-shrink-0"
+                  className={`rounded-full px-4 py-2 text-sm font-semibold transition flex-shrink-0 ${
+                    isBarClassic
+                      ? 'bg-[#8B2635] text-[#FAF8F3] hover:bg-[#A02E3F]'
+                      : 'bg-white text-black hover:bg-white/90'
+                  }`}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
@@ -1753,7 +1892,11 @@ const orderedCategories = useMemo(() => {
                   }}
                 >
                   <motion.div
-                    className="relative overflow-hidden rounded-full bg-white text-black py-4 px-6 flex items-center justify-center gap-3 transition-transform duration-500"
+                    className={`relative overflow-hidden rounded-full py-4 px-6 flex items-center justify-center gap-3 transition-transform duration-500 ${
+                      isBarClassic
+                        ? 'bg-[#8B2635] text-[#FAF8F3] hover:bg-[#A02E3F]'
+                        : 'bg-white text-black'
+                    }`}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >

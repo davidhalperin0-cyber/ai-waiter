@@ -4,29 +4,18 @@ import { ReactNode } from 'react';
 
 export function BarThemeClassic({ children }: { children: ReactNode }) {
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-amber-50 via-amber-100/50 to-amber-50">
-      {/* Classic wood texture pattern */}
+    <div className="relative min-h-screen bg-[#1a1a1a]">
+      {/* Modern subtle gradient overlay for depth */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[#1a1a1a] via-[#1f1f1f] to-[#1a1a1a] opacity-100" />
+      
+      {/* Subtle texture - very minimal, modern */}
       <div 
-        className="absolute inset-0 opacity-10"
+        className="absolute inset-0 opacity-[0.02]"
         style={{
-          backgroundImage: `repeating-linear-gradient(
-            45deg,
-            transparent,
-            transparent 10px,
-            rgba(139, 69, 19, 0.1) 10px,
-            rgba(139, 69, 19, 0.1) 20px
-          )`,
+          backgroundImage: `radial-gradient(circle at 2px 2px, rgba(255, 255, 255, 0.15) 1px, transparent 0)`,
+          backgroundSize: '40px 40px',
         }}
       />
-      
-      {/* Subtle vintage border */}
-      <div className="absolute inset-0 border-8 border-amber-800/20 pointer-events-none" />
-      
-      {/* Classic decorative corners */}
-      <div className="absolute top-0 left-0 w-24 h-24 border-t-4 border-l-4 border-amber-700/30" />
-      <div className="absolute top-0 right-0 w-24 h-24 border-t-4 border-r-4 border-amber-700/30" />
-      <div className="absolute bottom-0 left-0 w-24 h-24 border-b-4 border-l-4 border-amber-700/30" />
-      <div className="absolute bottom-0 right-0 w-24 h-24 border-b-4 border-r-4 border-amber-700/30" />
 
       {/* Content */}
       <div className="relative z-10">{children}</div>
