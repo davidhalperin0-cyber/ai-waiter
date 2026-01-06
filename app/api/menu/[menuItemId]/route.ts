@@ -29,7 +29,8 @@ export async function PUT(
       isPregnancySafe,
       isBusiness,
       isHidden,
-    } = body as Partial<MenuItem> & { businessId?: string; price?: number; isHidden?: boolean };
+      sortOrder,
+    } = body as Partial<MenuItem> & { businessId?: string; price?: number; isHidden?: boolean; sortOrder?: number };
 
     if (!businessId) {
       return NextResponse.json({ message: 'businessId is required' }, { status: 400 });
@@ -72,6 +73,7 @@ export async function PUT(
     if (isFeatured !== undefined) updateData.is_featured = isFeatured;
     if (isPregnancySafe !== undefined) updateData.is_pregnancy_safe = isPregnancySafe;
     if (isHidden !== undefined) updateData.isHidden = isHidden;
+    if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
     
     // Handle isBusiness separately - if column doesn't exist, skip it
     let extraUpdates: any = {};

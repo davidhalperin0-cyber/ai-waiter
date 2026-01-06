@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
       .from('menuItems')
       .select('*')
       .eq('businessId', businessId)
+      .order('sortOrder', { ascending: true, nullsFirst: false })
       .order('is_featured', { ascending: false })
       .order('name', { ascending: true });
 
@@ -44,6 +45,8 @@ export async function GET(req: NextRequest) {
       isBusiness: item.isBusiness !== undefined ? item.isBusiness : false,
       // Hidden flag (may not exist on older schemas)
       isHidden: item.isHidden !== undefined ? item.isHidden : false,
+      // Sort order (may not exist on older schemas)
+      sortOrder: item.sortOrder !== undefined ? item.sortOrder : 0,
       // English fields (may be null / missing)
       categoryEn: item.category_en || undefined,
       nameEn: item.name_en || undefined,

@@ -24,6 +24,7 @@ interface DashboardMenuItem {
   isPregnancySafe?: boolean;
   isBusiness?: boolean;
   isHidden?: boolean;
+  sortOrder?: number;
 }
 
 interface DashboardTable {
@@ -973,6 +974,84 @@ export default function DashboardPage() {
     }
   }
 
+  async function moveItemUp(item: DashboardMenuItem) {
+    if (!businessId) return;
+    const currentIndex = items.findIndex(i => i.name === item.name);
+    if (currentIndex <= 0) return; // Already at top
+
+    const prevItem = items[currentIndex - 1];
+    const currentSortOrder = item.sortOrder ?? currentIndex;
+    const prevSortOrder = prevItem.sortOrder ?? (currentIndex - 1);
+
+    try {
+      setLoading(true);
+      // Swap sort orders
+      await Promise.all([
+        fetch(`/api/menu/${encodeURIComponent(item.name)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            businessId,
+            sortOrder: prevSortOrder,
+          }),
+        }),
+        fetch(`/api/menu/${encodeURIComponent(prevItem.name)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            businessId,
+            sortOrder: currentSortOrder,
+          }),
+        }),
+      ]);
+      await loadMenu();
+    } catch (err: any) {
+      setError(err.message || 'נכשל בהזזת מנה');
+      toast.error(err.message || 'נכשל בהזזת מנה');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function moveItemDown(item: DashboardMenuItem) {
+    if (!businessId) return;
+    const currentIndex = items.findIndex(i => i.name === item.name);
+    if (currentIndex < 0 || currentIndex >= items.length - 1) return; // Already at bottom
+
+    const nextItem = items[currentIndex + 1];
+    const currentSortOrder = item.sortOrder ?? currentIndex;
+    const nextSortOrder = nextItem.sortOrder ?? (currentIndex + 1);
+
+    try {
+      setLoading(true);
+      // Swap sort orders
+      await Promise.all([
+        fetch(`/api/menu/${encodeURIComponent(item.name)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            businessId,
+            sortOrder: nextSortOrder,
+          }),
+        }),
+        fetch(`/api/menu/${encodeURIComponent(nextItem.name)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            businessId,
+            sortOrder: currentSortOrder,
+          }),
+        }),
+      ]);
+      await loadMenu();
+    } catch (err: any) {
+      setError(err.message || 'נכשל בהזזת מנה');
+      toast.error(err.message || 'נכשל בהזזת מנה');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleAddTable(e: React.FormEvent) {
     e.preventDefault();
     if (!businessId || !newTable.tableId || !newTable.label) return;
@@ -1877,6 +1956,32 @@ export default function DashboardPage() {
                       )}
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2 lg:flex-col">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => moveItemUp(item)}
+                          disabled={items.findIndex(i => i.name === item.name) === 0}
+                          className={`text-sm px-3 py-2 rounded-lg font-medium transition-all active:scale-95 ${
+                            items.findIndex(i => i.name === item.name) === 0
+                              ? 'text-neutral-500 bg-neutral-800/30 border border-neutral-700/20 cursor-not-allowed'
+                              : 'text-white bg-neutral-700/60 border border-neutral-600/30 hover:bg-neutral-600'
+                          }`}
+                          title="הזז למעלה"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          onClick={() => moveItemDown(item)}
+                          disabled={items.findIndex(i => i.name === item.name) === items.length - 1}
+                          className={`text-sm px-3 py-2 rounded-lg font-medium transition-all active:scale-95 ${
+                            items.findIndex(i => i.name === item.name) === items.length - 1
+                              ? 'text-neutral-500 bg-neutral-800/30 border border-neutral-700/20 cursor-not-allowed'
+                              : 'text-white bg-neutral-700/60 border border-neutral-600/30 hover:bg-neutral-600'
+                          }`}
+                          title="הזז למטה"
+                        >
+                          ↓
+                        </button>
+                      </div>
                       <button
                         onClick={() => toggleHidden(item)}
                         className={`text-sm px-4 py-2 rounded-lg font-medium transition-all active:scale-95 ${
