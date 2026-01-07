@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ThemeWrapper from '../../../../../components/themes/ThemeWrapper';
+import { SessionProvider } from '@/components/SessionContext';
 
 // Modern SVG Icons
 function PhoneIcon({ className }: { className?: string }) {
@@ -253,6 +254,25 @@ function HomePageContent({
       setLanguage(saved);
     }
   }, []);
+
+  // CRITICAL: Clear expiration flag immediately when this page loads
+  // This page is the entry point when scanning QR - clearing the flag here
+  // allows SessionProvider to create a new session
+  useEffect(() => {
+    if (!businessId || !tableId || typeof window === 'undefined') return;
+    
+    // Clear expiration flag when scanning QR (this is a new QR scan)
+    // This must happen BEFORE SessionProvider initializes
+    const expirationCheckKey = `session_expired_${businessId}_${tableId}`;
+    const hadExpirationFlag = localStorage.getItem(expirationCheckKey);
+    if (hadExpirationFlag) {
+      console.log('New QR scan detected on home page - clearing expiration flag');
+      localStorage.removeItem(expirationCheckKey);
+      // Also clear any old session to force creation of new one
+      const sessionKey = `session_${businessId}_${tableId}`;
+      localStorage.removeItem(sessionKey);
+    }
+  }, [businessId, tableId]);
 
   // Track QR/NFC scan when page loads
   useEffect(() => {
@@ -1186,5 +1206,9 @@ export default function HomePage({
 }) {
   const { businessId, tableId } = params;
   
-  return <HomePageContent businessId={businessId} tableId={tableId} />;
+  return (
+    <SessionProvider businessId={businessId} tableId={tableId}>
+      <HomePageContent businessId={businessId} tableId={tableId} />
+    </SessionProvider>
+  );
 }
