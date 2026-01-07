@@ -215,29 +215,31 @@ function CustomerMenuPageContent({
       
       // If we got here, session exists but wasn't valid (expired)
       // Check if it's really expired
-      try {
-        const parsed = JSON.parse(stored);
-        const now = Date.now();
-        const sessionAge = now - parsed.sessionStart;
-        const maxAge = 60 * 60 * 1000; // 1 hour
-        
-        if (sessionAge >= maxAge) {
-          // Session expired - remove it and mark expiration
-          console.log('Session expired detected:', { 
-            sessionAge, 
-            maxAge, 
-            sessionAgeMs: sessionAge,
-            sessionAgeSeconds: Math.floor(sessionAge / 1000),
-            maxAgeSeconds: Math.floor(maxAge / 1000)
-          });
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          const now = Date.now();
+          const sessionAge = now - parsed.sessionStart;
+          const maxAge = 60 * 60 * 1000; // 1 hour
+          
+          if (sessionAge >= maxAge) {
+            // Session expired - remove it and mark expiration
+            console.log('Session expired detected:', { 
+              sessionAge, 
+              maxAge, 
+              sessionAgeMs: sessionAge,
+              sessionAgeSeconds: Math.floor(sessionAge / 1000),
+              maxAgeSeconds: Math.floor(maxAge / 1000)
+            });
+            localStorage.removeItem(storageKey);
+            const expirationCheckKey = `session_expired_${businessId}_${tableId}`;
+            localStorage.setItem(expirationCheckKey, Date.now().toString());
+            return true;
+          }
+        } catch (e) {
+          // Invalid session data - remove it
           localStorage.removeItem(storageKey);
-          const expirationCheckKey = `session_expired_${businessId}_${tableId}`;
-          localStorage.setItem(expirationCheckKey, Date.now().toString());
-          return true;
         }
-      } catch (e) {
-        // Invalid session data - remove it
-        localStorage.removeItem(storageKey);
       }
       
       // No session - check if there's an expiration flag
