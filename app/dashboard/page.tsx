@@ -129,6 +129,7 @@ export default function DashboardPage() {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [baseUrl, setBaseUrl] = useState<string | null>(null);
 
   const fileInputGalleryRef = useRef<HTMLInputElement | null>(null);
   const fileInputCameraRef = useRef<HTMLInputElement | null>(null);
@@ -1274,22 +1275,50 @@ export default function DashboardPage() {
     }
   }
 
-  // Helper function to get base URL for QR codes and links
-  // Uses NEXT_PUBLIC_APP_URL if available (production), otherwise uses current origin
+  // Fetch base URL from API to ensure consistent URLs for QR codes
+  useEffect(() => {
+    async function fetchBaseUrl() {
+      try {
+        const res = await fetch('/api/config/base-url');
+        const data = await res.json();
+        if (data.baseUrl) {
+          setBaseUrl(data.baseUrl);
+        } else {
+          // Fallback to current origin if API fails
+          setBaseUrl(window.location.origin);
+        }
+      } catch (err) {
+        console.error('Failed to fetch base URL:', err);
+        // Fallback to current origin if API fails
+        setBaseUrl(window.location.origin);
+      }
+    }
+    
+    if (typeof window !== 'undefined') {
+      fetchBaseUrl();
+    }
+  }, []);
+  
   function getBaseUrl(): string {
     if (typeof window === 'undefined') return '';
-    // In Next.js, NEXT_PUBLIC_* variables are available on client-side
-    return (process.env.NEXT_PUBLIC_APP_URL as string) || window.location.origin;
+    // Use fetched baseUrl if available, otherwise fallback to current origin
+    return baseUrl || window.location.origin;
   }
 
   async function generateQR(tableId: string) {
     if (!businessId) return;
     try {
-      const baseUrl = getBaseUrl();
-      const url = `${baseUrl}/menu/${businessId}/${tableId}/home`;
+      // Use fetched baseUrl if available, otherwise use fallback
+      const urlBase = baseUrl || getBaseUrl();
+      if (!urlBase) {
+        setError('ממתין לטעינת כתובת הבסיס...');
+        return;
+      }
+      const url = `${urlBase}/menu/${businessId}/${tableId}/home`;
       const dataUrl = await QRCode.toDataURL(url);
       setQrDataUrl(dataUrl);
       setSelectedTable(tableId);
+      setError(null); // Clear any previous errors
     } catch (err) {
       setError('נכשל ביצירת קוד QR');
     }
