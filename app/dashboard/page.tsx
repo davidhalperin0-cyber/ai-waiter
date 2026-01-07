@@ -2975,11 +2975,15 @@ export default function DashboardPage() {
                   // CRITICAL: Save template to localStorage to bypass read replica lag
                   if (typeof window !== 'undefined' && finalTemplate) {
                     const localStorageKey = `business_${businessId}_template`;
+                    const cacheVersionKey = `business_${businessId}_template_version`;
+                    const now = Date.now();
                     localStorage.setItem(localStorageKey, JSON.stringify({
                       template: finalTemplate,
-                      timestamp: Date.now(),
+                      timestamp: now,
                     }));
-                    console.log('💾 Saved template to localStorage:', finalTemplate);
+                    // Update version to signal other tabs/pages that template changed
+                    localStorage.setItem(cacheVersionKey, now.toString());
+                    console.log('💾 Saved template to localStorage:', finalTemplate, 'version:', now);
                   }
 
                   // CRITICAL: Save aiInstructions to localStorage to bypass read replica lag
