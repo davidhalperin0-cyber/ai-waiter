@@ -19,9 +19,17 @@ export async function GET(req: NextRequest) {
     
     const { data: business, error } = await supabaseAdmin
       .from('businesses')
-      .select('businessId, name, name_en, logoUrl, template, isEnabled, subscription, businessHours, customContent')
+      .select('businessId, name, name_en, logoUrl, template, isEnabled, subscription, businessHours, customContent, debug_last_writer')
       .eq('businessId', businessId)
       .maybeSingle();
+    
+    // Log template value from DB
+    if (business) {
+      console.log('📋 menu/info - Template from DB:', {
+        template: business.template,
+        debug_last_writer: business.debug_last_writer,
+      });
+    }
 
     if (error) {
       console.error('Error fetching business info', error);

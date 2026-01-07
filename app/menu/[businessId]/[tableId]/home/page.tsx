@@ -132,7 +132,8 @@ function HomePageContent({
         }
 
         // Debug: Log what we received from API
-        console.log('📥 API Response - customContent:', {
+        console.log('📥 API Response - Template and customContent:', {
+          template: infoData.template,
           hasCustomContent: !!infoData.customContent,
           customContent: infoData.customContent,
           contact: infoData.customContent?.contact,
@@ -193,6 +194,13 @@ function HomePageContent({
         // This ensures template changes are immediately reflected
         let finalTemplate = (infoData.template || 'generic') as any;
         
+        console.log('🔍 Template comparison:', {
+          cachedTemplate,
+          apiTemplate: infoData.template,
+          areDifferent: cachedTemplate !== infoData.template,
+          cachedAge: cachedTemplateTimestamp > 0 ? Date.now() - cachedTemplateTimestamp : 0,
+        });
+        
         // If API template is different from cached, always use API (template was updated)
         if (cachedTemplate && cachedTemplate !== infoData.template && infoData.template) {
           console.log('🔄 Template changed! Using API template (newer):', {
@@ -216,7 +224,10 @@ function HomePageContent({
         } else {
           // Default: Use API template (most reliable source)
           finalTemplate = (infoData.template || 'generic') as any;
-          console.log('📥 Using API template:', finalTemplate);
+          console.log('📥 Using API template (default):', {
+            template: finalTemplate,
+            reason: !cachedTemplate ? 'no cache' : cachedTemplate !== infoData.template ? 'mismatch' : 'cache too old',
+          });
           // Update cache with API template
           if (typeof window !== 'undefined' && finalTemplate) {
             const now = Date.now();
@@ -227,6 +238,8 @@ function HomePageContent({
             localStorage.setItem(cacheVersionKey, now.toString());
           }
         }
+        
+        console.log('🎨 Final template selected:', finalTemplate);
 
         // CRITICAL: Use cached name, nameEn, and logoUrl if they're newer than 5 minutes old
         // This ensures we use the data we know was saved, not stale read replica data
