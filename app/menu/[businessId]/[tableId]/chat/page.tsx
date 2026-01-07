@@ -59,22 +59,64 @@ function ChatPageContent({
   const { items, addItem, removeItem, clear } = useCart();
   const { session, markOrderConfirmed, markCartUpdated, updateSession, isSessionValid } = useSession();
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [language, setLanguage] = useState<'he' | 'en'>('he');
+  
+  // Get welcome message based on language
+  const getWelcomeMessage = (lang: 'he' | 'en'): Message => {
+    if (lang === 'en') {
+      return {
+        id: 1,
+        role: 'assistant',
+        content:
+          'Hi! I\'m the restaurant\'s smart assistant. I know what you\'ve added to your order. You can ask me about allergies, ingredients, or modifications to dishes, and I\'ll help you complete your order safely and comfortably.',
+        quickReplies: [
+          { text: 'Complete Order', label: 'Complete Order' },
+          { text: 'Continue Chatting', label: 'Continue Chatting' },
+        ],
+      };
+    } else {
+      return {
+        id: 1,
+        role: 'assistant',
+        content:
+          'היי! אני העוזר החכם של המסעדה. אני יודע מה הוספתם להזמנה. אפשר לשאול אותי על אלרגיות, מרכיבים או שינויים במנות, ואני אעזור לכם לסיים את ההזמנה בצורה בטוחה ונוחה.',
+        quickReplies: [
+          { text: 'לסגור את ההזמנה', label: 'לסגור את ההזמנה' },
+          { text: 'להמשיך בצ\'אט', label: 'להמשיך בצ\'אט' },
+        ],
+      };
+    }
+  };
   
   // Initialize with welcome message (same for server and client to avoid hydration error)
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      role: 'assistant',
-      content:
-        'היי! אני העוזר החכם של המסעדה. אני יודע מה הוספתם להזמנה. אפשר לשאול אותי על אלרגיות, מרכיבים או שינויים במנות, ואני אעזור לכם לסיים את ההזמנה בצורה בטוחה ונוחה.',
-      quickReplies: [
-        { text: 'לסגור את ההזמנה', label: 'לסגור את ההזמנה' },
-        { text: 'להמשיך בצ\'אט', label: 'להמשיך בצ\'אט' },
-      ],
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([getWelcomeMessage('he')]);
   
   const [isHydrated, setIsHydrated] = useState(false);
+  
+  // Load saved language preference from localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const saved = window.localStorage.getItem('menu_language');
+    if (saved === 'he' || saved === 'en') {
+      setLanguage(saved);
+      // Update welcome message if language changed
+      if (messages.length === 1 && messages[0].id === 1) {
+        setMessages([getWelcomeMessage(saved)]);
+      }
+    }
+  }, []);
+
+  // Switch language function
+  const switchLanguage = (lang: 'he' | 'en') => {
+    setLanguage(lang);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('menu_language', lang);
+    }
+    // Update welcome message if it's the only message
+    if (messages.length === 1 && messages[0].id === 1) {
+      setMessages([getWelcomeMessage(lang)]);
+    }
+  };
   
   // Get storage key for AI history - uses deviceId if available, otherwise falls back to tableId
   const getChatStorageKey = () => {
@@ -522,21 +564,23 @@ function ChatPageContent({
         const itemsText = addedItemsSummary
           .map((i) => `${i.name} × ${i.quantity}`)
           .join(', ');
-        summaryParts.push(`הוספתי: ${itemsText}`);
+        summaryParts.push(language === 'en' ? `Added: ${itemsText}` : `הוספתי: ${itemsText}`);
       }
       if (removedItemsSummary.length > 0) {
         const itemsText = removedItemsSummary
           .map((i) => `${i.name} × ${i.quantity}`)
           .join(', ');
-        summaryParts.push(`הסרתי: ${itemsText}`);
+        summaryParts.push(language === 'en' ? `Removed: ${itemsText}` : `הסרתי: ${itemsText}`);
       }
 
-      toast.success(`עדכנתי את ההזמנה לפי הבקשה לצ'אט.`);
+      toast.success(language === 'en' ? 'Updated the order according to your chat request.' : `עדכנתי את ההזמנה לפי הבקשה לצ'אט.`);
 
       const assistantMessage: Message = {
         id: Date.now() + 2,
         role: 'assistant',
-        content: `${summaryParts.join('. ')}.\nאני אכין סיכום מעודכן של ההזמנה.`,
+        content: language === 'en' 
+          ? `${summaryParts.join('. ')}.\nI'll prepare an updated summary of your order.`
+          : `${summaryParts.join('. ')}.\nאני אכין סיכום מעודכן של ההזמנה.`,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -544,12 +588,13 @@ function ChatPageContent({
   }
 
   function handleQuickReplyClick(buttonText: string) {
-    // Handle special quick reply buttons
-    if (buttonText === 'לסגור את ההזמנה') {
+    // Handle special quick reply buttons (both Hebrew and English)
+    if (buttonText === 'לסגור את ההזמנה' || buttonText === 'Complete Order') {
       // Request order summary from AI
       if (items.length > 0) {
         // If there are items in cart, ask AI for summary
-        sendMessageWithText('תראה לי סיכום של ההזמנה שלי');
+        const summaryRequest = language === 'en' ? 'Show me a summary of my order' : 'תראה לי סיכום של ההזמנה שלי';
+        sendMessageWithText(summaryRequest);
       } else {
         // If no items, navigate to menu page
         router.push(`/menu/${businessId}/${tableId}`);
@@ -595,14 +640,14 @@ function ChatPageContent({
     
     // Check from localStorage first
     if (checkSessionFromStorage()) {
-      toast.error('הקישור פג תוקף. אנא סרוק את קוד ה-QR מחדש כדי להזמין.');
+      toast.error(language === 'en' ? 'The link has expired. Please scan the QR code again to order.' : 'הקישור פג תוקף. אנא סרוק את קוד ה-QR מחדש כדי להזמין.');
       setSessionExpired(true);
       return;
     }
     
     // Also check using the session from state if available
     if (!isSessionValid || !isSessionValid()) {
-      toast.error('הקישור פג תוקף. אנא סרוק את קוד ה-QR מחדש כדי להזמין.');
+      toast.error(language === 'en' ? 'The link has expired. Please scan the QR code again to order.' : 'הקישור פג תוקף. אנא סרוק את קוד ה-QR מחדש כדי להזמין.');
       setSessionExpired(true);
       return;
     }
@@ -626,6 +671,7 @@ function ChatPageContent({
           businessId,
           tableId,
           cart: items,
+          language,
           messages: nextMessages.map((m) => ({
             role: m.role,
             content: m.content,
@@ -634,7 +680,7 @@ function ChatPageContent({
       });
 
       const data = await res.json();
-      const reply = data.reply ?? 'מצטער, משהו השתבש.';
+      const reply = data.reply ?? (language === 'en' ? 'Sorry, something went wrong.' : 'מצטער, משהו השתבש.');
 
       // Find the mentioned item in full menu items
       let mentionedItem: MenuItemLite | undefined;
@@ -912,22 +958,50 @@ function ChatPageContent({
                 <h1 className="text-lg font-light tracking-[0.15em] uppercase text-white/90">AI Assistant</h1>
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[10px] tracking-widest uppercase text-white/40">המערכת מחוברת ופעילה</span>
+                  <span className="text-[10px] tracking-widest uppercase text-white/40">
+                    {language === 'en' ? 'System Connected & Active' : 'המערכת מחוברת ופעילה'}
+                  </span>
                 </div>
               </div>
             </div>
             
-            <Link
-              href={`/menu/${businessId}/${tableId}`}
-              className="p-3 rounded-2xl border border-white/5 bg-white/[0.03] hover:bg-white/[0.08] transition-all group"
-            >
-              <motion.span 
-                className="block text-xl text-white/60 group-hover:text-white"
-                whileHover={{ x: -4 }}
+            <div className="flex items-center gap-3">
+              {/* Language Toggle */}
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => switchLanguage('he')}
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition ${
+                    language === 'he'
+                      ? 'bg-white/20 text-white'
+                      : 'text-white/60 hover:text-white/80'
+                  }`}
+                >
+                  עברית
+                </button>
+                <button
+                  onClick={() => switchLanguage('en')}
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition ${
+                    language === 'en'
+                      ? 'bg-white/20 text-white'
+                      : 'text-white/60 hover:text-white/80'
+                  }`}
+                >
+                  EN
+                </button>
+              </div>
+              
+              <Link
+                href={`/menu/${businessId}/${tableId}`}
+                className="p-3 rounded-2xl border border-white/5 bg-white/[0.03] hover:bg-white/[0.08] transition-all group"
               >
-                ←
-              </motion.span>
-            </Link>
+                <motion.span 
+                  className="block text-xl text-white/60 group-hover:text-white"
+                  whileHover={{ x: -4 }}
+                >
+                  ←
+                </motion.span>
+              </Link>
+            </div>
           </div>
         </header>
 
@@ -940,13 +1014,17 @@ function ChatPageContent({
           >
             <div className="text-3xl mb-3">⏰</div>
             <h2 className="text-lg font-medium mb-2 text-yellow-200">
-              הקישור פג תוקף
+              {language === 'en' ? 'Link Expired' : 'הקישור פג תוקף'}
             </h2>
             <p className="text-sm text-white/70 leading-relaxed max-w-xs mx-auto mb-4">
-              הקישור תקף לשעה אחת בלבד. כדי להזמין שוב, אנא סרוק את קוד ה-QR מחדש.
+              {language === 'en' 
+                ? 'The link is valid for one hour only. To order again, please scan the QR code again.'
+                : 'הקישור תקף לשעה אחת בלבד. כדי להזמין שוב, אנא סרוק את קוד ה-QR מחדש.'}
             </p>
             <p className="text-xs text-white/50">
-              ניתן לצפות בהודעות, אך לא ניתן להזמין
+              {language === 'en' 
+                ? 'You can view messages, but cannot order'
+                : 'ניתן לצפות בהודעות, אך לא ניתן להזמין'}
             </p>
           </motion.div>
         )}
@@ -959,7 +1037,10 @@ function ChatPageContent({
               const isOrderSummary = m.content.includes('סיכום') || 
                                     m.content.includes('סה"כ') || 
                                     (m.content.includes('×') && m.content.match(/\d+\s*×/)) ||
-                                    m.content.includes('סיכום ההזמנה');
+                                    m.content.includes('סיכום ההזמנה') ||
+                                    m.content.toLowerCase().includes('summary') ||
+                                    m.content.toLowerCase().includes('total') ||
+                                    m.content.toLowerCase().includes('order summary');
               
               return (
               <motion.div
@@ -979,7 +1060,7 @@ function ChatPageContent({
                   {/* Avatar / Role Indicator */}
                   <div className={`flex items-center gap-3 mb-1 px-2 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
                     <span className="text-[10px] tracking-[0.2em] uppercase text-white/30 font-light">
-                      {m.role === 'user' ? 'לקוח' : 'עוזר חכם'}
+                      {m.role === 'user' ? (language === 'en' ? 'Customer' : 'לקוח') : (language === 'en' ? 'Smart Assistant' : 'עוזר חכם')}
                     </span>
                   </div>
 
@@ -1093,7 +1174,7 @@ function ChatPageContent({
                               name: m.mentionedItem!.name,
                               price: m.mentionedItem!.price,
                             });
-                            toast.success(`${m.mentionedItem!.name} נוסף לעגלה`);
+                            toast.success(language === 'en' ? `${m.mentionedItem!.name} added to cart` : `${m.mentionedItem!.name} נוסף לעגלה`);
                             markCartUpdated();
                           }}
                           className={`${menuStyle.button.primary} w-full`}
