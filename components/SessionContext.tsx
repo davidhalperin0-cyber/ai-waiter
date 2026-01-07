@@ -56,6 +56,8 @@ export function SessionProvider({
   const [session, setSession] = useState<SessionState | null>(null);
 
   // Initialize or load session from localStorage
+  // IMPORTANT: Only load existing valid session, don't create new one automatically
+  // This prevents expired sessions from being reset on page refresh
   useEffect(() => {
     const storageKey = `session_${businessId}_${tableId}`;
     const stored = localStorage.getItem(storageKey);
@@ -69,31 +71,24 @@ export function SessionProvider({
         const maxAge = 60 * 60 * 1000; // 1 hour
         
         if (sessionAge < maxAge) {
+          // Session is valid - load it
           setSession(parsed);
           return;
         } else {
-          // Session expired - remove it from localStorage
+          // Session expired - remove it from localStorage but don't create new one
           localStorage.removeItem(storageKey);
+          setSession(null);
         }
       } catch (e) {
-        // Invalid stored data, create new session
+        // Invalid stored data - remove it but don't create new session
+        localStorage.removeItem(storageKey);
+        setSession(null);
       }
+    } else {
+      // No stored session - don't create new one automatically
+      // Session will be created only when user scans QR code or explicitly needs it
+      setSession(null);
     }
-    
-    // Create new session
-    const newSession: SessionState = {
-      tableId,
-      businessId,
-      sessionStart: Date.now(),
-      orderStatus: 'none',
-      upsellShown: false,
-      everythingOkayShown: false,
-      incompleteOrderShown: false,
-      deviceId: getDeviceId(),
-    };
-    
-    setSession(newSession);
-    localStorage.setItem(storageKey, JSON.stringify(newSession));
   }, [tableId, businessId]);
 
   // Save session to localStorage whenever it changes
