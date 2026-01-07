@@ -107,6 +107,17 @@ function HomePageContent({
         const templateKey = `business_${businessId}_template`;
         const cacheVersionKey = `business_${businessId}_template_version`;
         
+        // Check if there's a URL parameter to force refresh (for testing/debugging)
+        const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const forceRefresh = urlParams?.get('refresh') === 'true';
+        
+        // If force refresh, clear template cache
+        if (forceRefresh && typeof window !== 'undefined') {
+          localStorage.removeItem(templateKey);
+          localStorage.removeItem(cacheVersionKey);
+          console.log('🔄 Force refresh: Cleared template cache');
+        }
+        
         // Add cache busting and version check to force fresh data
         const lastKnownVersion = typeof window !== 'undefined' ? localStorage.getItem(cacheVersionKey) : null;
         
@@ -178,39 +189,42 @@ function HomePageContent({
           }
         }
 
-        // CRITICAL: Check if API template is different from cached template
-        // If different, clear cache and use API data (template was updated)
+        // CRITICAL: Always prioritize API template if it's different from cache
+        // This ensures template changes are immediately reflected
         let finalTemplate = (infoData.template || 'generic') as any;
         
-        // If API returned a different template than cached, clear cache and use API
+        // If API template is different from cached, always use API (template was updated)
         if (cachedTemplate && cachedTemplate !== infoData.template && infoData.template) {
-          console.log('🔄 Template changed! Clearing cache and using API template:', {
+          console.log('🔄 Template changed! Using API template (newer):', {
             cachedTemplate,
             apiTemplate: infoData.template,
           });
-          // Clear cached template
+          // Clear cached template to force use of API template
           if (typeof window !== 'undefined') {
             localStorage.removeItem(templateKey);
-            // Update version to force refresh
+            // Update version to signal change
             localStorage.setItem(cacheVersionKey, Date.now().toString());
           }
           finalTemplate = infoData.template as any;
-        } else if (cachedTemplate && cachedTemplateTimestamp > Date.now() - 5 * 60 * 1000) {
-          // Cached data is recent (less than 5 minutes old) and matches API, use it
+        } else if (cachedTemplate === infoData.template && cachedTemplateTimestamp > Date.now() - 5 * 60 * 1000) {
+          // Only use cache if it matches API AND is recent (both conditions must be true)
           finalTemplate = cachedTemplate as any;
-          console.log('✅ Using cached template from localStorage (source of truth):', {
+          console.log('✅ Using cached template (matches API and is recent):', {
             template: finalTemplate,
             cachedAge: Date.now() - cachedTemplateTimestamp,
           });
         } else {
-          // Use API template and update cache
+          // Default: Use API template (most reliable source)
           finalTemplate = (infoData.template || 'generic') as any;
+          console.log('📥 Using API template:', finalTemplate);
+          // Update cache with API template
           if (typeof window !== 'undefined' && finalTemplate) {
+            const now = Date.now();
             localStorage.setItem(templateKey, JSON.stringify({
               template: finalTemplate,
-              timestamp: Date.now(),
+              timestamp: now,
             }));
-            localStorage.setItem(cacheVersionKey, Date.now().toString());
+            localStorage.setItem(cacheVersionKey, now.toString());
           }
         }
 
