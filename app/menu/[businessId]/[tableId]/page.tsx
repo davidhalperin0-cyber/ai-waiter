@@ -300,9 +300,14 @@ function CustomerMenuPageContent({
         }
         setError(null);
 
+        // CRITICAL: Define cache keys before using them
+        const templateKey = `business_${businessId}_template`;
+        const cacheVersionKey = `business_${businessId}_template_version`;
+        
         // Load business info (for theme) - with cache busting to get fresh data
+        const lastKnownVersion = typeof window !== 'undefined' ? localStorage.getItem(cacheVersionKey) : null;
         const infoRes = await fetch(
-          `/api/menu/info?businessId=${encodeURIComponent(businessId)}&_t=${Date.now()}`,
+          `/api/menu/info?businessId=${encodeURIComponent(businessId)}&_t=${Date.now()}&_v=${lastKnownVersion || '0'}`,
           { cache: 'no-store' }
         );
         const infoData = await infoRes.json();
@@ -311,11 +316,11 @@ function CustomerMenuPageContent({
           planType: infoData.planType,
           menuOnlyMessage: infoData.menuOnlyMessage,
           hasMessage: !!infoData.menuOnlyMessage,
+          template: infoData.template,
         });
 
         // CRITICAL: Check localStorage for cached template that was saved after update
         // This bypasses read replica lag by using the data we know was saved
-        const templateKey = `business_${businessId}_template`;
         const cachedTemplateData = typeof window !== 'undefined' ? localStorage.getItem(templateKey) : null;
         let cachedTemplate: string | null = null;
         let cachedTemplateTimestamp = 0;
@@ -363,16 +368,40 @@ function CustomerMenuPageContent({
           }
         }
 
-        // CRITICAL: Use cached template if it's newer than 5 minutes old
-        // This ensures we use the data we know was saved, not stale read replica data
+        // CRITICAL: Check if API template is different from cached template
+        // If different, clear cache and use API data (template was updated)
         let finalTemplate = (infoData.template || 'generic') as 'bar-modern' | 'bar-classic' | 'bar-mid' | 'pizza-modern' | 'pizza-classic' | 'pizza-mid' | 'sushi' | 'generic' | 'gold';
-        if (cachedTemplate && cachedTemplateTimestamp > Date.now() - 5 * 60 * 1000) {
-          // Cached data is recent (less than 5 minutes old), use it instead of API data
+        
+        // If API returned a different template than cached, clear cache and use API
+        if (cachedTemplate && cachedTemplate !== infoData.template && infoData.template) {
+          console.log('🔄 Template changed! Clearing cache and using API template:', {
+            cachedTemplate,
+            apiTemplate: infoData.template,
+          });
+          // Clear cached template
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem(templateKey);
+            // Update version to force refresh
+            localStorage.setItem(cacheVersionKey, Date.now().toString());
+          }
+          finalTemplate = infoData.template as any;
+        } else if (cachedTemplate && cachedTemplateTimestamp > Date.now() - 5 * 60 * 1000) {
+          // Cached data is recent (less than 5 minutes old) and matches API, use it
           finalTemplate = cachedTemplate as any;
           console.log('✅ Using cached template from localStorage (source of truth):', {
             template: finalTemplate,
             cachedAge: Date.now() - cachedTemplateTimestamp,
           });
+        } else {
+          // Use API template and update cache
+          finalTemplate = (infoData.template || 'generic') as any;
+          if (typeof window !== 'undefined' && finalTemplate) {
+            localStorage.setItem(templateKey, JSON.stringify({
+              template: finalTemplate,
+              timestamp: Date.now(),
+            }));
+            localStorage.setItem(cacheVersionKey, Date.now().toString());
+          }
         }
 
         // CRITICAL: Use cached name, nameEn, and logoUrl if they're newer than 5 minutes old
