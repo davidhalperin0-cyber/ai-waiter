@@ -186,8 +186,18 @@ function ChatPageContent({
 
   // Check session validity on page load
   // CRITICAL: Check session directly from localStorage on page load to catch expiration
-  // even if the phone was closed and reopened after expiration (1 minute for testing)
+  // even if the phone was closed and reopened after expiration (1 hour)
   useEffect(() => {
+    // First, check if there's an expiration flag (even if no session exists)
+    const expirationCheckKey = `session_expired_${businessId}_${tableId}`;
+    const expiredFlag = localStorage.getItem(expirationCheckKey);
+    
+    if (expiredFlag) {
+      // There's an expiration flag - session was expired and should stay expired
+      console.log('Expiration flag found in chat - keeping session expired');
+      setSessionExpired(true);
+    }
+    
     // Check session from localStorage immediately on page load
     const checkSessionFromStorage = () => {
       if (typeof window === 'undefined') return false;
@@ -195,21 +205,29 @@ function ChatPageContent({
       const storageKey = `session_${businessId}_${tableId}`;
       const stored = localStorage.getItem(storageKey);
       
-      if (!stored) return false;
+      if (!stored) {
+        // No session - check if there's an expiration flag
+        if (expiredFlag) {
+          return true; // Session expired
+        }
+        return false;
+      }
       
       try {
         const parsed = JSON.parse(stored);
         const now = Date.now();
         const sessionAge = now - parsed.sessionStart;
-        const maxAge = 60 * 1000; // 1 minute (for testing)
+        const maxAge = 60 * 60 * 1000; // 1 hour
         
         if (sessionAge >= maxAge) {
           // Session expired - remove it and mark expiration
           localStorage.removeItem(storageKey);
-          const expirationCheckKey = `session_expired_${businessId}_${tableId}`;
           localStorage.setItem(expirationCheckKey, Date.now().toString());
           return true;
         }
+        
+        // Session is valid - clear any expiration flag (new session started)
+        localStorage.removeItem(expirationCheckKey);
         
         return false; // Session is valid
       } catch (e) {
@@ -559,7 +577,7 @@ function ChatPageContent({
         const parsed = JSON.parse(stored);
         const now = Date.now();
         const sessionAge = now - parsed.sessionStart;
-        const maxAge = 60 * 1000; // 1 minute (for testing)
+        const maxAge = 60 * 60 * 1000; // 1 hour
         
         if (sessionAge >= maxAge) {
           // Session expired - remove it and mark expiration

@@ -39,7 +39,7 @@ interface SessionContextValue {
   resetSession: () => void;
   markOrderConfirmed: () => void;
   markCartUpdated: () => void;
-  isSessionValid: () => boolean; // Check if session is still valid (within 1 minute for testing)
+  isSessionValid: () => boolean; // Check if session is still valid (within 1 hour)
 }
 
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
@@ -66,10 +66,10 @@ export function SessionProvider({
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        // Check if session is still valid (not older than 1 minute for testing)
+        // Check if session is still valid (not older than 1 hour)
         const now = Date.now();
         const sessionAge = now - parsed.sessionStart;
-        const maxAge = 60 * 1000; // 1 minute (for testing)
+        const maxAge = 60 * 60 * 1000; // 1 hour
         
         console.log('Checking stored session:', { 
           sessionAge, 
@@ -113,32 +113,27 @@ export function SessionProvider({
       // For now, we'll only create a new session if we can't determine expiration
       // The page-level checks will handle showing the expired message
       
-      // Check if there was a recent expiration (within last 2 minutes)
-      // If so, don't create new session - it was likely expired
+      // Check if there's an expiration flag
+      // If so, don't create new session - it was expired and should stay expired
+      // The flag will only be cleared when a new QR is scanned (which creates a new session)
       const expirationCheckKey = `session_expired_${businessId}_${tableId}`;
       const expiredFlag = localStorage.getItem(expirationCheckKey);
       
       if (expiredFlag) {
-        const expiredTime = parseInt(expiredFlag, 10);
-        const timeSinceExpiration = Date.now() - expiredTime;
-        // If expired within last 2 minutes, don't create new session
-        if (timeSinceExpiration < 2 * 60 * 1000) {
-          console.log('Session was recently expired - not creating new one');
-          setSession(null);
-          setIsInitialized(true);
-          return;
-        } else {
-          // Old expiration flag - remove it and allow new session
-          localStorage.removeItem(expirationCheckKey);
-        }
+        // Session was expired - don't create new one until QR is scanned again
+        // The expiration flag persists until a new session is created (via QR scan)
+        console.log('Session was expired - not creating new one. User must scan QR again.');
+        setSession(null);
+        setIsInitialized(true);
+        return;
       }
       
-      // No expiration flag or old expiration - this is likely a first-time visitor or new QR scan
+      // No expiration flag - this is likely a first-time visitor or new QR scan
       // Clear any old expiration flag and create a new session
       // expirationCheckKey already defined above, so just use it
       localStorage.removeItem(expirationCheckKey); // Clear expiration flag for new session
       
-      console.log('No stored session found - creating new session');
+      console.log('No stored session found and no expiration flag - creating new session (likely new QR scan)');
       const newSession: SessionState = {
         tableId,
         businessId,
@@ -166,7 +161,7 @@ export function SessionProvider({
       // Double check session is still valid before saving
       const now = Date.now();
       const sessionAge = now - session.sessionStart;
-      const maxAge = 60 * 1000; // 1 minute (for testing)
+      const maxAge = 60 * 60 * 1000; // 1 hour
       
       console.log('Attempting to save session:', { sessionAge, maxAge, isValid: sessionAge < maxAge });
       

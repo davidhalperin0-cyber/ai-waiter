@@ -1,6 +1,7 @@
 # 🔒 תיקון בעיית SSL/HTTPS - yallaorder.online
 
 ## הבעיה
+
 האתר מציג אזהרת אבטחה "חיבור זה אינו פרטי" כי הדומיין לא מוגדר נכון ב-Vercel.
 
 ## ✅ הפתרון
@@ -22,11 +23,13 @@
 Vercel יציג לך שתי אפשרויות:
 
 #### אופציה A: A Record (מומלץ לכתובת IP סטטית)
+
 - **Type**: `A`
 - **Name**: `@` (או ריק - עבור הדומיין הראשי)
 - **Value**: הכתובת IP ש-Vercel מציג
 
 #### אופציה B: CNAME Record (מומלץ יותר)
+
 - **Type**: `CNAME`
 - **Name**: `@` או `www` (תלוי אם אתה רוצה www או לא)
 - **Value**: `cname.vercel-dns.com` (או הערך ש-Vercel מציג)
@@ -34,6 +37,7 @@ Vercel יציג לך שתי אפשרויות:
 **להגדרה המלאה:**
 
 1. הוסף **CNAME** עבור `www`:
+
    - **Name**: `www`
    - **Value**: `cname.vercel-dns.com`
 
@@ -41,6 +45,7 @@ Vercel יציג לך שתי אפשרויות:
    - Vercel יציג לך כתובת IP - השתמש בה
 
 **או** (אם ה-registrar תומך):
+
 - הוסף **ALIAS** או **ANAME** record שמצביע על `cname.vercel-dns.com`
 
 ### שלב 3: המתן להתאמת DNS
@@ -73,6 +78,7 @@ Vercel יציג לך שתי אפשרויות:
 אחרי שהגדרת הכל:
 
 1. בדוק שהדומיין עובד:
+
    ```
    https://yallaorder.online
    ```
@@ -87,19 +93,23 @@ Vercel יציג לך שתי אפשרויות:
 ## ⚠️ בעיות נפוצות
 
 ### "Domain not configured"
+
 - בדוק שהגדרת את ה-DNS נכון
 - המתן עוד קצת (זה יכול לקחת זמן)
 
 ### "SSL Certificate Pending"
+
 - זה תקין! Vercel מקצה תעודת SSL אוטומטית
 - המתן 5-10 דקות
 
 ### עדיין רואה אזהרת אבטחה
+
 - ודא שאתה נכנס דרך `https://` ולא `http://`
 - נסה למחוק את ה-cache של הדפדפן
 - נסה ב-Incognito mode
 
 ### DNS לא עובד
+
 - בדוק שהערכים ב-DNS נכונים (ללא שגיאות כתיב)
 - בדוק שה-CNAME/A Record מצביע על הערכים ש-Vercel נתן
 - המתן יותר זמן
@@ -117,4 +127,3 @@ Vercel יציג לך שתי אפשרויות:
 2. בדוק את ה-DNS דרך [whatsmydns.net](https://www.whatsmydns.net)
 3. בדוק את הלוגים ב-Vercel Dashboard → Deployments
 4. נסה ליצור קשר עם התמיכה של Vercel
-
