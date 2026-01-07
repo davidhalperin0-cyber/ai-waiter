@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import bcrypt from 'bcryptjs';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { token, password } = body as { token?: string; password?: string };
+    const searchParams = req.nextUrl.searchParams;
+    const token = searchParams.get('token');
 
-    if (!token || !password) {
-      return NextResponse.json({ message: 'נדרש token וסיסמה' }, { status: 400 });
-    }
-
-    if (password.length < 8) {
-      return NextResponse.json({ message: 'הסיסמה חייבת להכיל לפחות 8 תווים' }, { status: 400 });
+    if (!token) {
+      return NextResponse.json({ 
+        valid: false,
+        message: 'קישור לא תקין' 
+      }, { status: 400 });
     }
 
     // Find business by reset token
@@ -26,11 +24,15 @@ export async function POST(req: NextRequest) {
 
     if (fetchError) {
       console.error('Error fetching business', fetchError);
-      return NextResponse.json({ message: 'שגיאה במערכת' }, { status: 500 });
+      return NextResponse.json({ 
+        valid: false,
+        message: 'שגיאה במערכת' 
+      }, { status: 500 });
     }
 
     if (!business) {
       return NextResponse.json({ 
+        valid: false,
         message: 'קישור לא תקין או פג תוקף' 
       }, { status: 400 });
     }
@@ -40,35 +42,21 @@ export async function POST(req: NextRequest) {
       const expiryDate = new Date(business.passwordResetExpiry);
       if (expiryDate < new Date()) {
         return NextResponse.json({ 
+          valid: false,
+          expired: true,
           message: 'קישור פג תוקף. אנא בקש קישור חדש' 
         }, { status: 400 });
       }
     }
 
-    // Hash new password
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // Update password and clear reset token
-    const { error: updateError } = await supabaseAdmin
-      .from('businesses')
-      .update({
-        passwordHash: passwordHash,
-        passwordResetToken: null,
-        passwordResetExpiry: null,
-      })
-      .eq('businessId', business.businessId);
-
-    if (updateError) {
-      console.error('Error updating password', updateError);
-      return NextResponse.json({ message: 'שגיאה בעדכון הסיסמה' }, { status: 500 });
-    }
-
     return NextResponse.json({ 
-      message: 'הסיסמה עודכנה בהצלחה' 
+      valid: true,
+      message: 'קישור תקין' 
     }, { status: 200 });
   } catch (error: any) {
-    console.error('Error in reset-password:', error);
+    console.error('Error in check-reset-token:', error);
     return NextResponse.json({ 
+      valid: false,
       message: 'שגיאה במערכת',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     }, { status: 500 });

@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
     // Generate reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+    const resetTokenExpiry = new Date(Date.now() + 60 * 1000); // 1 minute from now (for testing)
 
     // Store reset token in database
     // We'll use a separate table or add columns to businesses table

@@ -183,7 +183,7 @@ function CustomerMenuPageContent({
 
   // Check session validity on page load and periodically
   // CRITICAL: Check session directly from localStorage on page load to catch expiration
-  // even if the phone was closed and reopened after 1 hour
+  // even if the phone was closed and reopened after expiration (1 minute for testing)
   useEffect(() => {
     // Check session from localStorage immediately on page load
     const checkSessionFromStorage = () => {
@@ -198,13 +198,30 @@ function CustomerMenuPageContent({
         const parsed = JSON.parse(stored);
         const now = Date.now();
         const sessionAge = now - parsed.sessionStart;
-        const maxAge = 60 * 60 * 1000; // 1 hour
+        const maxAge = 60 * 1000; // 1 minute (for testing)
         
         if (sessionAge >= maxAge) {
-          // Session expired - remove it and return true (expired)
+          // Session expired - remove it and mark expiration
+          console.log('Session expired detected:', { 
+            sessionAge, 
+            maxAge, 
+            sessionAgeMs: sessionAge,
+            sessionAgeSeconds: Math.floor(sessionAge / 1000),
+            maxAgeSeconds: Math.floor(maxAge / 1000)
+          });
           localStorage.removeItem(storageKey);
+          const expirationCheckKey = `session_expired_${businessId}_${tableId}`;
+          localStorage.setItem(expirationCheckKey, Date.now().toString());
           return true;
         }
+        
+        // Log session age for debugging
+        console.log('Session still valid:', { 
+          sessionAgeMs: sessionAge,
+          sessionAgeSeconds: Math.floor(sessionAge / 1000),
+          maxAgeSeconds: Math.floor(maxAge / 1000),
+          remainingSeconds: Math.floor((maxAge - sessionAge) / 1000)
+        });
         
         return false; // Session is valid
       } catch (e) {
@@ -226,21 +243,25 @@ function CustomerMenuPageContent({
       return;
     }
     
-    // Check every 10 seconds to catch expiration
+    // Check every 5 seconds to catch expiration more quickly
     const interval = setInterval(() => {
       // Check from localStorage first (more reliable)
       if (checkSessionFromStorage()) {
+        console.log('Session expired during periodic check');
         setSessionExpired(true);
         toast.error('הקישור פג תוקף. אנא סרוק את קוד ה-QR מחדש כדי להזמין.');
+        clearInterval(interval); // Stop checking once expired
         return;
       }
       
       // Also check using the session from state if available
       if (session && isSessionValid && !isSessionValid()) {
+        console.log('Session expired via isSessionValid()');
         setSessionExpired(true);
         toast.error('הקישור פג תוקף. אנא סרוק את קוד ה-QR מחדש כדי להזמין.');
+        clearInterval(interval); // Stop checking once expired
       }
-    }, 10000); // Check every 10 seconds
+    }, 5000); // Check every 5 seconds for faster detection
     
     return () => clearInterval(interval);
   }, [session, isSessionValid, businessId, tableId]);

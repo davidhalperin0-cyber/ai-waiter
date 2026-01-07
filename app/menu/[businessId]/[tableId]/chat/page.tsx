@@ -186,7 +186,7 @@ function ChatPageContent({
 
   // Check session validity on page load
   // CRITICAL: Check session directly from localStorage on page load to catch expiration
-  // even if the phone was closed and reopened after 1 hour
+  // even if the phone was closed and reopened after expiration (1 minute for testing)
   useEffect(() => {
     // Check session from localStorage immediately on page load
     const checkSessionFromStorage = () => {
@@ -201,11 +201,13 @@ function ChatPageContent({
         const parsed = JSON.parse(stored);
         const now = Date.now();
         const sessionAge = now - parsed.sessionStart;
-        const maxAge = 60 * 60 * 1000; // 1 hour
+        const maxAge = 60 * 1000; // 1 minute (for testing)
         
         if (sessionAge >= maxAge) {
-          // Session expired - remove it and return true (expired)
+          // Session expired - remove it and mark expiration
           localStorage.removeItem(storageKey);
+          const expirationCheckKey = `session_expired_${businessId}_${tableId}`;
+          localStorage.setItem(expirationCheckKey, Date.now().toString());
           return true;
         }
         
@@ -557,11 +559,13 @@ function ChatPageContent({
         const parsed = JSON.parse(stored);
         const now = Date.now();
         const sessionAge = now - parsed.sessionStart;
-        const maxAge = 60 * 60 * 1000; // 1 hour
+        const maxAge = 60 * 1000; // 1 minute (for testing)
         
         if (sessionAge >= maxAge) {
-          // Session expired - remove it and return true (expired)
+          // Session expired - remove it and mark expiration
           localStorage.removeItem(storageKey);
+          const expirationCheckKey = `session_expired_${businessId}_${tableId}`;
+          localStorage.setItem(expirationCheckKey, Date.now().toString());
           return true;
         }
         
