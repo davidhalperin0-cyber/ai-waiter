@@ -185,16 +185,6 @@ function CustomerMenuPageContent({
   // CRITICAL: Check session directly from localStorage on page load to catch expiration
   // even if the phone was closed and reopened after expiration (1 hour)
   useEffect(() => {
-    // First, check if there's an expiration flag (even if no session exists)
-    const expirationCheckKey = `session_expired_${businessId}_${tableId}`;
-    const expiredFlag = localStorage.getItem(expirationCheckKey);
-    
-    if (expiredFlag) {
-      // There's an expiration flag - session was expired and should stay expired
-      console.log('Expiration flag found - keeping session expired');
-      setSessionExpired(true);
-    }
-    
     // Check session from localStorage immediately on page load
     const checkSessionFromStorage = () => {
       if (typeof window === 'undefined') return false;
@@ -202,14 +192,29 @@ function CustomerMenuPageContent({
       const storageKey = `session_${businessId}_${tableId}`;
       const stored = localStorage.getItem(storageKey);
       
-      if (!stored) {
-        // No session - check if there's an expiration flag
-        if (expiredFlag) {
-          return true; // Session expired
+      // If there's a valid session, don't check expiration flag
+      // (it might have been cleared on home page but session still exists)
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          const now = Date.now();
+          const sessionAge = now - parsed.sessionStart;
+          const maxAge = 60 * 60 * 1000; // 1 hour
+          
+          // If session is valid, don't worry about expiration flag
+          if (sessionAge < maxAge) {
+            // Session is valid - clear any expiration flag if it exists
+            const expirationCheckKey = `session_expired_${businessId}_${tableId}`;
+            localStorage.removeItem(expirationCheckKey);
+            return false; // Session is valid
+          }
+        } catch (e) {
+          // Invalid session data - continue to check expiration flag
         }
-        return false;
       }
       
+      // If we got here, session exists but wasn't valid (expired)
+      // Check if it's really expired
       try {
         const parsed = JSON.parse(stored);
         const now = Date.now();
@@ -226,25 +231,26 @@ function CustomerMenuPageContent({
             maxAgeSeconds: Math.floor(maxAge / 1000)
           });
           localStorage.removeItem(storageKey);
+          const expirationCheckKey = `session_expired_${businessId}_${tableId}`;
           localStorage.setItem(expirationCheckKey, Date.now().toString());
           return true;
         }
-        
-        // Session is valid - clear any expiration flag (new session started)
-        localStorage.removeItem(expirationCheckKey);
-        
-        // Log session age for debugging
-        console.log('Session still valid:', { 
-          sessionAgeMs: sessionAge,
-          sessionAgeSeconds: Math.floor(sessionAge / 1000),
-          maxAgeSeconds: Math.floor(maxAge / 1000),
-          remainingSeconds: Math.floor((maxAge - sessionAge) / 1000)
-        });
-        
-        return false; // Session is valid
       } catch (e) {
-        return false;
+        // Invalid session data - remove it
+        localStorage.removeItem(storageKey);
       }
+      
+      // No session - check if there's an expiration flag
+      const expirationCheckKey = `session_expired_${businessId}_${tableId}`;
+      const expiredFlag = localStorage.getItem(expirationCheckKey);
+      
+      if (expiredFlag) {
+        // There's an expiration flag - session expired
+        return true; // Session expired
+      }
+      
+      // No session and no expiration flag - might be new visit, let SessionProvider handle it
+      return false;
     };
     
     // Check immediately on page load

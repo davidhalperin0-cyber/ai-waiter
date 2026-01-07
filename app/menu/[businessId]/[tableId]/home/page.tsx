@@ -255,18 +255,31 @@ function HomePageContent({
     }
   }, []);
 
-  // CRITICAL: Clear expiration flag immediately when this page loads
+  // CRITICAL: Clear expiration flag IMMEDIATELY when this page loads
   // This page is the entry point when scanning QR - clearing the flag here
   // allows SessionProvider to create a new session
+  // This must run synchronously BEFORE any React effects or SessionProvider initializes
+  if (typeof window !== 'undefined' && businessId && tableId) {
+    const expirationCheckKey = `session_expired_${businessId}_${tableId}`;
+    const hadExpirationFlag = localStorage.getItem(expirationCheckKey);
+    if (hadExpirationFlag) {
+      console.log('New QR scan detected on home page - clearing expiration flag synchronously');
+      localStorage.removeItem(expirationCheckKey);
+      // Also clear any old session to force creation of new one
+      const sessionKey = `session_${businessId}_${tableId}`;
+      localStorage.removeItem(sessionKey);
+    }
+  }
+
+  // Also clear in useEffect as backup (runs after component mount)
   useEffect(() => {
     if (!businessId || !tableId || typeof window === 'undefined') return;
     
     // Clear expiration flag when scanning QR (this is a new QR scan)
-    // This must happen BEFORE SessionProvider initializes
     const expirationCheckKey = `session_expired_${businessId}_${tableId}`;
     const hadExpirationFlag = localStorage.getItem(expirationCheckKey);
     if (hadExpirationFlag) {
-      console.log('New QR scan detected on home page - clearing expiration flag');
+      console.log('New QR scan detected on home page - clearing expiration flag (useEffect backup)');
       localStorage.removeItem(expirationCheckKey);
       // Also clear any old session to force creation of new one
       const sessionKey = `session_${businessId}_${tableId}`;
