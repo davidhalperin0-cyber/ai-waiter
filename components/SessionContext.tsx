@@ -240,7 +240,7 @@ export function SessionProvider({
     if (!session) return false;
     const now = Date.now();
     const sessionAge = now - session.sessionStart;
-    const maxAge = 60 * 1000; // 1 minute (for testing)
+    const maxAge = 60 * 60 * 1000; // 1 hour (same as session expiration)
     const isValid = sessionAge < maxAge;
     
     // If session expired, clear it
