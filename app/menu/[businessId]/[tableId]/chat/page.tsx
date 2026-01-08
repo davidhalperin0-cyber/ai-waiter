@@ -88,22 +88,19 @@ function ChatPageContent({
     }
   };
   
-  // Initialize with welcome message (same for server and client to avoid hydration error)
-  const [messages, setMessages] = useState<Message[]>([getWelcomeMessage('he')]);
+  // Initialize with welcome message - will be updated when language is loaded
+  const [messages, setMessages] = useState<Message[]>([]);
   
   const [isHydrated, setIsHydrated] = useState(false);
   
-  // Load saved language preference from localStorage
+  // Load saved language preference from localStorage and initialize welcome message
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const saved = window.localStorage.getItem('menu_language');
-    if (saved === 'he' || saved === 'en') {
-      setLanguage(saved);
-      // Update welcome message if language changed
-      if (messages.length === 1 && messages[0].id === 1) {
-        setMessages([getWelcomeMessage(saved)]);
-      }
-    }
+    const initialLanguage = (saved === 'he' || saved === 'en') ? saved : 'he';
+    setLanguage(initialLanguage);
+    // Initialize welcome message with correct language
+    setMessages([getWelcomeMessage(initialLanguage)]);
   }, []);
 
   // Switch language function
