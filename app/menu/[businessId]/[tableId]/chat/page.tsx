@@ -158,17 +158,9 @@ function ChatPageContent({
         if (storedSessionStart !== null && storedSessionStart !== session.sessionStart) {
           // Session changed - clear old messages
           localStorage.removeItem(storageKey);
-          // Keep welcome message
-          const welcomeMessage: Message = {
-            id: Date.now(),
-            role: 'assistant',
-            content:
-              'היי! אני העוזר החכם של המסעדה. אני יודע מה הוספתם להזמנה. אפשר לשאול אותי על אלרגיות, מרכיבים או שינויים במנות, ואני אעזור לכם לסיים את ההזמנה בצורה בטוחה ונוחה.',
-            quickReplies: [
-              { text: 'לסגור את ההזמנה', label: 'לסגור את ההזמנה' },
-              { text: 'להמשיך בצ\'אט', label: 'להמשיך בצ\'אט' },
-            ],
-          };
+          // Keep welcome message in correct language
+          const welcomeMessage = getWelcomeMessage(language);
+          welcomeMessage.id = Date.now(); // Use current timestamp for new session
           setMessages([welcomeMessage]);
           return;
         }
@@ -871,29 +863,30 @@ function ChatPageContent({
         setLastSummary(null);
         
         // Clear chat messages after order confirmation
-        const welcomeMessage: Message = {
+        const orderConfirmationMessage: Message = {
           id: Date.now(),
           role: 'assistant',
-          content:
-            'הזמנה אושרה בהצלחה! מזהה: ' + data.orderId.substring(0, 8) + '\n\nאם תרצו להזמין שוב, אני כאן לעזור!',
+          content: language === 'en'
+            ? `Order confirmed successfully! ID: ${data.orderId.substring(0, 8)}\n\nIf you'd like to order again, I'm here to help!`
+            : 'הזמנה אושרה בהצלחה! מזהה: ' + data.orderId.substring(0, 8) + '\n\nאם תרצו להזמין שוב, אני כאן לעזור!',
         };
-        setMessages([welcomeMessage]);
+        setMessages([orderConfirmationMessage]);
         
         // Clear from localStorage
         if (typeof window !== 'undefined' && session) {
           const storageKey = getChatStorageKey();
           localStorage.setItem(storageKey, JSON.stringify({
-            messages: [welcomeMessage],
+            messages: [orderConfirmationMessage],
             sessionStart: session.sessionStart, // Store sessionStart with messages
           }));
         }
         
-        toast.success(`הזמנה אושרה! מזהה: ${data.orderId}`);
+        toast.success(language === 'en' ? `Order confirmed! ID: ${data.orderId}` : `הזמנה אושרה! מזהה: ${data.orderId}`);
       } else {
-        toast.error(data.message || 'נכשל ביצירת ההזמנה');
+        toast.error(data.message || (language === 'en' ? 'Failed to create order' : 'נכשל ביצירת ההזמנה'));
       }
     } catch (err) {
-      toast.error('שגיאת רשת ביצירת ההזמנה');
+        toast.error(language === 'en' ? 'Network error creating order' : 'שגיאת רשת ביצירת ההזמנה');
     }
   }
 
