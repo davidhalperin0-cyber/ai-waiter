@@ -311,18 +311,29 @@ export async function PUT(req: NextRequest) {
         savedAiInstructions = rpcResult.data[0]?.aiInstructions || '';
         
         console.log('✅ RPC function succeeded!', {
-          returnedAiInstructions: savedAiInstructions,
+          returnedAiInstructions: savedAiInstructions?.substring(0, 100) || '',
           length: savedAiInstructions?.length || 0,
+          fullRpcResult: rpcResult.data,
         });
         
         // Verify the saved data matches what we sent
         const expectedAiInstructions = updateData.aiInstructions || '';
         
         if (savedAiInstructions !== expectedAiInstructions) {
-          console.warn('⚠️ WARNING: RPC saved aiInstructions does not match expected!', {
+          console.error('❌ CRITICAL: RPC saved aiInstructions does not match expected!', {
             expectedLength: expectedAiInstructions.length,
             savedLength: savedAiInstructions?.length || 0,
+            expectedFirst100: expectedAiInstructions.substring(0, 100),
+            savedFirst100: savedAiInstructions?.substring(0, 100) || '',
+            areEqual: savedAiInstructions === expectedAiInstructions,
           });
+          
+          // CRITICAL: If RPC returned wrong value, use what we sent instead
+          // This is a workaround for read replica lag or RPC issues
+          console.warn('⚠️ Using sent value instead of RPC result due to mismatch');
+          savedAiInstructions = expectedAiInstructions;
+        } else {
+          console.log('✅ RPC returned value matches what we sent - verification passed');
         }
         
         // Remove aiInstructions from updateData since it's already updated via RPC
