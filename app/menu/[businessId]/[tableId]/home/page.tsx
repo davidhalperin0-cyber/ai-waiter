@@ -196,86 +196,91 @@ function HomePageContent({
         const cacheVersionNumber = currentCacheVersion ? parseInt(currentCacheVersion, 10) : 0;
         const lastKnownVersionNumber = lastKnownVersion ? parseInt(lastKnownVersion, 10) : 0;
         
-        // CRITICAL: Always prioritize API template if it's different from cache
-        // BUT: If cache was updated more recently (newer version), prefer cache to bypass read replica lag
+        // CRITICAL: Simplified template selection logic
+        // Priority: 1. Cached template if version is newer (bypass read replica lag)
+        //           2. API template (source of truth)
+        //           3. Default to 'generic'
         let finalTemplate = (infoData.template || 'generic') as any;
         
         console.log('🔍 Template comparison:', {
           cachedTemplate,
           apiTemplate: infoData.template,
-          areDifferent: cachedTemplate !== infoData.template,
-          cachedAge: cachedTemplateTimestamp > 0 ? Date.now() - cachedTemplateTimestamp : 0,
           cacheVersion: cacheVersionNumber,
           lastKnownVersion: lastKnownVersionNumber,
           cacheIsNewer: cacheVersionNumber > lastKnownVersionNumber,
+          cacheAge: cachedTemplateTimestamp > 0 ? Date.now() - cachedTemplateTimestamp : 0,
         });
         
-        // If cache version is newer than what we knew about, template was just updated
-        // In this case, prefer cached template even if API doesn't match (read replica lag)
-        if (cachedTemplate && cacheVersionNumber > lastKnownVersionNumber && cachedTemplateTimestamp > Date.now() - 10 * 60 * 1000) {
-          console.log('🔄 Cache version is newer! Using cached template (bypassing read replica lag):', {
+        // CRITICAL: Always prefer API template (source of truth from database)
+        // Only use cache if:
+        // 1. Cache version is newer than what we knew (same device just updated)
+        // 2. Cache matches API AND is very recent (within 2 minutes) - for same device
+        // Otherwise: Always use API (handles different devices, read replica lag, etc.)
+        
+        if (cachedTemplate && cacheVersionNumber > lastKnownVersionNumber && cachedTemplateTimestamp > Date.now() - 2 * 60 * 1000) {
+          // Same device just updated template (within 2 minutes) - use cache to bypass read replica lag
+          console.log('✅ Using cached template (same device, just updated):', {
             cachedTemplate,
             apiTemplate: infoData.template,
             cacheVersion: cacheVersionNumber,
             lastKnownVersion: lastKnownVersionNumber,
+            age: Date.now() - cachedTemplateTimestamp,
           });
           finalTemplate = cachedTemplate as any;
-        } else if (cachedTemplate && cachedTemplate !== infoData.template && infoData.template) {
-          // Cache and API differ, and cache isn't newer - use API (template was updated on server)
-          console.log('🔄 Template changed! Using API template (newer):', {
-            cachedTemplate,
-            apiTemplate: infoData.template,
-          });
-          // Clear cached template to force use of API template
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem(templateKey);
-            // Update version to signal change
-            localStorage.setItem(cacheVersionKey, Date.now().toString());
-          }
-          finalTemplate = infoData.template as any;
-        } else if (cachedTemplate === infoData.template && cachedTemplateTimestamp > Date.now() - 5 * 60 * 1000) {
-          // Only use cache if it matches API AND is recent (both conditions must be true)
-          finalTemplate = cachedTemplate as any;
-          console.log('✅ Using cached template (matches API and is recent):', {
-            template: finalTemplate,
-            cachedAge: Date.now() - cachedTemplateTimestamp,
-          });
         } else {
-          // Default: Use API template (most reliable source)
+          // Default: Always use API template (source of truth from database)
+          // This ensures different devices always get the latest data
           finalTemplate = (infoData.template || 'generic') as any;
-          console.log('📥 Using API template (default):', {
+          console.log('📥 Using API template (source of truth):', {
             template: finalTemplate,
-            reason: !cachedTemplate ? 'no cache' : cachedTemplate !== infoData.template ? 'mismatch' : 'cache too old',
+            reason: !cachedTemplate ? 'no cache (different device or first load)' 
+                    : cacheVersionNumber <= lastKnownVersionNumber ? 'cache not newer' 
+                    : cachedTemplateTimestamp <= Date.now() - 2 * 60 * 1000 ? 'cache too old' 
+                    : 'default to API',
+            apiTemplate: infoData.template,
+            cachedTemplate: cachedTemplate,
           });
-          // Update cache with API template
+          // Update cache with API template for future use (for same device)
           if (typeof window !== 'undefined' && finalTemplate) {
             const now = Date.now();
             localStorage.setItem(templateKey, JSON.stringify({
               template: finalTemplate,
               timestamp: now,
             }));
+            // Update version to match API (don't keep old version)
             localStorage.setItem(cacheVersionKey, now.toString());
           }
         }
         
         console.log('🎨 Final template selected:', finalTemplate);
 
-        // CRITICAL: Use cached name, nameEn, and logoUrl if they're newer than 5 minutes old
-        // This ensures we use the data we know was saved, not stale read replica data
+        // CRITICAL: Always prefer API data (source of truth from database)
+        // Only use cache if it's from same device and very recent (within 2 minutes)
+        // This ensures different devices always get the latest data
         let finalName = infoData.name || 'העסק';
         let finalNameEn = infoData.nameEn || undefined;
         let finalLogoUrl = infoData.logoUrl;
         
-        if (cachedBasicInfoTimestamp > Date.now() - 5 * 60 * 1000) {
-          // Cached data is recent (less than 5 minutes old), use it instead of API data
+        if (cachedBasicInfoTimestamp > Date.now() - 2 * 60 * 1000 && cacheVersionNumber > lastKnownVersionNumber) {
+          // Same device just updated (within 2 minutes) - use cache to bypass read replica lag
           if (cachedName !== null) finalName = cachedName;
           if (cachedNameEn !== undefined) finalNameEn = cachedNameEn;
           if (cachedLogoUrl !== undefined) finalLogoUrl = cachedLogoUrl;
-          console.log('✅ Using cached basicInfo from localStorage (source of truth):', {
+          console.log('✅ Using cached basicInfo (same device, just updated):', {
             name: finalName,
             nameEn: finalNameEn,
             logoUrl: finalLogoUrl,
             cachedAge: Date.now() - cachedBasicInfoTimestamp,
+          });
+        } else {
+          // Always use API data (ensures different devices get latest)
+          console.log('📥 Using API basicInfo (source of truth):', {
+            name: finalName,
+            nameEn: finalNameEn,
+            logoUrl: finalLogoUrl,
+            reason: cachedBasicInfoTimestamp <= Date.now() - 2 * 60 * 1000 ? 'cache too old' 
+                    : cacheVersionNumber <= lastKnownVersionNumber ? 'cache not newer' 
+                    : 'default to API',
           });
         }
 
@@ -320,6 +325,16 @@ function HomePageContent({
 
     if (businessId) {
       loadData();
+      
+      // CRITICAL: Auto-refresh every 30 seconds to get updates from other devices
+      // This ensures phone gets updates when admin saves on computer
+      const refreshInterval = setInterval(() => {
+        console.log('🔄 Auto-refreshing business info to get latest updates...');
+        // Reload data to get latest from API
+        loadData().catch(err => console.error('Error auto-refreshing:', err));
+      }, 30 * 1000); // Every 30 seconds
+      
+      return () => clearInterval(refreshInterval);
     }
   }, [businessId]);
 
@@ -368,15 +383,27 @@ function HomePageContent({
               const cacheVersionNumber = currentCacheVersion ? parseInt(currentCacheVersion, 10) : 0;
               const lastKnownVersionNumber = lastKnownVersion ? parseInt(lastKnownVersion, 10) : 0;
               
-              // Use same logic as loadData to determine final template
+              // CRITICAL: Always prefer API template (source of truth)
+              // Only use cache if same device just updated (within 2 minutes)
               let finalTemplate = (infoData.template || 'generic') as any;
               
-              if (cachedTemplate && cacheVersionNumber > lastKnownVersionNumber && cachedTemplateTimestamp > Date.now() - 10 * 60 * 1000) {
+              if (cachedTemplate && cacheVersionNumber > lastKnownVersionNumber && cachedTemplateTimestamp > Date.now() - 2 * 60 * 1000) {
+                // Same device just updated - use cache
                 finalTemplate = cachedTemplate as any;
-              } else if (cachedTemplate && cachedTemplate !== infoData.template && infoData.template) {
-                finalTemplate = infoData.template as any;
-              } else if (cachedTemplate === infoData.template && cachedTemplateTimestamp > Date.now() - 5 * 60 * 1000) {
-                finalTemplate = cachedTemplate as any;
+                console.log('✅ Storage event: Using cached template (same device, just updated):', finalTemplate);
+              } else {
+                // Always use API (ensures different devices get latest)
+                finalTemplate = (infoData.template || 'generic') as any;
+                console.log('📥 Storage event: Using API template (source of truth):', finalTemplate);
+                // Update cache with API template
+                if (typeof window !== 'undefined' && finalTemplate) {
+                  const now = Date.now();
+                  localStorage.setItem(templateKey, JSON.stringify({
+                    template: finalTemplate,
+                    timestamp: now,
+                  }));
+                  localStorage.setItem(cacheVersionKey, now.toString());
+                }
               }
               
               // Update state if template changed
