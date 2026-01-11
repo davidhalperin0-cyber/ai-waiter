@@ -3350,7 +3350,11 @@ export default function DashboardPage() {
                 </p>
                 <textarea
                   name="aiInstructions"
-                  defaultValue={businessInfo.aiInstructions || ''}
+                  value={businessInfo.aiInstructions || ''}
+                  onChange={(e) => {
+                    // Update state immediately for controlled component
+                    setBusinessInfo((prev) => prev ? { ...prev, aiInstructions: e.target.value } : null);
+                  }}
                   rows={8}
                   className="w-full rounded-lg bg-neutral-800/80 border border-neutral-700/50 px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all resize-y"
                   placeholder="לדוגמה:&#10;בסושי - המנות 'סלמון אפוי' ו'טונה אפויה' חייבות להיות אפויות, לא נא.&#10;אין אפשרות להסיר גבינה מפיצה מרגריטה.&#10;כל המנות ללא גלוטן מסומנות בתפריט."
