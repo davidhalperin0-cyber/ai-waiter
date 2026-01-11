@@ -479,8 +479,9 @@ export default function DashboardPage() {
 
         // CRITICAL: Always prefer API aiInstructions (source of truth from database)
         // Only use cache if same device just updated (within 2 minutes)
+        // FIXED: Removed cacheVersionNumber > lastKnownVersionNumber check because they're always the same
         let finalAiInstructions = data.business.aiInstructions || '';
-        if (cachedAiInstructions !== null && cachedAiInstructionsTimestamp > Date.now() - 2 * 60 * 1000 && cacheVersionNumber > lastKnownVersionNumber) {
+        if (cachedAiInstructions !== null && cachedAiInstructionsTimestamp > Date.now() - 2 * 60 * 1000) {
           // Same device just updated (within 2 minutes) - use cache to bypass read replica lag
           finalAiInstructions = cachedAiInstructions;
           console.log('✅ Using cached aiInstructions (same device, just updated):', {
