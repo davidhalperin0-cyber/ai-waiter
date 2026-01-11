@@ -3071,7 +3071,7 @@ export default function DashboardPage() {
                     logoUrl: finalLogoUrl, // Use API response or form value
                     type, 
                     template: finalTemplate, // Use API response as source of truth
-                    aiInstructions: finalAiInstructions || '', // Use API response as source of truth (empty string if undefined)
+                    aiInstructions: finalAiInstructions ?? '', // Use API response as source of truth (empty string if null/undefined)
                     businessHours: finalBusinessHours, // Use API response as source of truth
                     subscription: updatedSubscription,
                     printerConfig: businessInfo.printerConfig,
