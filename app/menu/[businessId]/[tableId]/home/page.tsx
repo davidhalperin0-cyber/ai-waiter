@@ -326,13 +326,13 @@ function HomePageContent({
     if (businessId) {
       loadData();
       
-      // CRITICAL: Auto-refresh every 30 seconds to get updates from other devices
-      // This ensures phone gets updates when admin saves on computer
+      // CRITICAL: Auto-refresh every 5 seconds to get updates from other devices IMMEDIATELY
+      // This ensures phone gets updates when admin saves on computer within 5 seconds
       const refreshInterval = setInterval(() => {
         console.log('🔄 Auto-refreshing business info to get latest updates...');
         // Reload data to get latest from API
         loadData().catch(err => console.error('Error auto-refreshing:', err));
-      }, 30 * 1000); // Every 30 seconds
+      }, 5 * 1000); // Every 5 seconds for immediate updates
       
       return () => clearInterval(refreshInterval);
     }
