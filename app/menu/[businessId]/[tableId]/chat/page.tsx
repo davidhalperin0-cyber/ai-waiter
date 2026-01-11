@@ -56,8 +56,15 @@ function ChatPageContent({
   tableId: string;
 }) {
   const router = useRouter();
-  const { items, addItem, removeItem, clear } = useCart();
+  const { items, addItem, removeItem, clear, getCart, setBusinessAndTable } = useCart();
   const { session, markOrderConfirmed, markCartUpdated, updateSession, isSessionValid } = useSession();
+  
+  // Set business and table for cart storage
+  useEffect(() => {
+    if (businessId && tableId) {
+      setBusinessAndTable(businessId, tableId);
+    }
+  }, [businessId, tableId, setBusinessAndTable]);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [language, setLanguage] = useState<'he' | 'en'>('he');
   
@@ -472,7 +479,9 @@ function ChatPageContent({
 
   // Incomplete order detection - if cart has items but no order for X minutes
   useEffect(() => {
-    if (!session || items.length === 0 || session.incompleteOrderShown) return;
+    // CRITICAL: Use getCart() to get current cart state
+    const currentCart = getCart();
+    if (!session || currentCart.length === 0 || session.incompleteOrderShown) return;
 
     // Check if there's an incomplete order (items in cart, no confirmed order)
     if (session.orderStatus === 'in_progress' && session.lastCartUpdate) {
@@ -490,10 +499,14 @@ function ChatPageContent({
         updateSession({ incompleteOrderShown: true });
       }
     }
-  }, [session, items.length, updateSession]);
+  }, [session, items.length, updateSession, getCart]);
 
   function applyActions(actions: any[]) {
     if (!Array.isArray(actions) || actions.length === 0) return;
+
+    // CRITICAL: Get current cart state before applying actions
+    // This ensures we always work with the latest cart state
+    const currentCart = getCart();
 
     let addedCount = 0;
     let removedCount = 0;
@@ -524,8 +537,8 @@ function ChatPageContent({
         }
       } else if (action?.type === 'remove_from_cart' && typeof action.itemName === 'string') {
         const quantity = typeof action.quantity === 'number' && action.quantity > 0 ? action.quantity : 1;
-        // Find the item in the current cart
-        const cartItem = items.find((i) => i.name === action.itemName);
+        // CRITICAL: Find the item in the CURRENT cart state (not from closure)
+        const cartItem = currentCart.find((i) => i.name === action.itemName);
         if (!cartItem) {
           console.warn('AI requested remove_from_cart for item not in cart', action.itemName);
           return;
@@ -564,12 +577,18 @@ function ChatPageContent({
 
       toast.success(language === 'en' ? 'Updated the order according to your chat request.' : `עדכנתי את ההזמנה לפי הבקשה לצ'אט.`);
 
+      // CRITICAL: Get updated cart state after actions to reflect real state
+      const updatedCart = getCart();
+      const cartSummary = updatedCart.length > 0
+        ? updatedCart.map((i) => `${i.quantity}x ${i.name}`).join(', ')
+        : (language === 'en' ? 'empty' : 'ריקה');
+
       const assistantMessage: Message = {
         id: Date.now() + 2,
         role: 'assistant',
         content: language === 'en' 
-          ? `${summaryParts.join('. ')}.\nI'll prepare an updated summary of your order.`
-          : `${summaryParts.join('. ')}.\nאני אכין סיכום מעודכן של ההזמנה.`,
+          ? `${summaryParts.join('. ')}.\nCurrent cart: ${cartSummary}.\nI'll prepare an updated summary of your order.`
+          : `${summaryParts.join('. ')}.\nהעגלה הנוכחית: ${cartSummary}.\nאני אכין סיכום מעודכן של ההזמנה.`,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -580,7 +599,9 @@ function ChatPageContent({
     // Handle special quick reply buttons (both Hebrew and English)
     if (buttonText === 'לסגור את ההזמנה' || buttonText === 'Complete Order') {
       // Request order summary from AI
-      if (items.length > 0) {
+      // CRITICAL: Use getCart() to get current cart state
+      const currentCart = getCart();
+      if (currentCart.length > 0) {
         // If there are items in cart, ask AI for summary
         const summaryRequest = language === 'en' ? 'Show me a summary of my order' : 'תראה לי סיכום של ההזמנה שלי';
         sendMessageWithText(summaryRequest);
@@ -653,13 +674,17 @@ function ChatPageContent({
     setLoading(true);
 
     try {
+      // CRITICAL: Get current cart state before sending to API
+      // This ensures the AI always has the latest cart state
+      const currentCart = getCart();
+      
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           businessId,
           tableId,
-          cart: items,
+          cart: currentCart, // Use current cart state, not closure
           language,
           messages: nextMessages.map((m) => ({
             role: m.role,
@@ -829,7 +854,9 @@ function ChatPageContent({
   }
 
   async function confirmOrder() {
-    if (!items.length || !lastSummary) return;
+    // CRITICAL: Use getCart() to get current cart state
+    const currentCart = getCart();
+    if (!currentCart.length || !lastSummary) return;
 
     // Check if session is still valid
     if (!isSessionValid || !isSessionValid()) {
@@ -845,7 +872,7 @@ function ChatPageContent({
         body: JSON.stringify({
           businessId,
           tableId,
-          items,
+          items: currentCart, // Use current cart state
           aiSummary: lastSummary,
         }),
       });

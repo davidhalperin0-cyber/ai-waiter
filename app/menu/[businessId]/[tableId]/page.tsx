@@ -49,8 +49,15 @@ function CustomerMenuPageContent({
     return price;
   };
   
-  const { items, addItem } = useCart();
+  const { items, addItem, removeItem, updateQuantity, clear, setBusinessAndTable } = useCart();
   const { session, markCartUpdated, updateSession, isSessionValid } = useSession();
+  
+  // Set business and table for cart storage
+  useEffect(() => {
+    if (businessId && tableId) {
+      setBusinessAndTable(businessId, tableId);
+    }
+  }, [businessId, tableId, setBusinessAndTable]);
   const [sessionExpired, setSessionExpired] = useState(false);
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -2325,7 +2332,7 @@ const orderedCategories = useMemo(() => {
           )}
         </AnimatePresence>
 
-        {/* Footer - Floating Premium Design */}
+        {/* Footer - Floating Premium Design with Cart Items */}
         <AnimatePresence>
           {totalItems > 0 && businessInfo?.planType !== 'menu_only' && (
             <motion.footer
@@ -2336,7 +2343,53 @@ const orderedCategories = useMemo(() => {
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
             >
               <div className="bg-neutral-900/80 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-                <div className="flex items-center justify-between mb-4 px-4">
+                {/* Cart Items List */}
+                <div className="mb-4 max-h-48 overflow-y-auto space-y-2">
+                  {items.map((item) => (
+                    <div key={item.menuItemId} className="flex items-center justify-between gap-2 px-2 py-2 rounded-lg bg-white/5">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-white/90 truncate">{item.name}</div>
+                        <div className="text-xs text-white/50">₪{item.price.toFixed(2)} × {item.quantity}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {/* Quantity Controls */}
+                        <div className="flex items-center gap-1 bg-white/10 rounded-lg">
+                          <button
+                            onClick={() => {
+                              if (item.quantity > 1) {
+                                updateQuantity(item.menuItemId, item.quantity - 1);
+                              } else {
+                                removeItem(item.menuItemId);
+                              }
+                            }}
+                            className="px-2 py-1 text-white/70 hover:text-white transition-colors"
+                            aria-label="הקטן כמות"
+                          >
+                            −
+                          </button>
+                          <span className="px-2 py-1 text-sm text-white min-w-[2ch] text-center">{item.quantity}</span>
+                          <button
+                            onClick={() => updateQuantity(item.menuItemId, item.quantity + 1)}
+                            className="px-2 py-1 text-white/70 hover:text-white transition-colors"
+                            aria-label="הגדל כמות"
+                          >
+                            +
+                          </button>
+                        </div>
+                        {/* Remove Button */}
+                        <button
+                          onClick={() => removeItem(item.menuItemId)}
+                          className="px-2 py-1 text-red-400/70 hover:text-red-400 transition-colors"
+                          aria-label="הסר פריט"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="flex items-center justify-between mb-4 px-4 border-t border-white/10 pt-4">
                   <div className="flex flex-col">
                     <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold">העגלה שלך</span>
                     <span className="text-sm text-white/80">
@@ -2347,9 +2400,23 @@ const orderedCategories = useMemo(() => {
                     <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold block">סה"כ</span>
                     <span className="text-xl font-light tracking-wider text-white">
                       ₪{totalPrice.toFixed(2)}
-          </span>
-        </div>
+                    </span>
+                  </div>
                 </div>
+                
+                {/* Clear Cart Button */}
+                {items.length > 0 && (
+                  <button
+                    onClick={() => {
+                      if (confirm(language === 'en' ? 'Clear all items from cart?' : 'לנקות את כל הפריטים מהעגלה?')) {
+                        clear();
+                      }
+                    }}
+                    className="w-full mb-3 px-4 py-2 text-xs text-white/60 hover:text-white/90 transition-colors border border-white/10 hover:border-white/20 rounded-lg"
+                  >
+                    {language === 'en' ? 'Clear Cart' : 'נקה עגלה'}
+                  </button>
+                )}
 
         <Link
           href={`/menu/${businessId}/${tableId}/chat`}
