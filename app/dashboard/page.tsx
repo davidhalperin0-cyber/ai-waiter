@@ -3027,9 +3027,11 @@ export default function DashboardPage() {
                   // Use template from API response if available (source of truth), otherwise use form value
                   const finalTemplate = data.template || template;
                   
-                  // Use aiInstructions from API response if available (source of truth), otherwise use form value
-                  const finalAiInstructions = data.aiInstructions !== undefined ? data.aiInstructions : (aiInstructions || '');
-                  console.log('📥 Received aiInstructions from API:', {
+                  // CRITICAL: Use the value we sent (aiInstructions) as source of truth, NOT API response
+                  // API response comes from read replica and may be stale (read replica lag)
+                  // We know the RPC saved it successfully, so use what we sent
+                  const finalAiInstructions = (aiInstructions !== null && aiInstructions !== undefined) ? aiInstructions.trim() : '';
+                  console.log('📥 Using sent aiInstructions (bypassing read replica lag):', {
                     hasInResponse: data.aiInstructions !== undefined,
                     responseValue: data.aiInstructions,
                     responseLength: data.aiInstructions?.length || 0,
@@ -3037,6 +3039,7 @@ export default function DashboardPage() {
                     formLength: aiInstructions?.length || 0,
                     finalValue: finalAiInstructions,
                     finalLength: finalAiInstructions?.length || 0,
+                    reason: 'Using sent value to bypass read replica lag - RPC confirmed save',
                   });
                   
                   // Use businessHours from API response if available (source of truth), otherwise use form value
