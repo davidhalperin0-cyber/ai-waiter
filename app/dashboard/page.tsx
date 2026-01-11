@@ -2956,6 +2956,11 @@ export default function DashboardPage() {
                 const template = formData.get('template') as string;
                 const aiInstructions = formData.get('aiInstructions') as string;
                 const menuOnlyMessage = formData.get('menuOnlyMessage') as string;
+                console.log('📝 Form submitted with aiInstructions:', {
+                  aiInstructions,
+                  aiInstructionsLength: aiInstructions?.length,
+                  aiInstructionsValue: aiInstructions,
+                });
                 console.log('📝 Form submitted with menuOnlyMessage:', {
                   menuOnlyMessage,
                   menuOnlyMessageLength: menuOnlyMessage?.length,
@@ -2990,7 +2995,7 @@ export default function DashboardPage() {
                       logoUrl: logoUrl || undefined,
                       type,
                       template,
-                      aiInstructions: aiInstructions || undefined,
+                      aiInstructions: aiInstructions !== null && aiInstructions !== undefined ? aiInstructions.trim() : '',
                       businessHours: businessHours, // Always send, even if null
                       menuOnlyMessage: businessInfo.subscription?.planType === 'menu_only'
                         ? (menuOnlyMessage?.trim() || null)
@@ -3041,7 +3046,7 @@ export default function DashboardPage() {
                     logoUrl: finalLogoUrl, // Use API response or form value
                     type, 
                     template: finalTemplate, // Use API response as source of truth
-                    aiInstructions: finalAiInstructions, // Use API response as source of truth
+                    aiInstructions: finalAiInstructions || '', // Use API response as source of truth (empty string if undefined)
                     businessHours: finalBusinessHours, // Use API response as source of truth
                     subscription: updatedSubscription,
                     printerConfig: businessInfo.printerConfig,
