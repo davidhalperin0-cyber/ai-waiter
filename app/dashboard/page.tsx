@@ -184,12 +184,12 @@ export default function DashboardPage() {
       loadTables();
       loadBusinessInfo();
       
-      // CRITICAL: Auto-refresh every 30 seconds to get updates from other devices
-      // This ensures computer gets updates when admin saves on phone
+      // CRITICAL: Auto-refresh every 5 seconds to get updates from other devices IMMEDIATELY
+      // This ensures computer gets updates when admin saves on phone within 5 seconds
       const refreshInterval = setInterval(() => {
         console.log('🔄 Auto-refreshing business info to get latest updates...');
         loadBusinessInfo().catch(err => console.error('Error auto-refreshing:', err));
-      }, 30 * 1000); // Every 30 seconds
+      }, 5 * 1000); // Every 5 seconds for immediate updates
       
       return () => clearInterval(refreshInterval);
     }
