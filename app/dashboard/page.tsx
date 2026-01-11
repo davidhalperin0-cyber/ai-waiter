@@ -183,6 +183,15 @@ export default function DashboardPage() {
       loadMenu();
       loadTables();
       loadBusinessInfo();
+      
+      // CRITICAL: Auto-refresh every 30 seconds to get updates from other devices
+      // This ensures computer gets updates when admin saves on phone
+      const refreshInterval = setInterval(() => {
+        console.log('🔄 Auto-refreshing business info to get latest updates...');
+        loadBusinessInfo().catch(err => console.error('Error auto-refreshing:', err));
+      }, 30 * 1000); // Every 30 seconds
+      
+      return () => clearInterval(refreshInterval);
     }
   }, [businessId]);
 
@@ -366,6 +375,13 @@ export default function DashboardPage() {
           instagramLength: data.business.customContent?.contact?.instagram?.length,
         });
         
+        // CRITICAL: Get cache version info before using it
+        const cacheVersionKey = `business_${businessId}_template_version`;
+        const currentCacheVersion = typeof window !== 'undefined' ? localStorage.getItem(cacheVersionKey) : null;
+        const cacheVersionNumber = currentCacheVersion ? parseInt(currentCacheVersion, 10) : 0;
+        const lastKnownVersion = typeof window !== 'undefined' ? localStorage.getItem(cacheVersionKey) : null;
+        const lastKnownVersionNumber = lastKnownVersion ? parseInt(lastKnownVersion, 10) : 0;
+        
         // Clean customContent from old fields - define before setBusinessInfo
         const cleanCustomContent = (content: any) => {
           if (!content) return null;
@@ -385,16 +401,23 @@ export default function DashboardPage() {
           };
         };
         
-        // CRITICAL: Use cached customContent if it's newer than 5 minutes old
-        // This ensures we use the data we know was saved, not stale read replica data
+        // CRITICAL: Always prefer API customContent (source of truth from database)
+        // Only use cache if same device just updated (within 2 minutes)
         let finalCustomContent = cleanCustomContent(data.business.customContent);
-        if (cachedCustomContent && cachedTimestamp > Date.now() - 5 * 60 * 1000) {
-          // Cached data is recent (less than 5 minutes old), use it instead of API data
+        if (cachedCustomContent && cachedTimestamp > Date.now() - 2 * 60 * 1000 && cacheVersionNumber > lastKnownVersionNumber) {
+          // Same device just updated (within 2 minutes) - use cache to bypass read replica lag
           finalCustomContent = cleanCustomContent(cachedCustomContent);
-          console.log('✅ Using cached customContent from localStorage (source of truth):', {
+          console.log('✅ Using cached customContent (same device, just updated):', {
             phone: finalCustomContent?.contact?.phone,
             email: finalCustomContent?.contact?.email,
             cachedAge: Date.now() - cachedTimestamp,
+          });
+        } else {
+          // Always use API data (ensures different devices get latest)
+          console.log('📥 Using API customContent (source of truth):', {
+            phone: finalCustomContent?.contact?.phone,
+            email: finalCustomContent?.contact?.email,
+            reason: !cachedCustomContent ? 'no cache' : cachedTimestamp <= Date.now() - 2 * 60 * 1000 ? 'cache too old' : 'default to API',
           });
         }
 
@@ -416,59 +439,107 @@ export default function DashboardPage() {
           });
         }
 
-        // CRITICAL: Use cached template if it's newer than 5 minutes old
-        // This ensures we use the data we know was saved, not stale read replica data
+        // CRITICAL: Always prefer API template (source of truth from database)
+        // Only use cache if same device just updated (within 2 minutes)
+        // This ensures different devices always get the latest data
+        // (cacheVersionNumber and lastKnownVersionNumber already defined above)
         let finalTemplate = data.business.template || 'generic';
-        if (cachedTemplate && cachedTemplateTimestamp > Date.now() - 5 * 60 * 1000) {
-          // Cached data is recent (less than 5 minutes old), use it instead of API data
+        
+        if (cachedTemplate && cacheVersionNumber > lastKnownVersionNumber && cachedTemplateTimestamp > Date.now() - 2 * 60 * 1000) {
+          // Same device just updated (within 2 minutes) - use cache to bypass read replica lag
           finalTemplate = cachedTemplate;
-          console.log('✅ Using cached template from localStorage (source of truth):', {
+          console.log('✅ Using cached template (same device, just updated):', {
             template: finalTemplate,
             cachedAge: Date.now() - cachedTemplateTimestamp,
           });
+        } else {
+          // Always use API template (ensures different devices get latest)
+          console.log('📥 Using API template (source of truth):', {
+            template: finalTemplate,
+            reason: !cachedTemplate ? 'no cache (different device or first load)' 
+                    : cacheVersionNumber <= lastKnownVersionNumber ? 'cache not newer' 
+                    : cachedTemplateTimestamp <= Date.now() - 2 * 60 * 1000 ? 'cache too old' 
+                    : 'default to API',
+            apiTemplate: data.business.template,
+            cachedTemplate: cachedTemplate,
+          });
+          // Update cache with API template
+          if (typeof window !== 'undefined' && finalTemplate) {
+            const now = Date.now();
+            localStorage.setItem(templateKey, JSON.stringify({
+              template: finalTemplate,
+              timestamp: now,
+            }));
+            localStorage.setItem(cacheVersionKey, now.toString());
+          }
         }
 
-        // CRITICAL: Use cached aiInstructions if it's newer than 5 minutes old
-        // This ensures we use the data we know was saved, not stale read replica data
+        // CRITICAL: Always prefer API aiInstructions (source of truth from database)
+        // Only use cache if same device just updated (within 2 minutes)
         let finalAiInstructions = data.business.aiInstructions || '';
-        if (cachedAiInstructions !== null && cachedAiInstructionsTimestamp > Date.now() - 5 * 60 * 1000) {
-          // Cached data is recent (less than 5 minutes old), use it instead of API data
+        if (cachedAiInstructions !== null && cachedAiInstructionsTimestamp > Date.now() - 2 * 60 * 1000 && cacheVersionNumber > lastKnownVersionNumber) {
+          // Same device just updated (within 2 minutes) - use cache to bypass read replica lag
           finalAiInstructions = cachedAiInstructions;
-          console.log('✅ Using cached aiInstructions from localStorage (source of truth):', {
+          console.log('✅ Using cached aiInstructions (same device, just updated):', {
             hasInstructions: !!finalAiInstructions,
             length: finalAiInstructions?.length || 0,
             cachedAge: Date.now() - cachedAiInstructionsTimestamp,
           });
-        }
-
-        // CRITICAL: Use cached businessHours if it's newer than 5 minutes old
-        // This ensures we use the data we know was saved, not stale read replica data
-        let finalBusinessHours = data.business.businessHours || null;
-        if (cachedBusinessHours !== null && cachedBusinessHoursTimestamp > Date.now() - 5 * 60 * 1000) {
-          // Cached data is recent (less than 5 minutes old), use it instead of API data
-          finalBusinessHours = cachedBusinessHours;
-          console.log('✅ Using cached businessHours from localStorage (source of truth):', {
-            businessHours: finalBusinessHours,
-            cachedAge: Date.now() - cachedBusinessHoursTimestamp,
+        } else {
+          // Always use API data (ensures different devices get latest)
+          console.log('📥 Using API aiInstructions (source of truth):', {
+            hasInstructions: !!finalAiInstructions,
+            length: finalAiInstructions?.length || 0,
+            reason: cachedAiInstructions === null ? 'no cache' : cachedAiInstructionsTimestamp <= Date.now() - 2 * 60 * 1000 ? 'cache too old' : 'default to API',
           });
         }
 
-        // CRITICAL: Use cached name, nameEn, and logoUrl if they're newer than 5 minutes old
-        // This ensures we use the data we know was saved, not stale read replica data
+        // CRITICAL: Always prefer API businessHours (source of truth from database)
+        // Only use cache if same device just updated (within 2 minutes)
+        let finalBusinessHours = data.business.businessHours || null;
+        if (cachedBusinessHours !== null && cachedBusinessHoursTimestamp > Date.now() - 2 * 60 * 1000 && cacheVersionNumber > lastKnownVersionNumber) {
+          // Same device just updated (within 2 minutes) - use cache to bypass read replica lag
+          finalBusinessHours = cachedBusinessHours;
+          console.log('✅ Using cached businessHours (same device, just updated):', {
+            businessHours: finalBusinessHours,
+            cachedAge: Date.now() - cachedBusinessHoursTimestamp,
+          });
+        } else {
+          // Always use API data (ensures different devices get latest)
+          console.log('📥 Using API businessHours (source of truth):', {
+            businessHours: finalBusinessHours,
+            reason: cachedBusinessHours === null ? 'no cache' : cachedBusinessHoursTimestamp <= Date.now() - 2 * 60 * 1000 ? 'cache too old' : 'default to API',
+          });
+        }
+
+        // CRITICAL: Always prefer API name, nameEn, and logoUrl (source of truth from database)
+        // Only use cache if same device just updated (within 2 minutes)
         let finalName = data.business.name;
         let finalNameEn = data.business.nameEn || undefined;
         let finalLogoUrl = data.business.logoUrl || '';
         
-        if (cachedBasicInfoTimestamp > Date.now() - 5 * 60 * 1000) {
-          // Cached data is recent (less than 5 minutes old), use it instead of API data
+        // CRITICAL: Always prefer API basicInfo (source of truth from database)
+        // Only use cache if same device just updated (within 2 minutes)
+        if (cachedBasicInfoTimestamp > Date.now() - 2 * 60 * 1000 && cacheVersionNumber > lastKnownVersionNumber) {
+          // Same device just updated (within 2 minutes) - use cache to bypass read replica lag
           if (cachedName !== null) finalName = cachedName;
           if (cachedNameEn !== undefined) finalNameEn = cachedNameEn;
           if (cachedLogoUrl !== undefined) finalLogoUrl = cachedLogoUrl || '';
-          console.log('✅ Using cached basicInfo from localStorage (source of truth):', {
+          console.log('✅ Using cached basicInfo (same device, just updated):', {
             name: finalName,
             nameEn: finalNameEn,
             logoUrl: finalLogoUrl,
             cachedAge: Date.now() - cachedBasicInfoTimestamp,
+          });
+        } else {
+          // Always use API data (ensures different devices get latest)
+          console.log('📥 Using API basicInfo (source of truth):', {
+            name: finalName,
+            nameEn: finalNameEn,
+            logoUrl: finalLogoUrl,
+            reason: cachedBasicInfoTimestamp <= Date.now() - 2 * 60 * 1000 ? 'cache too old' 
+                    : cacheVersionNumber <= lastKnownVersionNumber ? 'cache not newer' 
+                    : 'default to API',
           });
         }
         
