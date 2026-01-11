@@ -2754,13 +2754,18 @@ export default function DashboardPage() {
                   // CRITICAL: Save to localStorage so it persists after page refresh
                   // This bypasses read replica lag by using the data we know was saved
                   const localStorageKey = `business_${businessId}_customContent`;
+                  const cacheVersionKey = `business_${businessId}_template_version`; // Use same version key as template
+                  const now = Date.now();
                   try {
                     localStorage.setItem(localStorageKey, JSON.stringify({
                       customContent: savedContent,
-                      timestamp: Date.now(),
+                      timestamp: now,
                     }));
+                    // Update version to signal other tabs/pages that customContent changed
+                    localStorage.setItem(cacheVersionKey, now.toString());
                     console.log('💾 Saved customContent to localStorage:', {
                       key: localStorageKey,
+                      version: now,
                       phone: savedContent?.contact?.phone,
                       email: savedContent?.contact?.email,
                     });
