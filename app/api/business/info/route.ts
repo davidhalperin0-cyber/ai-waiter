@@ -52,6 +52,14 @@ export async function GET(req: NextRequest) {
         facebookLength: rawFacebook?.length,
         // Log the full JSON to see if it's truncated
         customContentJson: JSON.stringify(business.customContent || business.customcontent).substring(0, 2000),
+        // CRITICAL: Log aiInstructions to debug the issue
+        aiInstructions: business.aiInstructions,
+        aiInstructionsType: typeof business.aiInstructions,
+        aiInstructionsLength: business.aiInstructions?.length || 0,
+        hasAiInstructions: !!business.aiInstructions,
+        aiInstructionsIsNull: business.aiInstructions === null,
+        aiInstructionsIsUndefined: business.aiInstructions === undefined,
+        aiInstructionsIsEmptyString: business.aiInstructions === '',
       });
     }
 
@@ -213,7 +221,7 @@ export async function GET(req: NextRequest) {
         headers: {},
         timeoutMs: 5000,
       },
-      aiInstructions: business.aiInstructions || null,
+      aiInstructions: business.aiInstructions ?? null, // Use ?? instead of || to preserve empty strings
       businessHours: business.businessHours || null,
       customContent: (() => {
         // Use the RPC result if available (it's already set in business.customContent above)
@@ -261,6 +269,17 @@ export async function GET(req: NextRequest) {
       })(),
     };
 
+    // CRITICAL: Log what we're returning to the client
+    console.log('📤 API: Returning business data to client:', {
+      aiInstructions: businessData.aiInstructions,
+      aiInstructionsType: typeof businessData.aiInstructions,
+      aiInstructionsLength: businessData.aiInstructions?.length || 0,
+      hasAiInstructions: !!businessData.aiInstructions,
+      aiInstructionsIsNull: businessData.aiInstructions === null,
+      aiInstructionsIsUndefined: businessData.aiInstructions === undefined,
+      aiInstructionsIsEmptyString: businessData.aiInstructions === '',
+    });
+    
     return NextResponse.json({ business: businessData }, { status: 200 });
   } catch (error: any) {
     console.error('Error fetching business info:', error);
