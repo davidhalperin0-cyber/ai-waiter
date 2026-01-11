@@ -373,6 +373,9 @@ export default function DashboardPage() {
           contact: data.business.customContent?.contact,
           instagram: data.business.customContent?.contact?.instagram,
           instagramLength: data.business.customContent?.contact?.instagram?.length,
+          aiInstructions: data.business.aiInstructions,
+          aiInstructionsLength: data.business.aiInstructions?.length || 0,
+          hasAiInstructions: !!data.business.aiInstructions,
         });
         
         // CRITICAL: Get cache version info before using it
@@ -574,6 +577,13 @@ export default function DashboardPage() {
           const typeChanged = prev.type !== newBusinessInfo.type;
           const templateChanged = prev.template !== newBusinessInfo.template;
           const aiInstructionsChanged = prev.aiInstructions !== newBusinessInfo.aiInstructions;
+          console.log('🔍 Checking if aiInstructions changed:', {
+            prev: prev.aiInstructions?.substring(0, 50) || 'empty',
+            new: newBusinessInfo.aiInstructions?.substring(0, 50) || 'empty',
+            prevLength: prev.aiInstructions?.length || 0,
+            newLength: newBusinessInfo.aiInstructions?.length || 0,
+            changed: aiInstructionsChanged,
+          });
           const hoursChanged = JSON.stringify(prev.businessHours) !== JSON.stringify(newBusinessInfo.businessHours);
           const subscriptionChanged = JSON.stringify(prev.subscription) !== JSON.stringify(newBusinessInfo.subscription);
           
@@ -3019,6 +3029,15 @@ export default function DashboardPage() {
                   
                   // Use aiInstructions from API response if available (source of truth), otherwise use form value
                   const finalAiInstructions = data.aiInstructions !== undefined ? data.aiInstructions : (aiInstructions || '');
+                  console.log('📥 Received aiInstructions from API:', {
+                    hasInResponse: data.aiInstructions !== undefined,
+                    responseValue: data.aiInstructions,
+                    responseLength: data.aiInstructions?.length || 0,
+                    formValue: aiInstructions,
+                    formLength: aiInstructions?.length || 0,
+                    finalValue: finalAiInstructions,
+                    finalLength: finalAiInstructions?.length || 0,
+                  });
                   
                   // Use businessHours from API response if available (source of truth), otherwise use form value
                   // CRITICAL: If API returns null but we sent a value, use the value we sent (bypass read replica lag)
@@ -3040,6 +3059,12 @@ export default function DashboardPage() {
                   const finalNameEn = data.nameEn !== undefined ? data.nameEn : (nameEn?.trim() || undefined);
                   const finalLogoUrl = data.logoUrl !== undefined ? data.logoUrl : (logoUrl || undefined);
 
+                  console.log('💾 Updating businessInfo state with:', {
+                    aiInstructions: finalAiInstructions,
+                    aiInstructionsLength: finalAiInstructions?.length || 0,
+                    hasAiInstructions: !!finalAiInstructions,
+                  });
+                  
                   setBusinessInfo({ 
                     name: finalName, // Use API response or form value
                     nameEn: finalNameEn, // Use API response or form value
@@ -3052,6 +3077,8 @@ export default function DashboardPage() {
                     printerConfig: businessInfo.printerConfig,
                     customContent: businessInfo.customContent,
                   });
+                  
+                  console.log('✅ businessInfo state updated, aiInstructions should now be:', finalAiInstructions || '');
                   
                   // CRITICAL: Save template to localStorage to bypass read replica lag
                   if (typeof window !== 'undefined' && finalTemplate) {
