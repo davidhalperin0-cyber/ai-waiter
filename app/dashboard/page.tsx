@@ -3065,13 +3065,18 @@ export default function DashboardPage() {
                   // CRITICAL: Save aiInstructions to localStorage to bypass read replica lag
                   if (typeof window !== 'undefined') {
                     const aiInstructionsKey = `business_${businessId}_aiInstructions`;
+                    const cacheVersionKey = `business_${businessId}_template_version`; // Use same version key as template
+                    const now = Date.now();
                     localStorage.setItem(aiInstructionsKey, JSON.stringify({
                       aiInstructions: finalAiInstructions || '',
-                      timestamp: Date.now(),
+                      timestamp: now,
                     }));
+                    // Update version to signal other tabs/pages that aiInstructions changed
+                    localStorage.setItem(cacheVersionKey, now.toString());
                     console.log('💾 Saved aiInstructions to localStorage:', {
                       hasInstructions: !!finalAiInstructions,
                       length: finalAiInstructions?.length || 0,
+                      version: now,
                     });
                   }
 
