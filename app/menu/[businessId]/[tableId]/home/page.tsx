@@ -98,9 +98,11 @@ function HomePageContent({
   const [loyaltySuccess, setLoyaltySuccess] = useState(false);
 
   useEffect(() => {
-    async function loadData() {
+    async function loadData(showLoading = true) {
       try {
-        setLoading(true);
+        if (showLoading) {
+          setLoading(true);
+        }
         setError(null);
 
         // CRITICAL: Define cache keys before using them
@@ -319,19 +321,21 @@ function HomePageContent({
       } catch (err: any) {
         setError(err.message || 'Error loading information');
       } finally {
-        setLoading(false);
+        if (showLoading) {
+          setLoading(false);
+        }
       }
     }
 
     if (businessId) {
-      loadData();
+      loadData(true);
       
       // CRITICAL: Auto-refresh every 5 seconds to get updates from other devices IMMEDIATELY
       // This ensures phone gets updates when admin saves on computer within 5 seconds
       const refreshInterval = setInterval(() => {
         console.log('🔄 Auto-refreshing business info to get latest updates...');
-        // Reload data to get latest from API
-        loadData().catch(err => console.error('Error auto-refreshing:', err));
+        // Reload data to get latest from API (don't show loading spinner on auto-refresh)
+        loadData(false).catch(err => console.error('Error auto-refreshing:', err));
       }, 5 * 1000); // Every 5 seconds for immediate updates
       
       return () => clearInterval(refreshInterval);

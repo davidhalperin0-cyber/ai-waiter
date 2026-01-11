@@ -400,39 +400,42 @@ function ChatPageContent({
           });
         }
 
-        // Load menu items
-        const res = await fetch(`/api/menu?businessId=${encodeURIComponent(businessId)}`);
-        const data = await res.json();
-        if (res.ok && Array.isArray(data.items)) {
-          // Filter out hidden items (isHidden = true) from customer menu
-          const visibleItems = data.items.filter((item: any) => !item.isHidden);
-          
-          // נשמור רק את מה שצריך לעגלה
-          const mapped = visibleItems.map((item: any) => ({
-            businessId: item.businessId,
-            name: item.name,
-            price: item.price,
-          }));
-          setMenuItems(mapped);
-          
-          // נשמור את כל הפרטים להצגת מנות
-          const fullMapped = visibleItems.map((item: any) => ({
-            businessId: item.businessId,
-            name: item.name,
-            price: item.price,
-            imageUrl: item.imageUrl,
-            ingredients: item.ingredients,
-            allergens: item.allergens,
-            category: item.category,
-            isPregnancySafe: item.isPregnancySafe,
-          }));
-          // Clean ingredients and allergens arrays from trailing 0s
-          const cleanedFullMapped = fullMapped.map((item: MenuItemLite) => ({
-            ...item,
-            ingredients: item.ingredients ? cleanArrayField(item.ingredients) : undefined,
-            allergens: item.allergens ? cleanArrayField(item.allergens) : undefined,
-          }));
-          setFullMenuItems(cleanedFullMapped);
+        // Load menu items (only on initial load, not on auto-refresh to prevent flickering)
+        // Menu items don't change often, so we don't need to refresh them every 5 seconds
+        if (menuItems.length === 0) {
+          const res = await fetch(`/api/menu?businessId=${encodeURIComponent(businessId)}`);
+          const data = await res.json();
+          if (res.ok && Array.isArray(data.items)) {
+            // Filter out hidden items (isHidden = true) from customer menu
+            const visibleItems = data.items.filter((item: any) => !item.isHidden);
+            
+            // נשמור רק את מה שצריך לעגלה
+            const mapped = visibleItems.map((item: any) => ({
+              businessId: item.businessId,
+              name: item.name,
+              price: item.price,
+            }));
+            setMenuItems(mapped);
+            
+            // נשמור את כל הפרטים להצגת מנות
+            const fullMapped = visibleItems.map((item: any) => ({
+              businessId: item.businessId,
+              name: item.name,
+              price: item.price,
+              imageUrl: item.imageUrl,
+              ingredients: item.ingredients,
+              allergens: item.allergens,
+              category: item.category,
+              isPregnancySafe: item.isPregnancySafe,
+            }));
+            // Clean ingredients and allergens arrays from trailing 0s
+            const cleanedFullMapped = fullMapped.map((item: MenuItemLite) => ({
+              ...item,
+              ingredients: item.ingredients ? cleanArrayField(item.ingredients) : undefined,
+              allergens: item.allergens ? cleanArrayField(item.allergens) : undefined,
+            }));
+            setFullMenuItems(cleanedFullMapped);
+          }
         }
       } catch (err) {
         console.error('Failed to load data for chat', err);
