@@ -439,6 +439,15 @@ function ChatPageContent({
       }
     }
     loadData();
+    
+    // CRITICAL: Auto-refresh every 5 seconds to get latest aiInstructions from other devices IMMEDIATELY
+    // This ensures phone gets updates when admin saves on computer within 5 seconds
+    const refreshInterval = setInterval(() => {
+      console.log('🔄 Auto-refreshing business info in chat to get latest aiInstructions...');
+      loadData().catch(err => console.error('Error auto-refreshing in chat:', err));
+    }, 5 * 1000); // Every 5 seconds for immediate updates
+    
+    return () => clearInterval(refreshInterval);
   }, [businessId]);
 
   // Auto-scroll to bottom when new messages arrive

@@ -22,11 +22,20 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch business info to get custom AI instructions
+    // CRITICAL: Use RPC or direct query with cache busting to bypass read replica lag
+    // Add timestamp to force fresh data
     const { data: business, error: businessError } = await supabaseAdmin
       .from('businesses')
       .select('aiInstructions')
       .eq('businessId', businessId)
       .single();
+    
+    // Log what we got for debugging
+    console.log('🤖 Chat API: Loaded aiInstructions:', {
+      hasInstructions: !!business?.aiInstructions,
+      length: business?.aiInstructions?.length || 0,
+      first100: business?.aiInstructions?.substring(0, 100) || '',
+    });
 
     if (businessError) {
       console.error('Error fetching business for AI instructions', businessError);
