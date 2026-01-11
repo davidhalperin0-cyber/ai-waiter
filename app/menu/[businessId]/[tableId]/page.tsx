@@ -368,12 +368,38 @@ function CustomerMenuPageContent({
           }
         }
 
+        // CRITICAL: Check cache version to detect if template was updated recently
+        // If cache version is newer than what we're seeing, prefer cached template
+        const currentCacheVersion = typeof window !== 'undefined' ? localStorage.getItem(cacheVersionKey) : null;
+        const cacheVersionNumber = currentCacheVersion ? parseInt(currentCacheVersion, 10) : 0;
+        const lastKnownVersionNumber = lastKnownVersion ? parseInt(lastKnownVersion, 10) : 0;
+        
         // CRITICAL: Always prioritize API template if it's different from cache
-        // This ensures template changes are immediately reflected
+        // BUT: If cache was updated more recently (newer version), prefer cache to bypass read replica lag
         let finalTemplate = (infoData.template || 'generic') as 'bar-modern' | 'bar-classic' | 'bar-mid' | 'pizza-modern' | 'pizza-classic' | 'pizza-mid' | 'sushi' | 'generic' | 'gold';
         
-        // If API template is different from cached, always use API (template was updated)
-        if (cachedTemplate && cachedTemplate !== infoData.template && infoData.template) {
+        console.log('🔍 Template comparison:', {
+          cachedTemplate,
+          apiTemplate: infoData.template,
+          areDifferent: cachedTemplate !== infoData.template,
+          cachedAge: cachedTemplateTimestamp > 0 ? Date.now() - cachedTemplateTimestamp : 0,
+          cacheVersion: cacheVersionNumber,
+          lastKnownVersion: lastKnownVersionNumber,
+          cacheIsNewer: cacheVersionNumber > lastKnownVersionNumber,
+        });
+        
+        // If cache version is newer than what we knew about, template was just updated
+        // In this case, prefer cached template even if API doesn't match (read replica lag)
+        if (cachedTemplate && cacheVersionNumber > lastKnownVersionNumber && cachedTemplateTimestamp > Date.now() - 10 * 60 * 1000) {
+          console.log('🔄 Cache version is newer! Using cached template (bypassing read replica lag):', {
+            cachedTemplate,
+            apiTemplate: infoData.template,
+            cacheVersion: cacheVersionNumber,
+            lastKnownVersion: lastKnownVersionNumber,
+          });
+          finalTemplate = cachedTemplate as any;
+        } else if (cachedTemplate && cachedTemplate !== infoData.template && infoData.template) {
+          // Cache and API differ, and cache isn't newer - use API (template was updated on server)
           console.log('🔄 Template changed! Using API template (newer):', {
             cachedTemplate,
             apiTemplate: infoData.template,
@@ -395,7 +421,10 @@ function CustomerMenuPageContent({
         } else {
           // Default: Use API template (most reliable source)
           finalTemplate = (infoData.template || 'generic') as any;
-          console.log('📥 Using API template:', finalTemplate);
+          console.log('📥 Using API template (default):', {
+            template: finalTemplate,
+            reason: !cachedTemplate ? 'no cache' : cachedTemplate !== infoData.template ? 'mismatch' : 'cache too old',
+          });
           // Update cache with API template
           if (typeof window !== 'undefined' && finalTemplate) {
             const now = Date.now();
@@ -533,6 +562,111 @@ function CustomerMenuPageContent({
     loadData(true);
     
     // No polling - only load once per businessId to prevent infinite re-renders
+  }, [businessId]);
+
+  // CRITICAL: Listen for template changes via localStorage storage events
+  // This allows the page to update immediately when template is changed in another tab
+  useEffect(() => {
+    if (typeof window === 'undefined' || !businessId) return;
+    
+    const templateKey = `business_${businessId}_template`;
+    const cacheVersionKey = `business_${businessId}_template_version`;
+    
+    const handleStorageChange = (e: StorageEvent) => {
+      // Check if template or version changed
+      if (e.key === templateKey || e.key === cacheVersionKey) {
+        console.log('🔄 Template storage changed, reloading data...', {
+          key: e.key,
+          newValue: e.newValue,
+        });
+        // Reload business info to get updated template
+        async function reloadData() {
+          try {
+            const lastKnownVersion = localStorage.getItem(cacheVersionKey);
+            const infoRes = await fetch(
+              `/api/menu/info?businessId=${encodeURIComponent(businessId)}&_t=${Date.now()}&_v=${lastKnownVersion || '0'}`,
+              { cache: 'no-store' }
+            );
+            const infoData = await infoRes.json();
+            
+            if (infoRes.ok) {
+              // Get updated cache
+              const cachedTemplateData = localStorage.getItem(templateKey);
+              let cachedTemplate: string | null = null;
+              let cachedTemplateTimestamp = 0;
+              
+              if (cachedTemplateData) {
+                try {
+                  const parsed = JSON.parse(cachedTemplateData);
+                  cachedTemplate = parsed.template;
+                  cachedTemplateTimestamp = parsed.timestamp || 0;
+                } catch (e) {
+                  console.warn('Failed to parse cached template:', e);
+                }
+              }
+              
+              const currentCacheVersion = localStorage.getItem(cacheVersionKey);
+              const cacheVersionNumber = currentCacheVersion ? parseInt(currentCacheVersion, 10) : 0;
+              const lastKnownVersionNumber = lastKnownVersion ? parseInt(lastKnownVersion, 10) : 0;
+              
+              // Use same logic as loadData to determine final template
+              let finalTemplate = (infoData.template || 'generic') as any;
+              
+              if (cachedTemplate && cacheVersionNumber > lastKnownVersionNumber && cachedTemplateTimestamp > Date.now() - 10 * 60 * 1000) {
+                finalTemplate = cachedTemplate as any;
+              } else if (cachedTemplate && cachedTemplate !== infoData.template && infoData.template) {
+                finalTemplate = infoData.template as any;
+              } else if (cachedTemplate === infoData.template && cachedTemplateTimestamp > Date.now() - 5 * 60 * 1000) {
+                finalTemplate = cachedTemplate as any;
+              }
+              
+              // Update state if template changed
+              setBusinessInfo((prev) => {
+                if (!prev || prev.template !== finalTemplate) {
+                  return {
+                    ...prev!,
+                    template: finalTemplate,
+                  };
+                }
+                return prev;
+              });
+            }
+          } catch (err) {
+            console.error('Error reloading template:', err);
+          }
+        }
+        
+        reloadData();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also listen for same-tab updates (when template is saved in same tab)
+    const checkVersionInterval = setInterval(() => {
+      const currentVersion = localStorage.getItem(cacheVersionKey);
+      const storedVersion = sessionStorage.getItem(`last_template_version_${businessId}`);
+      
+      if (currentVersion && currentVersion !== storedVersion) {
+        console.log('🔄 Template version changed in same tab, reloading...');
+        sessionStorage.setItem(`last_template_version_${businessId}`, currentVersion);
+        handleStorageChange({
+          key: cacheVersionKey,
+          newValue: currentVersion,
+        } as StorageEvent);
+      }
+    }, 1000); // Check every second
+    
+    // Initialize stored version
+    const currentVersion = localStorage.getItem(cacheVersionKey);
+    if (currentVersion) {
+      sessionStorage.setItem(`last_template_version_${businessId}`, currentVersion);
+    }
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(checkVersionInterval);
+    };
   }, [businessId]);
 
   // Load saved language preference from localStorage
@@ -1397,16 +1531,23 @@ const orderedCategories = useMemo(() => {
           {/* Don't show menu if subscription is expired or business is disabled */}
           {!subscriptionExpired && !businessDisabled ? (
             <>
-          {/* Mobile Categories Navigation - Grid Layout */}
-          <nav className="lg:hidden sticky top-0 z-30 mb-8 -mx-4 bg-black/40 backdrop-blur-sm pt-4 pb-4">
+          {/* Mobile Categories Navigation - Premium Design */}
+          <nav className={`lg:hidden sticky top-0 z-30 mb-8 -mx-4 ${isBarClassic ? 'bg-[#1a1a1a]/80 backdrop-blur-xl' : 'bg-black/40 backdrop-blur-xl'} border-b ${isBarClassic ? 'border-white/5' : 'border-white/10'} pt-4 pb-4`}>
             <div className="px-4">
-              {/* Home button */}
+              {/* Home button with icon */}
               <div className="mb-3">
                 <motion.button
                   onClick={() => scrollToCategory('all')}
-                  className="relative w-full group"
+                  className="relative w-full group flex items-center justify-center gap-2"
                   whileTap={{ scale: 0.98 }}
                 >
+                  <svg className={`w-4 h-4 transition-all duration-300 ${
+                    activeCategory === 'all'
+                      ? isBarClassic ? 'text-[#1a1a1a]' : 'text-black'
+                      : isBarClassic ? 'text-[#FAF8F3]/60' : 'text-white/60'
+                  }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
                   <div
                     className={`px-5 py-2.5 rounded-full text-xs font-medium tracking-wider transition-all duration-500 ${
                       activeCategory === 'all'
@@ -1430,7 +1571,7 @@ const orderedCategories = useMemo(() => {
                 </motion.button>
               </div>
 
-              {/* Categories Grid */}
+              {/* Categories Grid - Premium Design */}
               {orderedCategories.length > 0 && (
                 <div className="grid grid-cols-3 gap-2">
                   {(categoriesExpanded ? orderedCategories : orderedCategories.slice(0, 3)).map((cat) => {
@@ -1454,16 +1595,17 @@ const orderedCategories = useMemo(() => {
                       onClick={() => scrollToCategory(cat)}
                       className="relative group"
                       whileTap={{ scale: 0.95 }}
+                      whileHover={{ scale: 1.02 }}
                     >
                       <div
-                        className={`px-3 py-2 rounded-full text-xs font-medium tracking-wider transition-all duration-500 text-center ${
+                        className={`px-3 py-2.5 rounded-lg text-xs font-medium tracking-wider transition-all duration-300 text-center ${
                           activeCategory === cat
                             ? isBarClassic
-                              ? 'text-[#1a1a1a] z-10'
-                              : 'text-black z-10'
+                              ? 'text-[#1a1a1a] z-10 bg-[#D4AF37] shadow-lg'
+                              : 'text-black z-10 bg-white shadow-lg'
                             : isBarClassic
-                              ? 'text-[#FAF8F3]/70 bg-white/5 border border-white/8'
-                            : 'text-white/60 bg-white/5 border border-white/10'
+                              ? 'text-[#FAF8F3]/70 bg-white/5 border border-white/8 hover:bg-white/8 hover:border-white/12'
+                            : 'text-white/60 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20'
                         }`}
                       >
                         <span className="line-clamp-1">{displayCategory}</span>
@@ -1471,7 +1613,7 @@ const orderedCategories = useMemo(() => {
                       {activeCategory === cat && (
                         <motion.div
                           layoutId="activeTab"
-                          className={`absolute inset-0 rounded-full -z-10 ${isBarClassic ? 'bg-[#D4AF37]' : 'bg-white'}`}
+                          className={`absolute inset-0 rounded-lg -z-10 ${isBarClassic ? 'bg-[#D4AF37]' : 'bg-white'}`}
                           transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                         />
                       )}
@@ -1481,16 +1623,17 @@ const orderedCategories = useMemo(() => {
                 </div>
               )}
 
-              {/* Expand/Collapse Button */}
+              {/* Expand/Collapse Button - Premium Design */}
               {orderedCategories.length > 3 && (
                 <motion.button
                   onClick={() => setCategoriesExpanded(!categoriesExpanded)}
-                  className={`mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-full text-xs font-medium transition-colors ${
+                  className={`mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-medium transition-all duration-300 ${
                     isBarClassic
-                      ? 'text-[#FAF8F3]/70 bg-white/5 border border-white/8 hover:bg-white/8'
-                      : 'text-white/60 bg-white/5 border border-white/10 hover:bg-white/10'
+                      ? 'text-[#FAF8F3]/70 bg-white/5 border border-white/8 hover:bg-white/8 hover:border-white/12'
+                      : 'text-white/60 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20'
                   }`}
                   whileTap={{ scale: 0.95 }}
+                  whileHover={{ scale: 1.02 }}
                 >
                   <span>{categoriesExpanded ? (language === 'en' ? 'Show Less' : 'הצג פחות') : (language === 'en' ? 'Show More' : 'הצג עוד')}</span>
                   <motion.span
@@ -1506,9 +1649,9 @@ const orderedCategories = useMemo(() => {
           </nav>
 
         {/* Continuous Menu Layout - All items in one scrollable page */}
-        <div className="lg:grid lg:grid-cols-[1fr_14rem] lg:gap-6 mb-6">
-          {/* Main Content Area */}
-          <div className="space-y-8">
+        <div className="mb-6">
+          {/* Main Content Area - Add margin for fixed sidebar */}
+          <div className="space-y-8 lg:mr-52">
             {/* Featured Section */}
             {featuredItems.length > 0 && (
               <section id="featured-section" className="mb-12">
@@ -1675,76 +1818,84 @@ const orderedCategories = useMemo(() => {
                         transition={{ delay: index * 0.05 }}
                         onClick={() => handleExpandItem(item)}
                       >
-                        {/* Image - Same size as featured items */}
-                        <div className={`${menuStyle.card.image} h-56 lg:h-72`}>
+                        {/* Image Container with Badge */}
+                        <div className="relative aspect-square rounded-lg overflow-hidden mb-4">
                           {item.imageUrl ? (
                             <img
                               src={item.imageUrl}
                               alt={item.name}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
                               onError={(e) => {
                                 (e.target as HTMLImageElement).style.display = 'none';
                               }}
                             />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-4xl opacity-20">
+                            <div className="w-full h-full flex items-center justify-center text-4xl opacity-20 bg-white/5">
                               🍽️
                             </div>
+                          )}
+                          {/* Featured Badge - Positioned on image */}
+                          {item.isFeatured && (
+                            <span className={isBarClassic
+                              ? "absolute top-3 right-3 text-[10px] tracking-[0.2em] uppercase text-[#D4AF37] bg-black/50 backdrop-blur-sm border border-[#D4AF37]/40 px-3 py-1.5 rounded-full font-medium shadow-lg"
+                              : "absolute top-3 right-3 text-[10px] tracking-[0.2em] uppercase text-amber-200/90 bg-black/40 backdrop-blur-sm border border-amber-200/30 px-3 py-1.5 rounded-full font-medium shadow-lg"
+                            }>
+                              {language === 'en' ? '⭐ Recommended' : '⭐ מומלץ השבוע'}
+                            </span>
+                          )}
+                          {/* Business Badge - Positioned on image */}
+                          {item.isBusiness && (
+                            <span className={isBarClassic
+                              ? "absolute top-3 right-3 text-[10px] tracking-[0.2em] uppercase text-blue-300/90 bg-black/50 backdrop-blur-sm border border-blue-300/40 px-3 py-1.5 rounded-full font-medium shadow-lg"
+                              : "absolute top-3 right-3 text-[10px] tracking-[0.2em] uppercase text-blue-300/90 bg-black/40 backdrop-blur-sm border border-blue-300/30 px-3 py-1.5 rounded-full font-medium shadow-lg"
+                            }>
+                              {language === 'en' ? '💼 Business' : '💼 עסקי'}
+                            </span>
+                          )}
+                          {/* Pregnancy Safe Badge - Positioned on image if no other badges */}
+                          {item.isPregnancySafe && !item.isFeatured && !item.isBusiness && (
+                            <span className={isBarClassic
+                              ? "absolute top-3 right-3 text-[10px] tracking-[0.1em] text-emerald-300/90 bg-black/50 backdrop-blur-sm border border-emerald-300/40 px-3 py-1.5 rounded-full font-medium shadow-lg"
+                              : "absolute top-3 right-3 text-[10px] tracking-[0.1em] text-emerald-200/90 bg-black/40 backdrop-blur-sm border border-emerald-200/30 px-3 py-1.5 rounded-full font-medium shadow-lg"
+                            }>
+                              {language === 'en' ? '🤰 Pregnancy-safe' : '🤰 מתאים להריון'}
+                            </span>
                           )}
                         </div>
 
                         {/* Content */}
-                        <div className={menuStyle.card.content}>
-                          {/* Badges */}
-                          <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            {item.isFeatured && (
-                              <span className={menuStyle.badge.featured}>
-                                {language === 'en' ? 'Recommended' : 'מומלץ'}
-                              </span>
-                            )}
-                            {item.isBusiness && (
-                              <span className="text-[10px] tracking-[0.2em] uppercase text-blue-300/80 border border-blue-300/20 px-3 py-1 rounded-full inline-block">
-                                {language === 'en' ? '💼 Business' : '💼 עסקי'}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Title and Price Row */}
-                          <div className="flex items-start justify-between gap-4 mb-2">
-                            <h3 className={menuStyle.typography.itemTitle}>{displayName}</h3>
-                            <span className={`${menuStyle.typography.price} hidden lg:block whitespace-nowrap`}>
-                              {formatPrice(item.price)}
-                            </span>
-                          </div>
-
+                        <div className="flex flex-col flex-1">
+                          {/* Title */}
+                          <h3 className={`${menuStyle.typography.itemTitle} mb-1`}>{displayName}</h3>
+                          
                           {/* Category Badge */}
                           {menuStyle.badge.category !== 'hidden' && (
-                            <span className={menuStyle.badge.category}>{item.category}</span>
+                            <span className={`${menuStyle.badge.category} mb-2`}>{item.category}</span>
                           )}
 
                           {/* Description */}
-                          {(displayIngredients?.length ||
-                            displayAllergens?.length ||
-                            item.isPregnancySafe) && (
-                            <p className={menuStyle.typography.itemDescription}>
+                          {(displayIngredients?.length || displayAllergens?.length) && (
+                            <p className={`${menuStyle.typography.itemDescription} mb-3 line-clamp-2`}>
                               {displayIngredients?.join(', ')}
                               {displayAllergens?.length && (
-                                <span className="text-red-300">
+                                <span className="text-red-300/80">
                                   {language === 'en' ? ' • Allergens: ' : ' • אלרגנים: '}
                                   {displayAllergens.join(', ')}
                                 </span>
                               )}
-                              {item.isPregnancySafe && (
-                                <span className={`${menuStyle.badge.pregnancy} mt-2 block w-fit`}>
-                                  {language === 'en' ? '🤰 Pregnancy-safe' : '🤰 מתאים להריון'}
-                                </span>
-                              )}
                             </p>
                           )}
+                          
+                          {/* Pregnancy Safe Badge - Below description if other badges exist */}
+                          {item.isPregnancySafe && (item.isFeatured || item.isBusiness) && (
+                            <span className={`${menuStyle.badge.pregnancy} mb-3 w-fit`}>
+                              {language === 'en' ? '🤰 Pregnancy-safe' : '🤰 מתאים להריון'}
+                            </span>
+                          )}
 
-                          {/* Price & Button Row */}
-                          <div className="flex items-center justify-between mt-auto pt-2">
-                            <span className={`${menuStyle.typography.price} lg:hidden`}>
+                          {/* Price and Add Button Row */}
+                          <div className="flex items-center justify-between mt-auto pt-3">
+                            <span className={`${menuStyle.typography.price} text-xl font-bold`}>
                               {formatPrice(item.price)}
                             </span>
                             {businessInfo?.planType !== 'menu_only' && (
@@ -1753,11 +1904,17 @@ const orderedCategories = useMemo(() => {
                                   e.stopPropagation();
                                   handleAddToCart(item);
                                 }}
-                                className={`${menuStyle.button.primary} w-full lg:w-auto`}
+                                className={isBarClassic 
+                                  ? "flex items-center gap-2 px-4 py-2 bg-[#8B2635] hover:bg-[#A02E3F] rounded-lg text-[#FAF8F3] text-sm font-medium transition-all duration-300 hover:scale-105 shadow-lg"
+                                  : "flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg text-white text-sm font-medium transition-all duration-300 hover:scale-105 border border-white/20 hover:border-white/30"
+                                }
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
                               >
-                                {language === 'en' ? 'Add to Cart' : 'הוסף לעגלה'}
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                </svg>
+                                <span>{language === 'en' ? 'Add to Cart' : 'הוסף לעגלה'}</span>
                               </motion.button>
                             )}
                           </div>
@@ -1894,30 +2051,35 @@ const orderedCategories = useMemo(() => {
           </div>
 
           {/* Categories Sidebar - Desktop Premium Design */}
-          <aside className="hidden lg:block lg:mb-0 lg:sticky lg:top-8 lg:self-start">
-            <div className="relative pl-6">
-              <div className="mb-8 pl-4">
-                <h2 className="text-[10px] uppercase tracking-[0.3em] text-white/30 font-bold mb-1">
-                  {language === 'en' ? 'MENU' : 'תפריט'}
-                </h2>
-                <div className="h-[1px] w-8 bg-white/20" />
-              </div>
+          <aside className={`hidden lg:block fixed right-0 top-0 h-full w-48 ${isBarClassic ? 'bg-[#1a1a1a]/80 backdrop-blur-xl border-r border-white/5' : 'bg-black/40 backdrop-blur-xl border-r border-white/10'} rounded-none border-t-0 border-b-0 p-4 z-30`} dir="rtl">
+            <div className="flex flex-col h-full">
+              <h3 className={`text-sm font-medium ${isBarClassic ? 'text-[#FAF8F3]/60' : 'text-white/60'} mb-4`}>
+                {language === 'en' ? 'MENU' : 'תפריט'}
+              </h3>
               
-              <div className="space-y-1">
+              <nav className="flex flex-col gap-1 flex-1">
                 <motion.button
                   onClick={() => scrollToCategory('all')}
-                  className="relative w-full text-right group flex items-center justify-end py-3 px-4 transition-all"
+                  className={`category-item flex items-center gap-2 text-right transition-all duration-300 ${
+                    activeCategory === 'all'
+                      ? isBarClassic
+                        ? 'text-[#FAF8F3] font-medium'
+                        : 'text-white font-medium'
+                      : isBarClassic
+                        ? 'text-[#FAF8F3]/60 hover:text-[#FAF8F3]'
+                        : 'text-white/60 hover:text-white'
+                  }`}
                   whileHover={{ x: -4 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  <span className={`text-sm tracking-wide transition-all duration-300 ${
-                    activeCategory === 'all' ? 'text-white font-medium' : 'text-white/40 group-hover:text-white/70'
-                  }`}>
-                    {language === 'en' ? 'Home' : 'עמוד הבית'}
-                  </span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                  <span>{language === 'en' ? 'Home' : 'עמוד הבית'}</span>
                   {activeCategory === 'all' && (
                     <motion.div
                       layoutId="activeTabDesktop"
-                      className="absolute right-0 w-1 h-6 bg-white rounded-full"
+                      className={`absolute right-0 w-1 h-6 ${isBarClassic ? 'bg-[#D4AF37]' : 'bg-white'} rounded-full`}
                       transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                     />
                   )}
@@ -1937,34 +2099,38 @@ const orderedCategories = useMemo(() => {
                   } else {
                     displayCategory = cat;
                   }
-                
                   
                   return (
-                  <motion.button
-                    key={cat}
-                    onClick={() => scrollToCategory(cat)}
-                    className="relative w-full text-right group flex items-center justify-end py-3 px-4 transition-all"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    whileHover={{ x: -4 }}
-                  >
-                    <span className={`text-sm tracking-wide transition-all duration-300 ${
-                      activeCategory === cat ? 'text-white font-medium' : 'text-white/40 group-hover:text-white/70'
-                    }`}>
-                      {displayCategory}
-                    </span>
-                    {activeCategory === cat && (
-                      <motion.div
-                        layoutId="activeTabDesktop"
-                        className="absolute right-0 w-1 h-6 bg-white rounded-full"
-                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                      />
-                    )}
-                  </motion.button>
+                    <motion.button
+                      key={cat}
+                      onClick={() => scrollToCategory(cat)}
+                      className={`category-item text-right transition-all duration-300 relative ${
+                        activeCategory === cat
+                          ? isBarClassic
+                            ? 'text-[#FAF8F3] font-medium'
+                            : 'text-white font-medium'
+                          : isBarClassic
+                            ? 'text-[#FAF8F3]/60 hover:text-[#FAF8F3]'
+                            : 'text-white/60 hover:text-white'
+                      }`}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      whileHover={{ x: -4 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <span>{displayCategory}</span>
+                      {activeCategory === cat && (
+                        <motion.div
+                          layoutId="activeTabDesktop"
+                          className={`absolute right-0 w-1 h-6 ${isBarClassic ? 'bg-[#D4AF37]' : 'bg-white'} rounded-full`}
+                          transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                        />
+                      )}
+                    </motion.button>
                   );
                 })}
-              </div>
+              </nav>
             </div>
           </aside>
         </div>

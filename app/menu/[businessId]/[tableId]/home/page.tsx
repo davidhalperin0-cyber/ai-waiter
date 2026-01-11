@@ -190,8 +190,14 @@ function HomePageContent({
           }
         }
 
+        // CRITICAL: Check cache version to detect if template was updated recently
+        // If cache version is newer than what we're seeing, prefer cached template
+        const currentCacheVersion = typeof window !== 'undefined' ? localStorage.getItem(cacheVersionKey) : null;
+        const cacheVersionNumber = currentCacheVersion ? parseInt(currentCacheVersion, 10) : 0;
+        const lastKnownVersionNumber = lastKnownVersion ? parseInt(lastKnownVersion, 10) : 0;
+        
         // CRITICAL: Always prioritize API template if it's different from cache
-        // This ensures template changes are immediately reflected
+        // BUT: If cache was updated more recently (newer version), prefer cache to bypass read replica lag
         let finalTemplate = (infoData.template || 'generic') as any;
         
         console.log('🔍 Template comparison:', {
@@ -199,10 +205,23 @@ function HomePageContent({
           apiTemplate: infoData.template,
           areDifferent: cachedTemplate !== infoData.template,
           cachedAge: cachedTemplateTimestamp > 0 ? Date.now() - cachedTemplateTimestamp : 0,
+          cacheVersion: cacheVersionNumber,
+          lastKnownVersion: lastKnownVersionNumber,
+          cacheIsNewer: cacheVersionNumber > lastKnownVersionNumber,
         });
         
-        // If API template is different from cached, always use API (template was updated)
-        if (cachedTemplate && cachedTemplate !== infoData.template && infoData.template) {
+        // If cache version is newer than what we knew about, template was just updated
+        // In this case, prefer cached template even if API doesn't match (read replica lag)
+        if (cachedTemplate && cacheVersionNumber > lastKnownVersionNumber && cachedTemplateTimestamp > Date.now() - 10 * 60 * 1000) {
+          console.log('🔄 Cache version is newer! Using cached template (bypassing read replica lag):', {
+            cachedTemplate,
+            apiTemplate: infoData.template,
+            cacheVersion: cacheVersionNumber,
+            lastKnownVersion: lastKnownVersionNumber,
+          });
+          finalTemplate = cachedTemplate as any;
+        } else if (cachedTemplate && cachedTemplate !== infoData.template && infoData.template) {
+          // Cache and API differ, and cache isn't newer - use API (template was updated on server)
           console.log('🔄 Template changed! Using API template (newer):', {
             cachedTemplate,
             apiTemplate: infoData.template,
@@ -302,6 +321,111 @@ function HomePageContent({
     if (businessId) {
       loadData();
     }
+  }, [businessId]);
+
+  // CRITICAL: Listen for template changes via localStorage storage events
+  // This allows the page to update immediately when template is changed in another tab
+  useEffect(() => {
+    if (typeof window === 'undefined' || !businessId) return;
+    
+    const templateKey = `business_${businessId}_template`;
+    const cacheVersionKey = `business_${businessId}_template_version`;
+    
+    const handleStorageChange = (e: StorageEvent) => {
+      // Check if template or version changed
+      if (e.key === templateKey || e.key === cacheVersionKey) {
+        console.log('🔄 Template storage changed, reloading data...', {
+          key: e.key,
+          newValue: e.newValue,
+        });
+        // Reload business info to get updated template
+        async function reloadData() {
+          try {
+            const lastKnownVersion = localStorage.getItem(cacheVersionKey);
+            const infoRes = await fetch(
+              `/api/menu/info?businessId=${encodeURIComponent(businessId)}&_t=${Date.now()}&_v=${lastKnownVersion || '0'}`,
+              { cache: 'no-store' }
+            );
+            const infoData = await infoRes.json();
+            
+            if (infoRes.ok) {
+              // Get updated cache
+              const cachedTemplateData = localStorage.getItem(templateKey);
+              let cachedTemplate: string | null = null;
+              let cachedTemplateTimestamp = 0;
+              
+              if (cachedTemplateData) {
+                try {
+                  const parsed = JSON.parse(cachedTemplateData);
+                  cachedTemplate = parsed.template;
+                  cachedTemplateTimestamp = parsed.timestamp || 0;
+                } catch (e) {
+                  console.warn('Failed to parse cached template:', e);
+                }
+              }
+              
+              const currentCacheVersion = localStorage.getItem(cacheVersionKey);
+              const cacheVersionNumber = currentCacheVersion ? parseInt(currentCacheVersion, 10) : 0;
+              const lastKnownVersionNumber = lastKnownVersion ? parseInt(lastKnownVersion, 10) : 0;
+              
+              // Use same logic as loadData to determine final template
+              let finalTemplate = (infoData.template || 'generic') as any;
+              
+              if (cachedTemplate && cacheVersionNumber > lastKnownVersionNumber && cachedTemplateTimestamp > Date.now() - 10 * 60 * 1000) {
+                finalTemplate = cachedTemplate as any;
+              } else if (cachedTemplate && cachedTemplate !== infoData.template && infoData.template) {
+                finalTemplate = infoData.template as any;
+              } else if (cachedTemplate === infoData.template && cachedTemplateTimestamp > Date.now() - 5 * 60 * 1000) {
+                finalTemplate = cachedTemplate as any;
+              }
+              
+              // Update state if template changed
+              setBusinessInfo((prev) => {
+                if (!prev || prev.template !== finalTemplate) {
+                  return {
+                    ...prev!,
+                    template: finalTemplate,
+                  };
+                }
+                return prev;
+              });
+            }
+          } catch (err) {
+            console.error('Error reloading template:', err);
+          }
+        }
+        
+        reloadData();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also listen for same-tab updates (when template is saved in same tab)
+    const checkVersionInterval = setInterval(() => {
+      const currentVersion = localStorage.getItem(cacheVersionKey);
+      const storedVersion = sessionStorage.getItem(`last_template_version_${businessId}`);
+      
+      if (currentVersion && currentVersion !== storedVersion) {
+        console.log('🔄 Template version changed in same tab, reloading...');
+        sessionStorage.setItem(`last_template_version_${businessId}`, currentVersion);
+        handleStorageChange({
+          key: cacheVersionKey,
+          newValue: currentVersion,
+        } as StorageEvent);
+      }
+    }, 1000); // Check every second
+    
+    // Initialize stored version
+    const currentVersion = localStorage.getItem(cacheVersionKey);
+    if (currentVersion) {
+      sessionStorage.setItem(`last_template_version_${businessId}`, currentVersion);
+    }
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(checkVersionInterval);
+    };
   }, [businessId]);
 
   useEffect(() => {
@@ -871,12 +995,16 @@ function HomePageContent({
             <div className="h-20 md:h-32" />
 
             {/* 3. PRIMARY ACTION: Menu Entry Button - Glass / Blur Premium */}
-            <div className="w-full">
+            <div className="w-full flex justify-center">
               <Link href={`/menu/${businessId}/${tableId}?from=home`} className="block">
                 <motion.button
-                  className="relative w-full aspect-[2/1] md:aspect-[16/9] min-w-[280px] max-w-[340px] mx-auto rounded-3xl font-medium text-xl md:text-2xl transition-all overflow-hidden shadow-2xl flex items-center justify-center group"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  className={`relative px-8 py-4 rounded-lg font-medium text-lg md:text-xl transition-all duration-300 overflow-hidden shadow-lg flex items-center justify-center group ${
+                    template === 'bar-classic'
+                      ? 'bg-white/10 backdrop-blur-md border border-white/20 hover:border-[#D4AF37]/40'
+                      : 'bg-white/10 backdrop-blur-md border border-white/20 hover:border-white/40'
+                  }`}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
@@ -889,27 +1017,68 @@ function HomePageContent({
                     }}
                   />
                   
-                  {/* Fallback for browsers without backdrop-filter support */}
-                  <div className="absolute inset-0 bg-white/92 opacity-0 group-hover:opacity-100 transition-opacity z-0" 
-                    style={{
-                      display: 'none',
-                    }}
-                  />
-                  
                   {/* Subtle Food Image Layer (if provided) */}
                   {businessInfo.customContent?.menuButtonImageUrl && (
                     <div 
-                      className="absolute inset-0 bg-cover bg-center opacity-40 mix-blend-overlay z-0 transition-transform duration-700 group-hover:scale-110"
+                      className="absolute inset-0 bg-cover bg-center opacity-20 mix-blend-overlay z-0 transition-transform duration-700 group-hover:scale-110 rounded-lg"
                       style={{
                         backgroundImage: `url(${businessInfo.customContent.menuButtonImageUrl})`,
                       }}
                     />
                   )}
                   
-                  {/* Text Overlay - Always Readable */}
-                  <span className="relative z-10 text-white tracking-wide font-semibold drop-shadow-lg">
+                  {/* Text Overlay - Always Readable with Pulse Glow Effect */}
+                  <motion.span 
+                    className={`relative z-10 tracking-wide font-semibold transition-colors duration-300 ${
+                      template === 'bar-classic' ? 'text-[#FAF8F3] group-hover:text-[#D4AF37]' : 'text-white group-hover:text-white'
+                    }`}
+                    animate={{
+                      opacity: [0.9, 1, 0.9],
+                      textShadow: template === 'bar-classic'
+                        ? [
+                            '0 0 10px rgba(212, 175, 55, 0.4)',
+                            '0 0 20px rgba(212, 175, 55, 0.6), 0 0 30px rgba(212, 175, 55, 0.4)',
+                            '0 0 10px rgba(212, 175, 55, 0.4)',
+                          ]
+                        : [
+                            '0 0 10px rgba(255, 255, 255, 0.3)',
+                            '0 0 20px rgba(255, 255, 255, 0.5), 0 0 30px rgba(255, 255, 255, 0.3)',
+                            '0 0 10px rgba(255, 255, 255, 0.3)',
+                          ],
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: 'easeInOut',
+                    }}
+                  >
                     {language === 'en' ? 'Enter Menu' : 'צפה בתפריט'}
-                  </span>
+                  </motion.span>
+                  
+                  {/* Pulse Glow Ring Effect */}
+                  <motion.div
+                    className={`absolute inset-0 rounded-lg border-2 ${template === 'bar-classic' ? 'border-[#D4AF37]/40' : 'border-white/30'}`}
+                    animate={{
+                      opacity: [0.3, 0.6, 0.3],
+                      scale: [1, 1.05, 1],
+                      boxShadow: template === 'bar-classic'
+                        ? [
+                            '0 0 20px rgba(212, 175, 55, 0.3)',
+                            '0 0 40px rgba(212, 175, 55, 0.5), 0 0 60px rgba(212, 175, 55, 0.3)',
+                            '0 0 20px rgba(212, 175, 55, 0.3)',
+                          ]
+                        : [
+                            '0 0 20px rgba(255, 255, 255, 0.2)',
+                            '0 0 40px rgba(255, 255, 255, 0.4), 0 0 60px rgba(255, 255, 255, 0.2)',
+                            '0 0 20px rgba(255, 255, 255, 0.2)',
+                          ],
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: 'easeInOut',
+                    }}
+                  />
                 </motion.button>
               </Link>
             </div>
@@ -925,7 +1094,11 @@ function HomePageContent({
                   {contact?.phone && (
                     <motion.a
                       href={`tel:${contact.phone}`}
-                      className="group relative"
+                      className={`p-3 rounded-full bg-transparent border transition-all duration-300 ${
+                        template === 'bar-classic'
+                          ? 'border-white/20 hover:border-[#D4AF37]/40'
+                          : 'border-white/20 hover:border-white/40'
+                      }`}
                       aria-label={language === 'en' ? 'Phone' : 'טלפון'}
                       initial={{ opacity: 0, y: 20, scale: 0.8 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -936,21 +1109,24 @@ function HomePageContent({
                         stiffness: 200,
                         damping: 15
                       }}
-                      whileHover={{ 
-                        scale: 1.15,
-                        y: -5,
-                        transition: { duration: 0.3 }
-                      }}
+                      whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      <div className="absolute inset-0 bg-green-500 rounded-full opacity-0 group-hover:opacity-20 blur-md transition-opacity duration-300" />
-                      <PhoneIcon className="relative w-6 h-6 text-white/40 group-hover:text-white transition-all duration-300 group-hover:drop-shadow-lg" />
+                      <PhoneIcon className={`w-6 h-6 transition-colors duration-300 ${
+                        template === 'bar-classic'
+                          ? 'text-[#FAF8F3]/60 hover:text-[#D4AF37]'
+                          : 'text-white/60 hover:text-white'
+                      }`} />
                     </motion.a>
                   )}
                   {contact?.email && (
                     <motion.a
                       href={`mailto:${contact.email}`}
-                      className="group relative"
+                      className={`p-3 rounded-full bg-transparent border transition-all duration-300 ${
+                        template === 'bar-classic'
+                          ? 'border-white/20 hover:border-[#D4AF37]/40'
+                          : 'border-white/20 hover:border-white/40'
+                      }`}
                       aria-label={language === 'en' ? 'Email' : 'אימייל'}
                       initial={{ opacity: 0, y: 20, scale: 0.8 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -961,23 +1137,26 @@ function HomePageContent({
                         stiffness: 200,
                         damping: 15
                       }}
-                      whileHover={{ 
-                        scale: 1.15,
-                        y: -5,
-                        transition: { duration: 0.3 }
-                      }}
+                      whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      <div className="absolute inset-0 bg-blue-400 rounded-full opacity-0 group-hover:opacity-20 blur-md transition-opacity duration-300" />
-                      <EmailIcon className="relative w-6 h-6 text-white/40 group-hover:text-white transition-all duration-300 group-hover:drop-shadow-lg" />
-</motion.a>
+                      <EmailIcon className={`w-6 h-6 transition-colors duration-300 ${
+                        template === 'bar-classic'
+                          ? 'text-[#FAF8F3]/60 hover:text-[#D4AF37]'
+                          : 'text-white/60 hover:text-white'
+                      }`} />
+                    </motion.a>
                   )}
                   {contact?.whatsapp && (
                     <motion.a
                       href={`https://wa.me/${contact.whatsapp.replace(/[^0-9]/g, '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group relative"
+                      className={`p-3 rounded-full bg-transparent border transition-all duration-300 ${
+                        template === 'bar-classic'
+                          ? 'border-white/20 hover:border-[#D4AF37]/40'
+                          : 'border-white/20 hover:border-white/40'
+                      }`}
                       aria-label="WhatsApp"
                       initial={{ opacity: 0, y: 20, scale: 0.8 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -988,15 +1167,14 @@ function HomePageContent({
                         stiffness: 200,
                         damping: 15
                       }}
-                      whileHover={{ 
-                        scale: 1.15,
-                        y: -5,
-                        transition: { duration: 0.3 }
-                      }}
+                      whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      <div className="absolute inset-0 bg-green-400 rounded-full opacity-0 group-hover:opacity-20 blur-md transition-opacity duration-300" />
-                      <WhatsAppIcon className="relative w-6 h-6 text-white/40 group-hover:text-white transition-all duration-300 group-hover:drop-shadow-lg" />
+                      <WhatsAppIcon className={`w-6 h-6 transition-colors duration-300 ${
+                        template === 'bar-classic'
+                          ? 'text-[#FAF8F3]/60 hover:text-[#D4AF37]'
+                          : 'text-white/60 hover:text-white'
+                      }`} />
                     </motion.a>
                   )}
                   {instagramUrl && (
@@ -1004,7 +1182,11 @@ function HomePageContent({
                       href={instagramUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group relative"
+                      className={`p-3 rounded-full bg-transparent border transition-all duration-300 ${
+                        template === 'bar-classic'
+                          ? 'border-white/20 hover:border-[#D4AF37]/40'
+                          : 'border-white/20 hover:border-white/40'
+                      }`}
                       aria-label="Instagram"
                       initial={{ opacity: 0, y: 20, scale: 0.8 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1015,16 +1197,14 @@ function HomePageContent({
                         stiffness: 200,
                         damping: 15
                       }}
-                      whileHover={{ 
-                        scale: 1.15,
-                        y: -5,
-                        rotate: [0, -5, 5, -5, 0],
-                        transition: { duration: 0.3 }
-                      }}
+                      whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      <div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 rounded-full opacity-0 group-hover:opacity-20 blur-md transition-opacity duration-300" />
-                      <InstagramIcon className="relative w-6 h-6 text-white/40 group-hover:text-white transition-all duration-300 group-hover:drop-shadow-lg" />
+                      <InstagramIcon className={`w-6 h-6 transition-colors duration-300 ${
+                        template === 'bar-classic'
+                          ? 'text-[#FAF8F3]/60 hover:text-[#D4AF37]'
+                          : 'text-white/60 hover:text-white'
+                      }`} />
                     </motion.a>
                   )}
                   {facebookUrl && (
@@ -1032,7 +1212,11 @@ function HomePageContent({
                       href={facebookUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group relative"
+                      className={`p-3 rounded-full bg-transparent border transition-all duration-300 ${
+                        template === 'bar-classic'
+                          ? 'border-white/20 hover:border-[#D4AF37]/40'
+                          : 'border-white/20 hover:border-white/40'
+                      }`}
                       aria-label="Facebook"
                       initial={{ opacity: 0, y: 20, scale: 0.8 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1043,16 +1227,14 @@ function HomePageContent({
                         stiffness: 200,
                         damping: 15
                       }}
-                      whileHover={{ 
-                        scale: 1.15,
-                        y: -5,
-                        rotate: [0, 5, -5, 5, 0],
-                        transition: { duration: 0.3 }
-                      }}
+                      whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      <div className="absolute inset-0 bg-blue-500 rounded-full opacity-0 group-hover:opacity-20 blur-md transition-opacity duration-300" />
-                      <FacebookIcon className="relative w-6 h-6 text-white/40 group-hover:text-white transition-all duration-300 group-hover:drop-shadow-lg" />
+                      <FacebookIcon className={`w-6 h-6 transition-colors duration-300 ${
+                        template === 'bar-classic'
+                          ? 'text-[#FAF8F3]/60 hover:text-[#D4AF37]'
+                          : 'text-white/60 hover:text-white'
+                      }`} />
                     </motion.a>
                   )}
                 </div>
