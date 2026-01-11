@@ -3144,6 +3144,10 @@ export default function DashboardPage() {
                     });
                   }
                   
+                  // CRITICAL: Reload business info from server after save (like we do for menu items and tables)
+                  // This ensures the phone gets the latest data immediately, bypassing read replica lag
+                  await loadBusinessInfo();
+                  
                   toast.success('פרטי העסק עודכנו בהצלחה!');
                 } catch (err: any) {
                   const message = err.message || 'נכשל בעדכון פרטי העסק';
