@@ -7,26 +7,34 @@ function getSupabaseAdmin(): SupabaseClient {
     return supabaseAdminInstance;
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
   // Debug: log what we have (without exposing the full keys)
   if (typeof window === 'undefined') {
-    // Server-side only
-    console.log('Supabase URL:', supabaseUrl ? 'SET' : 'NOT SET');
-    console.log('Service Role Key:', serviceRoleKey ? `SET (${serviceRoleKey.substring(0, 20)}...)` : 'NOT SET');
+    console.log('Supabase URL:', supabaseUrl ? `${supabaseUrl.slice(0, 30)}...` : 'NOT SET');
+    console.log('Service Role Key:', serviceRoleKey ? 'SET' : 'NOT SET');
   }
 
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error(
-      `Supabase admin env vars are not set. URL: ${supabaseUrl ? 'SET' : 'NOT SET'}, Key: ${serviceRoleKey ? 'SET' : 'NOT SET'}`,
-    );
+  const isPlaceholder = !supabaseUrl || !serviceRoleKey ||
+    supabaseUrl.includes('placeholder') || serviceRoleKey.includes('placeholder') ||
+    supabaseUrl.includes('your_') || serviceRoleKey.includes('your_');
+  
+  if (isPlaceholder) {
+    console.warn('⚠️ Supabase admin env vars are not set or are placeholders.');
+    supabaseAdminInstance = createClient('https://placeholder.supabase.co', 'placeholder_key', {
+      auth: { persistSession: false },
+    });
+    return supabaseAdminInstance;
   }
+
+  // Custom fetch with no-store avoids Vercel serverless "fetch failed" in some environments
+  const customFetch: typeof fetch = (input, init) =>
+    fetch(input, { ...init, cache: 'no-store' });
 
   supabaseAdminInstance = createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      persistSession: false,
-    },
+    auth: { persistSession: false },
+    global: { fetch: customFetch },
   });
 
   return supabaseAdminInstance;

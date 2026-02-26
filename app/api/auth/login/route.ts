@@ -3,23 +3,31 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import bcrypt from 'bcryptjs';
 import { signAuthToken } from '@/lib/auth';
 
+function isPlaceholder(value: string | undefined): boolean {
+  if (!value || value.length < 3) return true;
+  const lower = value.toLowerCase();
+  return lower.includes('your_') || lower === 'placeholder' || lower.startsWith('placeholder');
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Check environment variables
-    if (!process.env.JWT_SECRET) {
-      console.error('JWT_SECRET is not set');
+    if (!process.env.JWT_SECRET || isPlaceholder(process.env.JWT_SECRET)) {
+      console.error('JWT_SECRET is not set or is placeholder');
       return NextResponse.json({ 
-        message: 'Server configuration error',
+        message: 'Server configuration error. Set JWT_SECRET in .env.local (use a long random string).',
         details: process.env.NODE_ENV === 'development' ? 'JWT_SECRET is not set' : undefined
-      }, { status: 500 });
+      }, { status: 503 });
     }
 
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.error('Supabase environment variables are not set');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceKey || isPlaceholder(supabaseUrl) || isPlaceholder(serviceKey)) {
+      console.error('Supabase environment variables are not set or are placeholders');
       return NextResponse.json({ 
-        message: 'Server configuration error',
+        message: 'Server configuration error. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local (from Supabase Dashboard → Project Settings → API).',
         details: process.env.NODE_ENV === 'development' ? 'Supabase env vars not set' : undefined
-      }, { status: 500 });
+      }, { status: 503 });
     }
 
     const body = await req.json();
@@ -37,7 +45,28 @@ export async function POST(req: NextRequest) {
 
     if (fetchError) {
       console.error('Error fetching business', fetchError);
-      return NextResponse.json({ message: 'Database error' }, { status: 500 });
+      const isFetchFailed = String(fetchError.message || '').toLowerCase().includes('fetch failed');
+      const msg =
+        process.env.NODE_ENV === 'development'
+          ? `Database error: ${fetchError.message}`
+          : isFetchFailed
+            ? 'Cannot reach database. Check Vercel env: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (no spaces, correct project URL).'
+            : 'Database error';
+      return NextResponse.json(
+        {
+          message: msg,
+          details:
+            process.env.NODE_ENV === 'development' || isFetchFailed
+              ? {
+                  supabaseError: fetchError.message,
+                  hint: isFetchFailed
+                    ? 'On Vercel: Settings → Environment Variables → set NEXT_PUBLIC_SUPABASE_URL (e.g. https://xxx.supabase.co) and SUPABASE_SERVICE_ROLE_KEY for Production, then Redeploy.'
+                    : 'Ensure table "businesses" exists (run COMPLETE_DATABASE_SCHEMA.sql) and SUPABASE_SERVICE_ROLE_KEY is the service_role key.',
+                }
+              : undefined,
+        },
+        { status: 500 }
+      );
     }
 
     if (!business) {

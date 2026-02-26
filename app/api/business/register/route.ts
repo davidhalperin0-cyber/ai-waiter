@@ -1,21 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Business } from '@/lib/types';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { signAuthToken } from '@/lib/auth';
+
+function isPlaceholder(value: string | undefined): boolean {
+  if (!value || value.length < 3) return true;
+  const lower = value.toLowerCase();
+  return lower.includes('your_') || lower === 'placeholder' || lower.startsWith('placeholder');
+}
 
 export async function POST(req: NextRequest) {
   try {
-    // Check if Supabase is configured
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.error('Supabase env vars missing:', {
-        url: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        key: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      });
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceKey || isPlaceholder(supabaseUrl) || isPlaceholder(serviceKey)) {
       return NextResponse.json(
-        { message: 'Server configuration error: Supabase not configured' },
-        { status: 500 },
+        {
+          message:
+            'Server configuration error. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local (from Supabase → Project Settings → API).',
+        },
+        { status: 503 },
       );
     }
 
@@ -34,7 +38,22 @@ export async function POST(req: NextRequest) {
 
     if (existingError) {
       console.error('Error checking existing business', existingError);
-      return NextResponse.json({ message: 'Database error' }, { status: 500 });
+      const isFetchFailed = String(existingError.message || '').toLowerCase().includes('fetch failed');
+      const hint = isFetchFailed
+        ? 'Cannot reach Supabase. Check: 1) Supabase project not paused (Dashboard → Restore). 2) Vercel env NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are correct, then Redeploy.'
+        : 'Run COMPLETE_DATABASE_SCHEMA.sql in Supabase SQL Editor to create the businesses table.';
+      return NextResponse.json(
+        {
+          message:
+            process.env.NODE_ENV === 'development'
+              ? `Database error: ${existingError.message}`
+              : isFetchFailed
+                ? 'Cannot reach database. See hint in details.'
+                : 'Database error',
+          details: process.env.NODE_ENV === 'development' || isFetchFailed ? { supabaseError: existingError.message, hint } : undefined,
+        },
+        { status: 500 },
+      );
     }
 
     if (existing) {
@@ -66,9 +85,20 @@ export async function POST(req: NextRequest) {
 
     if (insertError) {
       console.error('❌ Error inserting business', insertError);
-      console.error('Business data attempted:', JSON.stringify(business, null, 2));
+      const isFetchFailed = String(insertError.message || '').toLowerCase().includes('fetch failed');
+      const hint = isFetchFailed
+        ? 'Cannot reach Supabase. Check: 1) Supabase project not paused (Dashboard → Restore). 2) Vercel env vars correct, then Redeploy.'
+        : 'Check that businesses table has all required columns (see COMPLETE_DATABASE_SCHEMA.sql).';
       return NextResponse.json(
-        { message: 'Database error', error: insertError.message },
+        {
+          message:
+            process.env.NODE_ENV === 'development'
+              ? `Database error: ${insertError.message}`
+              : isFetchFailed
+                ? 'Cannot reach database. See hint in details.'
+                : 'Database error',
+          details: process.env.NODE_ENV === 'development' || isFetchFailed ? { supabaseError: insertError.message, hint } : undefined,
+        },
         { status: 500 },
       );
     }
